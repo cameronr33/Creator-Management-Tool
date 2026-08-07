@@ -1,0 +1,10 @@
+# Two services deploy from this repo:
+#   web    — the Next.js app (this config's start command)
+#   cron   — the scheduled loop worker (override startCommand to: npx tsx scripts/cron-worker.ts)
+[build]
+  builder = "nixpacks"
+
+[deploy]
+  startCommand = "npm run start"
+  restartPolicyType = "on_failure"
+  restartPolicyMaxRetries = 3
