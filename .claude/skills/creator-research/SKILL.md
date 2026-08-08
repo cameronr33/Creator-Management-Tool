@@ -227,6 +227,49 @@ Create the API key once in the app under **Settings → API keys** (the raw key 
 
 ---
 
+## Queue mode — running this skill for the "Full Analysis" button
+
+The app has a **Full Analysis** button on each creator's page. Clicking it runs an *instant* Apify-only pass on the server immediately (labelled `est.` throughout the UI — it is provisional for exactly the reasons in the Guardrails section below), and queues a request for the *accurate* pass: a full run of this skill, including the Chrome grid scrape and vision-based reel descriptions, which only your machine can do.
+
+Run this while you're at your machine, either as a one-off check or as a recurring `/loop`:
+
+```bash
+/loop 30m check the Creator Manager research queue and process pending requests with the creator-research skill
+```
+
+Each pass through the queue:
+
+1. **List open requests:**
+   ```bash
+   python scripts/queue_client.py --list
+   ```
+   Prints one tab-separated line per queued request: `requestId  clientSlug  campaignName  @username  name  contentPillar`. Empty output means nothing to do — stop here.
+
+2. **For each request, claim it** so a concurrent run (or a stale retry) doesn't duplicate the work:
+   ```bash
+   python scripts/queue_client.py --claim <requestId>
+   ```
+
+3. **Run the normal 11-step pipeline** (Steps 1–11 above) for just that one handle, under the campaign and content pillar named in the queue row. Confirm the campaign and content pillar with the user only if the queue row leaves either blank — otherwise proceed without asking, since the request already encodes the user's intent from clicking the button.
+
+4. **Push the result** exactly as in Step 12:
+   ```bash
+   python scripts/push_to_creator_manager.py --csv "<path>" --client <clientSlug> --campaign "<campaignName>"
+   ```
+   This is what actually overwrites the provisional `est.` data with the accurate Chrome-scraped numbers and vision-based descriptions — the ingest endpoint's upsert-without-clobbering-pipeline-state behavior (Step 12) applies here unchanged.
+
+5. **Report the outcome:**
+   ```bash
+   python scripts/queue_client.py --complete <requestId>
+   # or, on failure:
+   python scripts/queue_client.py --fail <requestId> --error "short reason"
+   ```
+   A `--fail`ed request is not retried automatically — leave it for the user to notice the "Analysis failed" chip and click Retry, which re-queues it.
+
+Skip a request rather than guessing if the handle can't be resolved, the account is private, or the pipeline hits a guardrail below with no safe fallback — `--fail` it with a clear reason instead of pushing partial or wrong data.
+
+---
+
 ## Guardrails and gotchas
 
 1. **Apify videoPlayCount ≠ Instagram public Views.** THE #1 mistake. Always run the Chrome grid scrape in Step 5.

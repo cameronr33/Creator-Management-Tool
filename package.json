@@ -20,9 +20,11 @@
     "backfill:socials": "tsx --env-file=.env.local scripts/backfill-socials.ts",
     "verify:import": "tsx scripts/verify-import.ts",
     "verify:add-creator": "tsx --env-file=.env.local scripts/verify-add-creator.ts",
+    "verify:quick-analysis": "tsx --env-file=.env.local scripts/verify-quick-analysis.ts",
     "cron": "tsx scripts/cron-worker.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
     "@neondatabase/serverless": "^1.1.0",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.4.0",

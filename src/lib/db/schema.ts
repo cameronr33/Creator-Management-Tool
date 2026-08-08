@@ -194,6 +194,20 @@ export const cmResearchStatusEnum = pgEnum("cm_research_status", [
   "failed",
 ]);
 
+/**
+ * Lifecycle of a "Full Analysis" request. `completed`/`quickPassAt` on
+ * cm_research_requests distinguishes the instant Apify-only pass from this
+ * status, which tracks the ACCURATE pass a local machine must run — see the
+ * cm_research_requests comment below.
+ */
+export const cmResearchRequestStatusEnum = pgEnum("cm_research_request_status", [
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
 // ─────────────────────────────────────────────────────────────────
 // cm_campaigns
 // ─────────────────────────────────────────────────────────────────
@@ -549,6 +563,49 @@ export const cmResearchRuns = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────
+// cm_research_requests — "Full Analysis" button state.
+//
+// Two passes write into this one row: the instant server-side Apify pass
+// (quickPassAt) fills in provisional data with viewsSource="apify" the
+// moment the button is clicked; `status` tracks the slower ACCURATE pass — a
+// local machine's Chrome-grid scrape + vision descriptions — which a runner
+// polling GET /api/research-requests picks up, sets `running`, then
+// `completed`/`failed` once it has pushed real data via /api/ingest/research
+// (linked back here as researchRunId).
+// ─────────────────────────────────────────────────────────────────
+
+export const cmResearchRequests = pgTable(
+  "cm_research_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    creatorId: uuid("creator_id")
+      .notNull()
+      .references(() => cmCreators.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => cmCampaigns.id, { onDelete: "cascade" }),
+    status: cmResearchRequestStatusEnum("status").default("queued").notNull(),
+    requestedBy: uuid("requested_by").references(() => users.id),
+    requestedAt: timestamp("requested_at").defaultNow().notNull(),
+    /** Stamped when the instant Apify-only pass finishes (usually seconds after requestedAt). */
+    quickPassAt: timestamp("quick_pass_at"),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    error: text("error"),
+    researchRunId: uuid("research_run_id").references(() => cmResearchRuns.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => [
+    index("cm_research_requests_status_idx").on(t.status),
+    index("cm_research_requests_creator_idx").on(t.creatorId),
+  ],
+);
+
+// ─────────────────────────────────────────────────────────────────
 // cm_api_keys — lets the creator-research skill push results in
 // ─────────────────────────────────────────────────────────────────
 
@@ -600,5 +657,7 @@ export type CmDeliverable = typeof cmDeliverables.$inferSelect;
 export type CmAlert = typeof cmAlerts.$inferSelect;
 export type CmMessageTemplate = typeof cmMessageTemplates.$inferSelect;
 export type CmResearchRun = typeof cmResearchRuns.$inferSelect;
+export type CmResearchRequest = typeof cmResearchRequests.$inferSelect;
+export type CmResearchRequestStatus = (typeof cmResearchRequestStatusEnum.enumValues)[number];
 export type CmStage = (typeof cmStageEnum.enumValues)[number];
 export type CmAlertType = (typeof cmAlertTypeEnum.enumValues)[number];

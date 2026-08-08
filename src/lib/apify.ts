@@ -20,6 +20,18 @@ export interface ApifyProfile {
   verified: boolean;
 }
 
+/** Same shape as the KEEP_FIELDS in .claude/skills/creator-research/scripts/aggregate_metrics.py */
+export interface ApifyReel {
+  shortCode: string | null;
+  timestamp: string | null;
+  videoPlayCount: number | null;
+  likesCount: number | null;
+  commentsCount: number | null;
+  videoDuration: number | null;
+  caption: string | null;
+  ownerUsername: string | null;
+}
+
 function token(): string {
   const t = process.env.APIFY_TOKEN;
   if (!t) throw new Error("APIFY_TOKEN is not set");
@@ -61,4 +73,47 @@ export async function fetchProfiles(usernames: string[]): Promise<ApifyProfile[]
     businessEmail: (it.businessEmail as string) ?? (it.publicEmail as string) ?? null,
     verified: Boolean(it.verified),
   }));
+}
+
+/**
+ * Run the instagram-scraper actor in "posts" mode for one profile and return
+ * up to `limit` reels. This is the SAME provisional data source as Step 1 of
+ * the creator-research skill, and carries the same caveat: `videoPlayCount`
+ * is NOT Instagram's public "Views" number (see the file header). Used for
+ * the instant "Full Analysis" server pass — src/lib/quick-analysis.ts labels
+ * everything derived from this as `viewsSource: "apify"` / provisional.
+ */
+export async function fetchReels(username: string, limit = 30): Promise<ApifyReel[]> {
+  const res = await fetch(
+    `${APIFY_BASE}/acts/${INSTAGRAM_SCRAPER}/run-sync-get-dataset-items?token=${token()}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        directUrls: [`https://www.instagram.com/${username}/`],
+        resultsType: "posts",
+        resultsLimit: limit,
+        addParentData: false,
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Apify run failed (HTTP ${res.status}): ${text.slice(0, 300)}`);
+  }
+
+  const items = (await res.json()) as Record<string, unknown>[];
+  return items
+    .filter((it) => typeof it.shortCode === "string")
+    .map((it) => ({
+      shortCode: (it.shortCode as string) ?? null,
+      timestamp: (it.timestamp as string) ?? null,
+      videoPlayCount: typeof it.videoPlayCount === "number" ? it.videoPlayCount : null,
+      likesCount: typeof it.likesCount === "number" ? it.likesCount : null,
+      commentsCount: typeof it.commentsCount === "number" ? it.commentsCount : null,
+      videoDuration: typeof it.videoDuration === "number" ? it.videoDuration : null,
+      caption: (it.caption as string) ?? null,
+      ownerUsername: (it.ownerUsername as string) ?? username,
+    }));
 }

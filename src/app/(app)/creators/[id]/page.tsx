@@ -27,6 +27,8 @@ import {
   AddressEditor,
   ProductEditor,
 } from "@/components/profile-editors";
+import { FullAnalysisButton } from "@/components/full-analysis-button";
+import { getLatestRequestForPartnership } from "@/lib/research-requests";
 import { compactNumber, fullNumber, money, shortDate, relativeDays } from "@/lib/format";
 import { renderTemplate, firstName } from "@/lib/outreach";
 import { formatAddress } from "@/lib/address";
@@ -38,7 +40,10 @@ export default async function CreatorDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const detail = await getPartnershipDetail(id);
+  const [detail, latestRequest] = await Promise.all([
+    getPartnershipDetail(id),
+    getLatestRequestForPartnership(id),
+  ]);
   if (!detail) notFound();
 
   const { creator, partnership, campaign, reels, socials, events, products, shipments, deliverables, outreach, otherPartnerships } = detail;
@@ -121,7 +126,10 @@ export default async function CreatorDetailPage({
         {/* Left: research */}
         <div className="space-y-6 lg:col-span-2">
           <Card className="p-4">
-            <SectionTitle>Research</SectionTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <SectionTitle>Research</SectionTitle>
+              <FullAnalysisButton partnershipId={partnership.id} initialRequest={latestRequest} />
+            </div>
             <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
               {metrics.map((m) => (
                 <div key={m.label}>

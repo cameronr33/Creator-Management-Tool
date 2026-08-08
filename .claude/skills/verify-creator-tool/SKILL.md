@@ -69,6 +69,26 @@ If creators exist without any link row (e.g. imported before
 `cm_creator_socials` existed), run `npm run backfill:socials` — it derives a
 primary link from `profileUrl` and is idempotent.
 
+## 3c. Full Analysis / two-pass research (pure math + live DB, self-cleaning)
+
+```bash
+npm run verify:quick-analysis
+```
+
+Asserts `aggregateReels` (the pure port of `aggregate_metrics.py`'s Step 2
+math) against known fixtures — avg/median/max, date range, cadence, top-3
+ordering capped at 3, and the 0-reel/1-reel edge cases — then, against the
+real database with full cleanup, the `cm_research_requests` lifecycle: a
+request appears in `listQueuedRequests()` while `status: "queued"`, drops out
+once claimed to `"running"`, and `getLatestRequestForPartnership` tracks
+`quickPassAt` and `status` correctly through to `"completed"`.
+
+This does **not** call Apify or the Claude API — it verifies the plumbing
+around those calls, not the calls themselves. To check the live integration,
+mint a temporary API key and exercise `.claude/skills/creator-research/scripts/queue_client.py --list / --claim / --complete / --fail` against the running
+dev server, then revoke the key and delete the test rows — the same pattern
+used to validate this feature originally, no test data or keys left behind.
+
 ## 4. Live route smoke-test
 
 Start the dev server (`npm run dev`, port 3002) and confirm every route responds. With a valid session cookie each should return 200; unauthenticated, the app routes must 307 to `/login` (that redirect is itself proof the auth guard works):

@@ -41,3 +41,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python (creator-research skill scripts)
+__pycache__/
+*.pyc

@@ -15,6 +15,13 @@
       "when": 1784836944141,
       "tag": "0001_add_creator_socials",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786152826536,
+      "tag": "0002_add_research_requests",
+      "breakpoints": true
     }
   ]
 }
