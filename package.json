@@ -20,10 +20,12 @@
     "backfill:socials": "tsx --env-file=.env.local scripts/backfill-socials.ts",
     "verify:import": "tsx scripts/verify-import.ts",
     "verify:add-creator": "tsx --env-file=.env.local scripts/verify-add-creator.ts",
-    "cron": "tsx scripts/cron-worker.ts"
+    "cron": "tsx scripts/cron-worker.ts",
+    "db:seed-demo": "tsx --env-file=.env.local scripts/seed-demo.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@types/pg": "^8.23.1",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
@@ -31,6 +33,7 @@
     "next": "16.2.11",
     "next-auth": "^5.0.0-beta.32",
     "node-cron": "^4.6.0",
+    "pg": "^8.23.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zod": "^4.4.3"
