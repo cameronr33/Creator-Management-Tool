@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, X, Star, Sparkles, Loader2, ExternalLink, Trash2 } from "lucide-react";
 import { PLATFORM_LABELS, type SocialPlatform } from "@/lib/social-links";
+import { parseAddress } from "@/lib/address";
 import type { CmCreator, CmCreatorSocial, CmPartnership, CmProductRequested } from "@/lib/db/schema";
 
 async function send(url: string, body: unknown, method = "POST") {
@@ -228,6 +229,9 @@ export function SocialsEditor({
 export function AddressEditor({ partnership }: { partnership: CmPartnership }) {
   const { pending, run } = useAction();
   const [open, setOpen] = useState(false);
+  const [paste, setPaste] = useState("");
+  const [parseIssues, setParseIssues] = useState<string[]>([]);
+  const [raw, setRaw] = useState(partnership.addressRaw ?? "");
   const [f, setF] = useState({
     recipientName: partnership.recipientName ?? "",
     addressLine1: partnership.addressLine1 ?? "",
@@ -239,11 +243,35 @@ export function AddressEditor({ partnership }: { partnership: CmPartnership }) {
   });
   const set = (k: keyof typeof f, v: string) => setF((prev) => ({ ...prev, [k]: v }));
 
+  // The DM almost always contains the address as one line — parse it instead
+  // of retyping six fields. Anything ambiguous is surfaced, never guessed.
+  const parsePasted = () => {
+    const parsed = parseAddress(paste);
+    if (!parsed) {
+      setParseIssues(["Could not parse — fill the fields in manually."]);
+      return;
+    }
+    setF({
+      recipientName: parsed.recipientName ?? "",
+      addressLine1: parsed.addressLine1 ?? "",
+      addressLine2: parsed.addressLine2 ?? "",
+      city: parsed.city ?? "",
+      region: parsed.region ?? "",
+      postalCode: parsed.postalCode ?? "",
+      country: parsed.country || "US",
+    });
+    setRaw(parsed.raw);
+    setParseIssues(parsed.issues);
+  };
+
   const save = async () => {
     const r = await run(() =>
       send(
         `/api/partnerships/${partnership.id}`,
-        Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v || null])),
+        {
+          ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v || null])),
+          addressRaw: raw || null,
+        },
         "PATCH",
       ),
     );
@@ -263,13 +291,36 @@ export function AddressEditor({ partnership }: { partnership: CmPartnership }) {
 
   return (
     <div className="mt-2 space-y-2 rounded-lg border border-border bg-surface-2 p-3">
+      <div className="flex gap-2">
+        <input
+          value={paste}
+          onChange={(e) => setPaste(e.target.value)}
+          placeholder='Paste the whole address from the DM — "Joe, 123 Main St, Austin, TX, 78701"'
+          className={input}
+        />
+        <button
+          onClick={parsePasted}
+          disabled={!paste.trim()}
+          className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-sm text-text-muted transition hover:bg-surface disabled:opacity-50"
+        >
+          Parse
+        </button>
+      </div>
+      {parseIssues.length > 0 && (
+        <ul className="space-y-0.5 text-xs text-amber-700">
+          {parseIssues.map((iss) => (
+            <li key={iss}>⚠ {iss}</li>
+          ))}
+        </ul>
+      )}
       <input value={f.recipientName} onChange={(e) => set("recipientName", e.target.value)} placeholder="Recipient name" className={input} />
       <input value={f.addressLine1} onChange={(e) => set("addressLine1", e.target.value)} placeholder="Street address" className={input} />
       <input value={f.addressLine2} onChange={(e) => set("addressLine2", e.target.value)} placeholder="Apt, suite (optional)" className={input} />
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         <input value={f.city} onChange={(e) => set("city", e.target.value)} placeholder="City" className={input} />
         <input value={f.region} onChange={(e) => set("region", e.target.value)} placeholder="State" className={input} />
         <input value={f.postalCode} onChange={(e) => set("postalCode", e.target.value)} placeholder="ZIP" className={input} />
+        <input value={f.country} onChange={(e) => set("country", e.target.value)} placeholder="Country" className={input} />
       </div>
       <div className="flex gap-2">
         <button

@@ -67,6 +67,7 @@ export interface CreatorRow {
   campaignId: string;
   campaignName: string;
   feeAmount: string | null;
+  outreachReason: string | null;
   lastOutboundAt: Date | null;
   repliedAt: Date | null;
   followUpCount: number;
@@ -99,6 +100,7 @@ export async function getCreatorRows(
       campaignId: cmPartnerships.campaignId,
       campaignName: cmCampaigns.name,
       feeAmount: cmPartnerships.feeAmount,
+      outreachReason: cmPartnerships.outreachReason,
     })
     .from(cmPartnerships)
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
@@ -208,13 +210,31 @@ export async function getPartnershipDetail(partnershipId: string) {
   };
 }
 
-export async function getDefaultTemplate(clientId: string) {
+export async function getDefaultTemplate(clientId: string, channel: "ig_dm" | "email" = "ig_dm") {
   const [tpl] = await db
     .select()
     .from(cmMessageTemplates)
-    .where(and(eq(cmMessageTemplates.clientId, clientId), eq(cmMessageTemplates.isDefault, true)))
+    .where(
+      and(
+        eq(cmMessageTemplates.clientId, clientId),
+        eq(cmMessageTemplates.isDefault, true),
+        eq(cmMessageTemplates.channel, channel),
+      ),
+    )
     .limit(1);
   return tpl ?? null;
+}
+
+/** Both channel defaults in one query — the worklist renders either. */
+export async function getDefaultTemplates(clientId: string) {
+  const rows = await db
+    .select()
+    .from(cmMessageTemplates)
+    .where(and(eq(cmMessageTemplates.clientId, clientId), eq(cmMessageTemplates.isDefault, true)));
+  return {
+    ig_dm: rows.find((r) => r.channel === "ig_dm") ?? null,
+    email: rows.find((r) => r.channel === "email") ?? null,
+  };
 }
 
 export async function getResearchRuns(clientId: string, limit = 15) {

@@ -5,6 +5,7 @@ import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { getStageCounts } from "@/lib/queries";
 import { getDashboardStalls, type StallItem } from "@/lib/dashboard";
 import { PageHeader, Card, StatTile, EmptyState, Avatar } from "@/components/ui";
+import { QueueItemAction, type QueueKind } from "@/components/queue-actions";
 import { STAGES, ACTIVE_STAGES, stageLabel } from "@/lib/stages";
 
 export default async function DashboardPage() {
@@ -46,6 +47,8 @@ export default async function DashboardPage() {
             items={stalls.followUpsDue}
             tone="warn"
             emptyLabel="Nobody's overdue"
+            queue="follow_ups"
+            moreHref="/outreach"
           />
           <StallQueue
             title="Awaiting address"
@@ -53,6 +56,8 @@ export default async function DashboardPage() {
             items={stalls.awaitingAddress}
             tone="warn"
             emptyLabel="All agreed deals have addresses"
+            queue="awaiting_address"
+            moreHref="/creators?stage=awaiting_address"
           />
           <StallQueue
             title="Ready to ship"
@@ -60,6 +65,8 @@ export default async function DashboardPage() {
             items={stalls.readyToShip}
             tone="accent"
             emptyLabel="Nothing waiting to ship"
+            queue="ready_to_ship"
+            moreHref="/creators?stage=fulfilling"
           />
           <StallQueue
             title="Delivered, no video"
@@ -67,6 +74,8 @@ export default async function DashboardPage() {
             items={stalls.deliveredNoVideo}
             tone="accent"
             emptyLabel="No pending videos"
+            queue="delivered_no_video"
+            moreHref="/creators?stage=content_pending"
           />
         </div>
 
@@ -97,12 +106,16 @@ function StallQueue({
   items,
   tone,
   emptyLabel,
+  queue,
+  moreHref,
 }: {
   title: string;
   icon: React.ReactNode;
   items: StallItem[];
   tone: "warn" | "accent";
   emptyLabel: string;
+  queue: QueueKind;
+  moreHref: string;
 }) {
   const ring = tone === "warn" ? "ring-amber-200" : "ring-indigo-200";
   return (
@@ -121,10 +134,10 @@ function StallQueue({
       ) : (
         <ul className="max-h-72 divide-y divide-border overflow-y-auto">
           {items.slice(0, 12).map((it) => (
-            <li key={it.partnershipId}>
+            <li key={it.partnershipId} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
               <Link
                 href={`/creators/${it.partnershipId}`}
-                className="flex items-center gap-2.5 px-4 py-2.5 transition hover:bg-surface-2"
+                className="flex min-w-0 flex-1 items-center gap-2.5 transition hover:opacity-80"
               >
                 <Avatar name={it.name} />
                 <div className="min-w-0 flex-1">
@@ -132,11 +145,17 @@ function StallQueue({
                   <div className="truncate text-xs text-text-muted">{it.detail}</div>
                 </div>
               </Link>
+              <QueueItemAction queue={queue} item={it} />
             </li>
           ))}
           {items.length > 12 && (
-            <li className="px-4 py-2 text-center text-xs text-text-faint">
-              +{items.length - 12} more
+            <li>
+              <Link
+                href={moreHref}
+                className="block px-4 py-2 text-center text-xs text-accent transition hover:bg-surface-2"
+              >
+                +{items.length - 12} more →
+              </Link>
             </li>
           )}
         </ul>

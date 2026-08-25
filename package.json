@@ -21,6 +21,10 @@
     "verify:import": "tsx scripts/verify-import.ts",
     "verify:add-creator": "tsx --env-file=.env.local scripts/verify-add-creator.ts",
     "verify:quick-analysis": "tsx --env-file=.env.local scripts/verify-quick-analysis.ts",
+    "verify:auto-stage": "tsx --env-file=.env.local scripts/verify-auto-stage.ts",
+    "verify:outreach-flow": "tsx --env-file=.env.local scripts/verify-outreach-flow.ts",
+    "verify:editors": "tsx --env-file=.env.local scripts/verify-editors.ts",
+    "verify:email-ingest": "tsx --env-file=.env.local scripts/verify-email-ingest.ts",
     "cron": "tsx scripts/cron-worker.ts"
   },
   "dependencies": {

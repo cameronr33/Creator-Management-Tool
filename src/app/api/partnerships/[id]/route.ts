@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { applyAutoStage } from "@/lib/auto-stage";
 import { db } from "@/lib/db";
 import {
   cmPartnerships,
@@ -26,7 +27,20 @@ const schema = z.object({
   region: z.string().nullable().optional(),
   postalCode: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
+  addressRaw: z.string().nullable().optional(),
+  outreachReason: z.string().nullable().optional(),
 });
+
+const ADDRESS_KEYS = [
+  "recipientName",
+  "addressLine1",
+  "addressLine2",
+  "city",
+  "region",
+  "postalCode",
+  "country",
+  "addressRaw",
+] as const;
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { error } = await requireAuth();
@@ -47,5 +61,25 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   }
 
   await db.update(cmPartnerships).set(update).where(eq(cmPartnerships.id, id));
-  return NextResponse.json({ ok: true });
+
+  // If the payload touched the address and the row now holds a complete one,
+  // an awaiting_address partnership advances to fulfilling automatically.
+  let stageChanged = null;
+  if (ADDRESS_KEYS.some((k) => data[k] !== undefined)) {
+    const [row] = await db
+      .select({
+        addressLine1: cmPartnerships.addressLine1,
+        city: cmPartnerships.city,
+        region: cmPartnerships.region,
+        postalCode: cmPartnerships.postalCode,
+      })
+      .from(cmPartnerships)
+      .where(eq(cmPartnerships.id, id))
+      .limit(1);
+    if (row?.addressLine1 && row.city && row.region && row.postalCode) {
+      stageChanged = await applyAutoStage(id, "address_complete");
+    }
+  }
+
+  return NextResponse.json({ ok: true, stageChanged });
 }

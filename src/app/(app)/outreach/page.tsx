@@ -1,9 +1,12 @@
-import { resolveClient, getDefaultTemplate, getCreatorRows } from "@/lib/queries";
+import { resolveClient, getDefaultTemplates, getCreatorRows } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { getDashboardStalls } from "@/lib/dashboard";
 import { PageHeader, EmptyState } from "@/components/ui";
-import { OutreachWorklist, type WorklistEntry } from "@/components/outreach-worklist";
-import { renderTemplate, firstName } from "@/lib/outreach";
+import {
+  OutreachWorklist,
+  type WorklistEntry,
+  type WorklistTemplates,
+} from "@/components/outreach-worklist";
 
 export default async function OutreachPage() {
   const client = await resolveClient(await getSelectedClientSlug());
@@ -18,25 +21,32 @@ export default async function OutreachPage() {
     );
   }
 
-  const [stalls, template, rows] = await Promise.all([
+  const [stalls, templates, rows] = await Promise.all([
     getDashboardStalls(client.id),
-    getDefaultTemplate(client.id),
+    getDefaultTemplates(client.id),
     getCreatorRows(client.id),
   ]);
 
-  const pillarByPartnership = new Map(rows.map((r) => [r.partnershipId, r.contentPillar]));
+  const rowByPartnership = new Map(rows.map((r) => [r.partnershipId, r]));
 
   const entries: WorklistEntry[] = stalls.followUpsDue.map((s) => {
     const kind: "initial" | "follow_up" = s.detail.includes("initial") ? "initial" : "follow_up";
-    const message = template
-      ? renderTemplate(template.body, {
-          name: firstName(s.name),
-          content_descriptor: pillarByPartnership.get(s.partnershipId) ?? "content",
-          reason: "",
-        })
-      : null;
-    return { ...s, message, kind };
+    const row = rowByPartnership.get(s.partnershipId);
+    return {
+      ...s,
+      kind,
+      businessEmail: row?.businessEmail ?? null,
+      contentPillar: row?.contentPillar ?? null,
+      outreachReason: row?.outreachReason ?? null,
+    };
   });
+
+  const worklistTemplates: WorklistTemplates = {
+    ig_dm: templates.ig_dm ? { subject: null, body: templates.ig_dm.body } : null,
+    email: templates.email
+      ? { subject: templates.email.subject, body: templates.email.body }
+      : null,
+  };
 
   return (
     <>
@@ -45,12 +55,12 @@ export default async function OutreachPage() {
         subtitle={`${entries.length} due · ${client.name}`}
       />
       <div className="mx-auto max-w-3xl p-6">
-        {!template && (
+        {!templates.ig_dm && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            No default message template for {client.name}. Add one in Settings to get pre-filled messages here.
+            No default DM template for {client.name}. Add one in Settings to get pre-filled messages here.
           </div>
         )}
-        <OutreachWorklist entries={entries} />
+        <OutreachWorklist entries={entries} templates={worklistTemplates} />
       </div>
     </>
   );

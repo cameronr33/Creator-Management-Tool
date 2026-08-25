@@ -10,6 +10,7 @@ const schema = z.object({
   clientId: z.string().uuid(),
   name: z.string().min(1),
   channel: z.enum(cmOutreachChannelEnum.enumValues).default("ig_dm"),
+  subject: z.string().nullable().optional(),
   body: z.string().min(1),
   isDefault: z.boolean().default(false),
 });
@@ -27,22 +28,42 @@ export async function POST(req: NextRequest) {
   if (d.id) {
     await db
       .update(cmMessageTemplates)
-      .set({ name: d.name, channel: d.channel, body: d.body, isDefault: d.isDefault, updatedAt: new Date() })
+      .set({
+        name: d.name,
+        channel: d.channel,
+        subject: d.subject ?? null,
+        body: d.body,
+        isDefault: d.isDefault,
+        updatedAt: new Date(),
+      })
       .where(eq(cmMessageTemplates.id, d.id));
   } else {
     const [row] = await db
       .insert(cmMessageTemplates)
-      .values({ clientId: d.clientId, name: d.name, channel: d.channel, body: d.body, isDefault: d.isDefault })
+      .values({
+        clientId: d.clientId,
+        name: d.name,
+        channel: d.channel,
+        subject: d.subject ?? null,
+        body: d.body,
+        isDefault: d.isDefault,
+      })
       .returning({ id: cmMessageTemplates.id });
     templateId = row.id;
   }
 
-  // Only one default per client.
+  // Only one default per client per channel — IG and email each keep their own.
   if (d.isDefault && templateId) {
     await db
       .update(cmMessageTemplates)
       .set({ isDefault: false })
-      .where(and(eq(cmMessageTemplates.clientId, d.clientId), ne(cmMessageTemplates.id, templateId)));
+      .where(
+        and(
+          eq(cmMessageTemplates.clientId, d.clientId),
+          eq(cmMessageTemplates.channel, d.channel),
+          ne(cmMessageTemplates.id, templateId),
+        ),
+      );
   }
 
   return NextResponse.json({ ok: true, id: templateId });

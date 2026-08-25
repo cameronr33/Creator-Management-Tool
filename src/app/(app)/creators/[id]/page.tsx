@@ -20,6 +20,8 @@ import {
   ShipmentControls,
   AddDeliverable,
   FeeEditor,
+  AgreementEditor,
+  BriefEditor,
 } from "@/components/partnership-actions";
 import {
   EditableProfile,
@@ -55,7 +57,7 @@ export default async function CreatorDetailPage({
     ? renderTemplate(template.body, {
         name: firstName(creator.name),
         content_descriptor: creator.contentPillar ?? "content",
-        reason: "",
+        reason: partnership.outreachReason ?? "",
       })
     : null;
 
@@ -225,17 +227,15 @@ export default async function CreatorDetailPage({
           <Card className="p-4">
             <SectionTitle>Agreement</SectionTitle>
             <div className="mt-3 space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-text-muted">Type</span>
-                {partnership.agreementType ? (
-                  <Badge tone={partnership.agreementType === "signed" ? "good" : "accent"}>
-                    {partnership.agreementType}
-                  </Badge>
-                ) : (
-                  <span className="text-text-faint">—</span>
-                )}
-              </div>
-              <div>
+              <AgreementEditor
+                partnershipId={partnership.id}
+                agreementType={partnership.agreementType}
+                agreedTerms={partnership.agreedTerms}
+                exitReason={partnership.exitReason}
+                notes={partnership.notes}
+                isTerminal={isTerminal(partnership.stage)}
+              />
+              <div className="border-t border-border pt-3">
                 <div className="mb-1 text-sm text-text-muted">Compensation</div>
                 <FeeEditor
                   partnershipId={partnership.id}
@@ -246,15 +246,6 @@ export default async function CreatorDetailPage({
                   <div className="mt-1 text-xs text-text-faint">Recorded {money(partnership.feeAmount)} — payment tracked in accounting</div>
                 )}
               </div>
-              {isTerminal(partnership.stage) && partnership.exitReason && (
-                <div className="text-sm">
-                  <span className="text-text-muted">Exit reason: </span>
-                  <span className="text-text">{partnership.exitReason.replace(/_/g, " ")}</span>
-                </div>
-              )}
-              {partnership.notes && (
-                <p className="border-t border-border pt-2 text-sm text-text-muted">{partnership.notes}</p>
-              )}
             </div>
           </Card>
 
@@ -300,14 +291,14 @@ export default async function CreatorDetailPage({
               <SectionTitle>Content</SectionTitle>
             </div>
             <div className="mt-2 flex items-center gap-2 text-sm">
-              <FileText size={14} className="text-text-faint" />
-              {partnership.briefUrl ? (
-                <a href={partnership.briefUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">
-                  Brief {partnership.briefSentAt ? `· sent ${shortDate(partnership.briefSentAt)}` : ""}
-                </a>
-              ) : (
-                <span className="text-text-faint">No brief sent</span>
-              )}
+              <FileText size={14} className="shrink-0 text-text-faint" />
+              <div className="min-w-0 flex-1">
+                <BriefEditor
+                  partnershipId={partnership.id}
+                  briefUrl={partnership.briefUrl}
+                  briefSentAt={partnership.briefSentAt ? shortDate(partnership.briefSentAt) : null}
+                />
+              </div>
             </div>
             <div className="mt-3 space-y-2 border-t border-border pt-3">
               {deliverables.length === 0 ? (

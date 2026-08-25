@@ -90,6 +90,28 @@ export function renderTemplate(
   });
 }
 
+/**
+ * Instagram DM deep link — Meta's official ig.me short link, which opens the
+ * DM composer for a logged-in browser. The @username profile link stays the
+ * fallback when IG shows a "message request" interstitial instead.
+ */
+export function igDmUrl(username: string): string {
+  return `https://ig.me/m/${encodeURIComponent(username)}`;
+}
+
+export function igProfileUrl(username: string): string {
+  return `https://www.instagram.com/${encodeURIComponent(username)}/`;
+}
+
+/** mailto: link with the subject and body pre-filled. */
+export function mailtoUrl(email: string, subject: string | null, body: string): string {
+  const params = new URLSearchParams();
+  if (subject) params.set("subject", subject);
+  if (body) params.set("body", body);
+  const qs = params.toString().replace(/\+/g, "%20");
+  return `mailto:${email}${qs ? `?${qs}` : ""}`;
+}
+
 /** First name only — "Abel & Victoria" -> "Abel", "AUTUMN SCHWALBE" -> "Autumn". */
 export function firstName(fullName: string): string {
   const first = fullName.trim().split(/[\s&/,]+/)[0] ?? fullName;

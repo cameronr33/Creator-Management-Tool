@@ -56,13 +56,18 @@ export function CampaignAdder({ clientId }: { clientId: string }) {
 
 export function TemplateEditor({
   clientId,
+  channel,
   template,
 }: {
   clientId: string;
-  template: { id: string; name: string; body: string; isDefault: boolean } | null;
+  channel: "ig_dm" | "email";
+  template: { id: string; name: string; subject: string | null; body: string; isDefault: boolean } | null;
 }) {
   const router = useRouter();
-  const [name, setName] = useState(template?.name ?? "Default outreach");
+  const [name, setName] = useState(
+    template?.name ?? (channel === "email" ? "Default email outreach" : "Default outreach"),
+  );
+  const [subject, setSubject] = useState(template?.subject ?? "");
   const [body, setBody] = useState(template?.body ?? "");
   const [pending, setPending] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -74,6 +79,8 @@ export function TemplateEditor({
       id: template?.id,
       clientId,
       name,
+      channel,
+      subject: channel === "email" ? subject.trim() || null : null,
       body,
       isDefault: true,
     });
@@ -92,6 +99,14 @@ export function TemplateEditor({
         onChange={(e) => setName(e.target.value)}
         className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
       />
+      {channel === "email" && (
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="Subject — placeholders work here too"
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+        />
+      )}
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -105,7 +120,7 @@ export function TemplateEditor({
           disabled={pending || !body.trim()}
           className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
         >
-          Save default template
+          Save default {channel === "email" ? "email" : "DM"} template
         </button>
         {saved && <span className="text-sm text-emerald-700">Saved</span>}
       </div>

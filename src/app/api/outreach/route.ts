@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { applyAutoStage } from "@/lib/auto-stage";
 import { db } from "@/lib/db";
 import {
   cmOutreachEvents,
@@ -15,6 +16,7 @@ const schema = z.object({
   channel: z.enum(cmOutreachChannelEnum.enumValues).default("ig_dm"),
   kind: z.enum(cmOutreachKindEnum.enumValues),
   body: z.string().optional(),
+  subject: z.string().optional(),
   occurredAt: z.string().optional(),
 });
 
@@ -33,9 +35,22 @@ export async function POST(req: NextRequest) {
     channel: d.channel,
     kind: d.kind,
     body: d.body ?? null,
+    subject: d.subject ?? null,
     occurredAt: d.occurredAt ? new Date(d.occurredAt) : new Date(),
     createdBy: session.user.id,
   });
 
-  return NextResponse.json({ ok: true });
+  // Sending a first message implies contacted; a reply implies
+  // in_conversation. Notes never advance the stage.
+  const trigger =
+    d.direction === "inbound" && d.kind === "reply"
+      ? ("inbound_message" as const)
+      : d.direction === "outbound" && (d.kind === "initial" || d.kind === "follow_up")
+        ? ("outbound_message" as const)
+        : null;
+  const stageChanged = trigger
+    ? await applyAutoStage(d.partnershipId, trigger, session.user.id)
+    : null;
+
+  return NextResponse.json({ ok: true, stageChanged });
 }

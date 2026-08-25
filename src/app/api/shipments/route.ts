@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { applyAutoStage } from "@/lib/auto-stage";
 import { db } from "@/lib/db";
 import { cmShipments, cmShipmentStatusEnum } from "@/lib/db/schema";
 
@@ -47,5 +48,14 @@ export async function POST(req: NextRequest) {
   } else {
     await db.insert(cmShipments).values(values);
   }
-  return NextResponse.json({ ok: true });
+
+  // A shipped/delivered package unambiguously advances the pipeline.
+  const stageChanged =
+    d.status === "shipped"
+      ? await applyAutoStage(d.partnershipId, "shipment_shipped")
+      : d.status === "delivered"
+        ? await applyAutoStage(d.partnershipId, "shipment_delivered")
+        : null;
+
+  return NextResponse.json({ ok: true, stageChanged });
 }

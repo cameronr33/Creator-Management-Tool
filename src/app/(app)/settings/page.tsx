@@ -28,7 +28,8 @@ export default async function SettingsPage() {
     getTemplates(client.id),
     getApiKeys(),
   ]);
-  const defaultTemplate = templates.find((t) => t.isDefault) ?? null;
+  const defaultDmTemplate = templates.find((t) => t.isDefault && t.channel === "ig_dm") ?? null;
+  const defaultEmailTemplate = templates.find((t) => t.isDefault && t.channel === "email") ?? null;
 
   return (
     <>
@@ -65,11 +66,20 @@ export default async function SettingsPage() {
         </Card>
 
         <Card className="p-5">
-          <SectionTitle>Default outreach template</SectionTitle>
+          <SectionTitle>Default DM template</SectionTitle>
           <p className="mt-1 mb-3 text-xs text-text-faint">
             Rendered on the Outreach worklist and each creator&apos;s composer with {"{{name}}"} filled in.
           </p>
-          <TemplateEditor clientId={client.id} template={defaultTemplate} />
+          <TemplateEditor clientId={client.id} channel="ig_dm" template={defaultDmTemplate} />
+        </Card>
+
+        <Card className="p-5">
+          <SectionTitle>Default email template</SectionTitle>
+          <p className="mt-1 mb-3 text-xs text-text-faint">
+            Used when a creator has a business email — the worklist offers Email as a channel and
+            pre-fills a mailto link with this subject and body.
+          </p>
+          <TemplateEditor clientId={client.id} channel="email" template={defaultEmailTemplate} />
         </Card>
 
         <Card className="p-5">

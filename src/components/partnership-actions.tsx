@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Check, Plus } from "lucide-react";
+import { Copy, Check, Plus, Reply } from "lucide-react";
 import { STAGES } from "@/lib/stages";
 import type { CmStage, CmShipment } from "@/lib/db/schema";
 
@@ -83,8 +83,22 @@ export function OutreachComposer({
     if (ok) setBody("");
   };
 
+  // The most common event after a send, reduced to one click.
+  const quickReply = () =>
+    run(() =>
+      post("/api/outreach", { partnershipId, direction: "inbound", channel, kind: "reply" }),
+    );
+
   return (
     <div className="space-y-2">
+      <button
+        onClick={quickReply}
+        disabled={pending}
+        className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-sm text-text-muted transition hover:bg-surface-2 disabled:opacity-50"
+        title="Log an inbound reply in one click"
+      >
+        <Reply size={14} /> They replied
+      </button>
       {suggestedMessage && (
         <div className="rounded-lg border border-border bg-surface-2 p-3">
           <div className="mb-1 flex items-center justify-between">
@@ -162,6 +176,13 @@ export function ShipmentControls({
       }),
     );
 
+  // Blur always persists — with no shipment yet, this creates one at "ready"
+  // so typed carrier/tracking values are never silently discarded.
+  const saveOnBlur = () => {
+    if (!carrier && !tracking && !shipment) return;
+    save(shipment?.status ?? "ready");
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
@@ -187,14 +208,14 @@ export function ShipmentControls({
         <input
           value={carrier}
           onChange={(e) => setCarrier(e.target.value)}
-          onBlur={() => shipment && save(shipment.status)}
+          onBlur={saveOnBlur}
           placeholder="Carrier"
           className="w-28 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
         />
         <input
           value={tracking}
           onChange={(e) => setTracking(e.target.value)}
-          onBlur={() => shipment && save(shipment.status)}
+          onBlur={saveOnBlur}
           placeholder="Tracking #"
           className="flex-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
         />
@@ -216,20 +237,34 @@ export function AddDeliverable({ partnershipId }: { partnershipId: string }) {
   const { pending, run } = useRefreshingAction();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
-  const [views, setViews] = useState("");
+  const [showOverride, setShowOverride] = useState(false);
+  const [publicViews, setPublicViews] = useState("");
+  const [warning, setWarning] = useState<string | null>(null);
 
   const submit = async () => {
-    const ok = await run(() =>
-      post("/api/deliverables", {
-        partnershipId,
-        url,
-        views: views ? Number(views) : null,
-        postedAt: new Date().toISOString(),
-      }),
-    );
-    if (ok) {
+    setWarning(null);
+    let warn: string | null = null;
+    const ok = await run(async () => {
+      const res = await fetch("/api/deliverables", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          partnershipId,
+          url,
+          // Metrics + posted date come from Apify (labeled provisional);
+          // the operator only types a number for a true public-Views reading.
+          fetchMetrics: true,
+          publicViews: publicViews ? Number(publicViews) : null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      warn = data?.warning ?? null;
+      return res.ok;
+    });
+    setWarning(warn);
+    if (ok && !warn) {
       setUrl("");
-      setViews("");
+      setPublicViews("");
       setOpen(false);
     }
   };
@@ -250,25 +285,174 @@ export function AddDeliverable({ partnershipId }: { partnershipId: string }) {
         placeholder="https://instagram.com/reel/…"
         className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
       />
-      <input
-        value={views}
-        onChange={(e) => setViews(e.target.value)}
-        placeholder="Views (optional)"
-        inputMode="numeric"
-        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
-      />
+      {showOverride ? (
+        <input
+          value={publicViews}
+          onChange={(e) => setPublicViews(e.target.value)}
+          placeholder="Public views — as read from the IG app"
+          inputMode="numeric"
+          className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+        />
+      ) : (
+        <button
+          onClick={() => setShowOverride(true)}
+          className="text-xs text-text-faint hover:text-accent"
+        >
+          I read the public view count off Instagram — enter it manually
+        </button>
+      )}
+      {warning && <p className="text-xs text-amber-700">⚠ {warning}</p>}
       <div className="flex gap-2">
         <button
           onClick={submit}
           disabled={pending || !url}
           className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
         >
-          Save
+          {pending ? "Fetching metrics…" : "Save & fetch metrics"}
         </button>
         <button onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-sm text-text-muted hover:bg-surface-2">
           Cancel
         </button>
       </div>
+    </div>
+  );
+}
+
+const EXIT_REASONS = [
+  { value: "below_cadence", label: "Below cadence (we passed)" },
+  { value: "wrong_pillar", label: "Wrong pillar (we passed)" },
+  { value: "fee_too_high", label: "Fee too high (we passed)" },
+  { value: "budget", label: "Budget (we passed)" },
+  { value: "research_fit", label: "Research fit (we passed)" },
+  { value: "not_interested", label: "Not interested (they passed)" },
+  { value: "competitor_conflict", label: "Competitor conflict (they passed)" },
+  { value: "wants_more_money", label: "Wants more money (they passed)" },
+  { value: "went_dark", label: "Went dark" },
+  { value: "other", label: "Other" },
+];
+
+/**
+ * Edits the agreement fields that previously had no UI at all —
+ * agreementType, agreedTerms, exitReason and partnership notes were
+ * PATCH-able via the API but rendered read-only.
+ */
+export function AgreementEditor({
+  partnershipId,
+  agreementType,
+  agreedTerms,
+  exitReason,
+  notes,
+  isTerminal,
+}: {
+  partnershipId: string;
+  agreementType: string | null;
+  agreedTerms: string | null;
+  exitReason: string | null;
+  notes: string | null;
+  isTerminal: boolean;
+}) {
+  const { pending, run } = useRefreshingAction();
+  const [type, setType] = useState(agreementType ?? "");
+  const [terms, setTerms] = useState(agreedTerms ?? "");
+  const [reason, setReason] = useState(exitReason ?? "");
+  const [noteText, setNoteText] = useState(notes ?? "");
+
+  const patch = (body: Record<string, unknown>) =>
+    run(() => post(`/api/partnerships/${partnershipId}`, body, "PATCH"));
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="text-text-muted">Type</span>
+        <select
+          value={type}
+          disabled={pending}
+          onChange={(e) => {
+            setType(e.target.value);
+            patch({ agreementType: e.target.value || null });
+          }}
+          className="rounded-lg border border-border bg-surface px-2 py-1 text-sm"
+        >
+          <option value="">—</option>
+          <option value="verbal">Verbal</option>
+          <option value="signed">Signed</option>
+        </select>
+      </div>
+      <textarea
+        value={terms}
+        onChange={(e) => setTerms(e.target.value)}
+        onBlur={() => terms !== (agreedTerms ?? "") && patch({ agreedTerms: terms || null })}
+        placeholder="Agreed terms — deliverables, timeline, exclusivity…"
+        rows={2}
+        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+      />
+      {isTerminal && (
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-text-muted">Exit reason</span>
+          <select
+            value={reason}
+            disabled={pending}
+            onChange={(e) => {
+              setReason(e.target.value);
+              patch({ exitReason: e.target.value || null });
+            }}
+            className="rounded-lg border border-border bg-surface px-2 py-1 text-sm"
+          >
+            <option value="">—</option>
+            {EXIT_REASONS.map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      <textarea
+        value={noteText}
+        onChange={(e) => setNoteText(e.target.value)}
+        onBlur={() => noteText !== (notes ?? "") && patch({ notes: noteText || null })}
+        placeholder="Partnership notes…"
+        rows={2}
+        className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+      />
+    </div>
+  );
+}
+
+/** Brief link + "mark sent" — previously read-only despite API support. */
+export function BriefEditor({
+  partnershipId,
+  briefUrl,
+  briefSentAt,
+}: {
+  partnershipId: string;
+  briefUrl: string | null;
+  briefSentAt: string | null; // pre-formatted date or null
+}) {
+  const { pending, run } = useRefreshingAction();
+  const [url, setUrl] = useState(briefUrl ?? "");
+
+  const patch = (body: Record<string, unknown>) =>
+    run(() => post(`/api/partnerships/${partnershipId}`, body, "PATCH"));
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onBlur={() => url !== (briefUrl ?? "") && patch({ briefUrl: url || null })}
+        placeholder="Brief URL (Google Doc, Notion…)"
+        className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+      />
+      {briefSentAt ? (
+        <span className="text-xs text-text-faint">Sent {briefSentAt}</span>
+      ) : (
+        <button
+          onClick={() => patch({ briefSentAt: new Date().toISOString() })}
+          disabled={pending || !url}
+          className="rounded-lg border border-border px-2 py-1.5 text-xs text-text-muted transition hover:bg-surface-2 disabled:opacity-50"
+        >
+          Mark brief sent now
+        </button>
+      )}
     </div>
   );
 }

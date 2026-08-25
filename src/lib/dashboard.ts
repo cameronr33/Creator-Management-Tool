@@ -14,6 +14,8 @@ export interface StallItem {
   name: string;
   username: string;
   detail: string;
+  /** Present on ready-to-ship items so the dashboard can one-click mark shipped. */
+  shipmentId?: string;
 }
 
 export interface DashboardStalls {
@@ -49,15 +51,19 @@ export async function getDashboardStalls(clientId: string): Promise<DashboardSta
 
   // 2. Ready to ship but not shipped.
   const shipRows = await db
-    .select({ partnershipId: cmShipments.partnershipId, status: cmShipments.status })
+    .select({ shipmentId: cmShipments.id, partnershipId: cmShipments.partnershipId, status: cmShipments.status })
     .from(cmShipments)
     .innerJoin(cmPartnerships, eq(cmShipments.partnershipId, cmPartnerships.id))
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
     .where(and(eq(cmCreators.clientId, clientId), eq(cmShipments.status, "ready")));
   const readyToShip: StallItem[] = shipRows
-    .map((s) => byId.get(s.partnershipId))
-    .filter((p): p is NonNullable<typeof p> => !!p)
-    .map((p) => ({ partnershipId: p.id, name: p.name, username: p.username, detail: "Product ready — not shipped" }));
+    .map((s) => {
+      const p = byId.get(s.partnershipId);
+      return p
+        ? { partnershipId: p.id, name: p.name, username: p.username, detail: "Product ready — not shipped", shipmentId: s.shipmentId }
+        : null;
+    })
+    .filter((p): p is NonNullable<typeof p> => !!p);
 
   // 3. Delivered but no video yet (fulfilment stages with a delivered shipment
   //    and zero deliverables).

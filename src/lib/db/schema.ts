@@ -369,6 +369,12 @@ export const cmPartnerships = pgTable(
 
     exitReason: cmExitReasonEnum("exit_reason"),
     notes: text("notes"),
+    /**
+     * Per-campaign personalization used as {{reason}} in outreach templates
+     * ("loved your brake-swap reel"). Belongs to this pitch, not the creator
+     * identity — the same creator in another campaign gets a fresh reason.
+     */
+    outreachReason: text("outreach_reason"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -396,6 +402,16 @@ export const cmOutreachEvents = pgTable(
     channel: cmOutreachChannelEnum("channel").default("ig_dm").notNull(),
     kind: cmOutreachKindEnum("kind").notNull(),
     body: text("body"),
+    /** Email subject line; null for DMs and manually logged touchpoints. */
+    subject: text("subject"),
+    /**
+     * External message id for synced events (Gmail message id). Unique so
+     * re-running the email sync is idempotent — Postgres unique constraints
+     * allow many NULLs, so UI-created rows are unaffected.
+     */
+    externalId: text("external_id"),
+    /** External thread id (Gmail thread id) for grouping synced messages. */
+    threadId: text("thread_id"),
     /** True for rows synthesized by import-hella.ts, whose real dates are unknown. */
     isMigrated: boolean("is_migrated").default(false).notNull(),
     createdBy: uuid("created_by").references(() => users.id),
@@ -404,6 +420,8 @@ export const cmOutreachEvents = pgTable(
   (t) => [
     index("cm_outreach_partnership_idx").on(t.partnershipId),
     index("cm_outreach_occurred_idx").on(t.occurredAt),
+    unique("cm_outreach_external_uq").on(t.externalId),
+    index("cm_outreach_thread_idx").on(t.threadId),
   ],
 );
 
@@ -526,6 +544,8 @@ export const cmMessageTemplates = pgTable(
       .references(() => clients.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     channel: cmOutreachChannelEnum("channel").default("ig_dm").notNull(),
+    /** Email subject line (placeholders supported); null for DM templates. */
+    subject: text("subject"),
     /** Supports {{name}}, {{content_descriptor}}, {{reason}} placeholders. */
     body: text("body").notNull(),
     isDefault: boolean("is_default").default(false).notNull(),

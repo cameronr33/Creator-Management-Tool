@@ -75,6 +75,24 @@ plus terminal `passed` / `declined` / `no_response` (split by who ended it).
 
 Both are driven by `scripts/cron-worker.ts` on a Railway worker service.
 
+- **Email sync** (`.claude/skills/email-sync`, run by Claude locally) — reads
+  creator outreach threads from the connected Gmail (cameron@sentic.io is cc'd
+  on outreach sent by a teammate), matches them to creators by business email,
+  and pushes touchpoints to `/api/emails/ingest`. Replies auto-advance
+  `contacted → in_conversation`. **Tracking only** — it never sends mail.
+  Coverage limit: a creator reply that doesn't reply-all to the cc'd mailbox is
+  invisible to the sync, so keep the cc on every message.
+
+## Auto-stage
+
+Routes advance the pipeline automatically on unambiguous events
+(`src/lib/auto-stage.ts`): first outbound message → `contacted`, a reply →
+`in_conversation`, a complete address → `fulfilling`, shipped/delivered →
+`fulfilling`/`content_pending`, a posted video → `posted`. Rules are a strict
+from-stage allowlist — they never move a stage backward and never touch the
+judgment stages (`negotiating`, `agreed`, `completed`) or terminals. Every
+change lands in `cm_stage_transitions` like a manual move.
+
 ## Verifying changes
 
 Run the `verify-creator-tool` skill, or manually:
@@ -83,6 +101,10 @@ Run the `verify-creator-tool` skill, or manually:
 npx tsc --noEmit && npm run lint && npm run build
 npm run verify:import          # offline migration-fidelity assertions
 npm run verify:add-creator     # link-parser + manual-add assertions (hits the DB, self-cleans)
+npm run verify:auto-stage      # auto-stage rule matrix + live lifecycle (self-cleans)
+npm run verify:outreach-flow   # send-flow rendering/logging assertions (self-cleans)
+npm run verify:editors         # address parser, metric labeling, shipment path (self-cleans)
+npm run verify:email-ingest    # Gmail matcher + idempotent ingest (self-cleans)
 ```
 
 ## Gotchas

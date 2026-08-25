@@ -117,3 +117,51 @@ export async function fetchReels(username: string, limit = 30): Promise<ApifyRee
       ownerUsername: (it.ownerUsername as string) ?? username,
     }));
 }
+
+export interface ApifyPost {
+  shortCode: string | null;
+  timestamp: string | null;
+  videoPlayCount: number | null;
+  likesCount: number | null;
+  commentsCount: number | null;
+  caption: string | null;
+}
+
+/**
+ * Fetch specific posts by URL (deliverable metric fetch). Same actor, same
+ * provisional-views caveat as fetchReels — callers must label results
+ * `metricsSource: "apify"`, never as authoritative public Views.
+ */
+export async function fetchPosts(urls: string[]): Promise<ApifyPost[]> {
+  if (urls.length === 0) return [];
+  const res = await fetch(
+    `${APIFY_BASE}/acts/${INSTAGRAM_SCRAPER}/run-sync-get-dataset-items?token=${token()}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        directUrls: urls,
+        resultsType: "posts",
+        resultsLimit: urls.length,
+        addParentData: false,
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Apify run failed (HTTP ${res.status}): ${text.slice(0, 300)}`);
+  }
+
+  const items = (await res.json()) as Record<string, unknown>[];
+  return items
+    .filter((it) => typeof it.shortCode === "string")
+    .map((it) => ({
+      shortCode: (it.shortCode as string) ?? null,
+      timestamp: (it.timestamp as string) ?? null,
+      videoPlayCount: typeof it.videoPlayCount === "number" ? it.videoPlayCount : null,
+      likesCount: typeof it.likesCount === "number" ? it.likesCount : null,
+      commentsCount: typeof it.commentsCount === "number" ? it.commentsCount : null,
+      caption: (it.caption as string) ?? null,
+    }));
+}

@@ -19,6 +19,12 @@ npm run build             # succeeds
 
 If `next build` fails on a stale route type referencing a deleted page, `rm -rf .next` and rerun — a removed `page.tsx` leaves a dangling entry in `.next/types`.
 
+A stale `.next` can also silently drop routes from the **dev** server's route
+table — the symptom is a 404 on a route whose file plainly exists (seen once
+with `/api/auth/[...nextauth]`, which broke login with a NextAuth 404/
+ClientFetchError). Diagnose by curling the route (404) vs a sibling API route
+(alive); fix by stopping the dev server, `rm -rf .next`, and restarting.
+
 ## 2. Schema is in sync
 
 ```bash
@@ -88,6 +94,33 @@ around those calls, not the calls themselves. To check the live integration,
 mint a temporary API key and exercise `.claude/skills/creator-research/scripts/queue_client.py --list / --claim / --complete / --fail` against the running
 dev server, then revoke the key and delete the test rows — the same pattern
 used to validate this feature originally, no test data or keys left behind.
+
+## 3d. Streamlining features (auto-stage, send flow, editors, email ingest)
+
+```bash
+npm run verify:auto-stage
+npm run verify:outreach-flow
+npm run verify:editors
+npm run verify:email-ingest
+```
+
+All four are self-cleaning (throwaway `__verify_` rows, cascade-deleted).
+
+- **auto-stage** asserts the FULL pure rule matrix (every trigger × every
+  stage) plus a live lifecycle with `cm_stage_transitions` audit rows. If you
+  change the rule table in `src/lib/auto-stage.ts`, change the expected table
+  in the script deliberately — never weaken a check to make it pass.
+- **outreach-flow** asserts renderTemplate/URL builders and that a logged
+  event stores the actual channel/body/subject (the old worklist hardcoded
+  `ig_dm` and logged the template).
+- **editors** asserts `parseAddress` on the four documented HELLA shapes, the
+  metricsSource labeling rules (manual public views → `ig_public_chrome`,
+  Apify → `apify`, provisional), and the shipment create-with-typed-carrier
+  path.
+- **email-ingest** asserts the Gmail matcher (direction by From vs To/Cc,
+  case-insensitive, display-name forms) and the live idempotent ingest
+  (double-push → exactly one row; replies advance `contacted →
+  in_conversation`).
 
 ## 4. Live route smoke-test
 
