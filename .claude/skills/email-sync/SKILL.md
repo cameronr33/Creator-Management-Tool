@@ -5,6 +5,14 @@ description: Sync creator outreach email threads from the connected Gmail into C
 
 # Email sync — track creator outreach happening over email
 
+> **The app now does this itself.** Settings → Email sync connects a Gmail
+> mailbox via OAuth (read-only) and the cron worker syncs twice a day
+> (`/api/cron/email-sync`), with a Sync now button for on-demand runs. Use
+> this skill only as a manual fallback — e.g. the Google OAuth app isn't set
+> up yet, or you want to sync a mailbox that isn't the connected one. Both
+> paths feed the same `/api/emails/ingest` endpoint and dedupe on the Gmail
+> message id, so mixing them is safe.
+
 Creator outreach email is sent by a teammate from their own mailbox with
 **cameron@sentic.io cc'd**. This skill reads those threads from the connected
 Gmail and pushes them into Creator Manager so the outreach timeline, follow-up

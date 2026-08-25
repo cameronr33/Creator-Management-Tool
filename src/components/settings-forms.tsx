@@ -128,6 +128,119 @@ export function TemplateEditor({
   );
 }
 
+export function GmailConnectCard({
+  configured,
+  account,
+}: {
+  configured: boolean;
+  account: {
+    email: string;
+    connectedAt: string;
+    lastSyncAt: string | null;
+    lastSyncStatus: string | null;
+    lastSyncSummary: {
+      inserted?: number;
+      skipped?: number;
+      unmatched?: number;
+      stageChanges?: number;
+      messagesFetched?: number;
+    } | null;
+  } | null;
+}) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const syncNow = async () => {
+    setPending(true);
+    setResult(null);
+    const res = await fetch("/api/gmail/sync", { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    setPending(false);
+    if (res.ok) {
+      setResult(
+        `Synced: ${data.inserted ?? 0} new touchpoint(s), ${data.stageChanges?.length ?? 0} stage change(s), ${data.unmatched?.length ?? 0} unmatched.`,
+      );
+      router.refresh();
+    } else {
+      setResult(`Sync failed: ${data.error ?? res.statusText}`);
+    }
+  };
+
+  const disconnect = async () => {
+    await fetch("/api/gmail/disconnect", { method: "POST" });
+    router.refresh();
+  };
+
+  if (!configured) {
+    return (
+      <p className="text-sm text-text-muted">
+        Set <code className="text-xs">GOOGLE_CLIENT_ID</code> and{" "}
+        <code className="text-xs">GOOGLE_CLIENT_SECRET</code> in the environment to enable Gmail
+        sync — the README has the Google Cloud setup steps.
+      </p>
+    );
+  }
+
+  if (!account) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-text-muted">
+          Connect the mailbox that is cc&apos;d on creator outreach. The app gets{" "}
+          <strong>read-only</strong> access, matches threads to creators by business email, and
+          logs touchpoints automatically — twice a day and on demand.
+        </p>
+        <a
+          href="/api/gmail/connect"
+          className="inline-block rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+        >
+          Connect Gmail
+        </a>
+      </div>
+    );
+  }
+
+  const s = account.lastSyncSummary;
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span className="font-medium text-text">{account.email}</span>
+        <span className="text-xs text-emerald-700">Connected · read-only</span>
+      </div>
+      <div className="text-xs text-text-muted">
+        {account.lastSyncAt ? (
+          <>
+            Last sync {account.lastSyncAt}
+            {account.lastSyncStatus === "ok" && s
+              ? ` — ${s.inserted ?? 0} new, ${s.unmatched ?? 0} unmatched, ${s.stageChanges ?? 0} stage change(s)`
+              : account.lastSyncStatus
+                ? ` — failed: ${account.lastSyncStatus}`
+                : null}
+          </>
+        ) : (
+          "Never synced — runs automatically twice a day, or sync now."
+        )}
+      </div>
+      {result && <p className="text-xs text-text-muted">{result}</p>}
+      <div className="flex gap-2">
+        <button
+          onClick={syncNow}
+          disabled={pending}
+          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
+        >
+          {pending ? "Syncing…" : "Sync now"}
+        </button>
+        <button
+          onClick={disconnect}
+          className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-muted transition hover:bg-surface-2"
+        >
+          Disconnect
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ApiKeyManager({
   keys,
 }: {

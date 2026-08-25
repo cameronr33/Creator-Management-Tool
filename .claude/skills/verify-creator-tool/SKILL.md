@@ -102,9 +102,10 @@ npm run verify:auto-stage
 npm run verify:outreach-flow
 npm run verify:editors
 npm run verify:email-ingest
+npm run verify:gmail-sync
 ```
 
-All four are self-cleaning (throwaway `__verify_` rows, cascade-deleted).
+All five are self-cleaning (throwaway `__verify_` rows, cascade-deleted).
 
 - **auto-stage** asserts the FULL pure rule matrix (every trigger × every
   stage) plus a live lifecycle with `cm_stage_transitions` audit rows. If you
@@ -121,6 +122,13 @@ All four are self-cleaning (throwaway `__verify_` rows, cascade-deleted).
   case-insensitive, display-name forms) and the live idempotent ingest
   (double-push → exactly one row; replies advance `contacted →
   in_conversation`).
+- **gmail-sync** asserts the pure Gmail helpers (query batching, MIME
+  text/plain extraction, message normalization) and the cm_gmail_accounts
+  round-trip with a real encrypt/decrypt cycle. It does NOT hit Google —
+  the OAuth flow itself is verified by clicking Connect Gmail + Sync now in
+  Settings with `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` set. The cron
+  route without a connected account must return
+  `{ok: true, skipped: "no Gmail account connected"}`, not an error.
 
 ## 4. Live route smoke-test
 

@@ -75,13 +75,39 @@ plus terminal `passed` / `declined` / `no_response` (split by who ended it).
 
 Both are driven by `scripts/cron-worker.ts` on a Railway worker service.
 
-- **Email sync** (`.claude/skills/email-sync`, run by Claude locally) — reads
-  creator outreach threads from the connected Gmail (cameron@sentic.io is cc'd
-  on outreach sent by a teammate), matches them to creators by business email,
-  and pushes touchpoints to `/api/emails/ingest`. Replies auto-advance
-  `contacted → in_conversation`. **Tracking only** — it never sends mail.
-  Coverage limit: a creator reply that doesn't reply-all to the cc'd mailbox is
-  invisible to the sync, so keep the cc on every message.
+- **Email sync** (`/api/cron/email-sync`, 13:30 & 21:30 UTC daily) — built
+  into the app itself, no Claude involved. Reads the Gmail mailbox connected
+  in Settings → Email sync (read-only OAuth grant), matches threads to
+  creators by business email, logs touchpoints to their timelines, and
+  auto-advances stages (reply → `in_conversation`). Also runnable on demand
+  via the **Sync now** button. **Tracking only** — the app never sends mail.
+  Coverage limit: only threads where the connected mailbox is on To/Cc are
+  visible — keep it cc'd on every outreach message. (The
+  `.claude/skills/email-sync` skill remains as a manual fallback that pushes
+  through `/api/emails/ingest` with an API key.)
+
+### Email sync setup (one-time, Google Cloud)
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → create (or
+   pick) a project → **APIs & Services → Library** → enable **Gmail API**.
+2. **APIs & Services → OAuth consent screen** — if the mailbox is on Google
+   Workspace, set User type **Internal** (no Google verification needed).
+   Personal-Gmail accounts must use External + Testing mode and add the
+   mailbox as a test user — note Google expires Testing-mode refresh tokens
+   after 7 days, so a Workspace/Internal app is strongly preferred for the
+   cron.
+3. **Credentials → Create credentials → OAuth client ID** → Web application.
+   Authorized redirect URI: `{APP_URL}/api/gmail/callback` (add one entry per
+   environment, e.g. `http://localhost:3002/api/gmail/callback` and the
+   Railway URL).
+4. Put the client ID/secret in `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+   (locally in `.env.local`; on Railway on the **web** service).
+5. In the app: Settings → Email sync → **Connect Gmail**, sign in as the
+   cc'd mailbox, approve the read-only scope.
+
+The refresh token is stored AES-256-GCM-encrypted using
+`TOKEN_ENCRYPTION_KEY` — that variable is now load-bearing; changing it means
+reconnecting Gmail.
 
 ## Auto-stage
 
@@ -105,6 +131,7 @@ npm run verify:auto-stage      # auto-stage rule matrix + live lifecycle (self-c
 npm run verify:outreach-flow   # send-flow rendering/logging assertions (self-cleans)
 npm run verify:editors         # address parser, metric labeling, shipment path (self-cleans)
 npm run verify:email-ingest    # Gmail matcher + idempotent ingest (self-cleans)
+npm run verify:gmail-sync      # Gmail helpers + encrypted account round-trip (self-cleans)
 ```
 
 ## Gotchas

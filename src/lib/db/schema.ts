@@ -626,6 +626,39 @@ export const cmResearchRequests = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────
+// cm_gmail_accounts — the app's own Gmail connection for the email sync.
+//
+// The sync must work for every teammate with no Claude session anywhere in
+// the loop, so the app holds a read-only OAuth grant itself. The refresh
+// token is AES-256-GCM encrypted at rest via src/lib/encryption.ts
+// (TOKEN_ENCRYPTION_KEY). One active row expected; connecting again
+// replaces it.
+// ─────────────────────────────────────────────────────────────────
+
+export const cmGmailAccounts = pgTable(
+  "cm_gmail_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** The connected mailbox address, from Gmail's profile endpoint. */
+    email: text("email").notNull(),
+    /** Encrypted OAuth refresh token ("iv:tag:ciphertext" hex format). */
+    refreshTokenEnc: text("refresh_token_enc").notNull(),
+    scope: text("scope"),
+    connectedBy: uuid("connected_by").references(() => users.id),
+    connectedAt: timestamp("connected_at").defaultNow().notNull(),
+    lastSyncAt: timestamp("last_sync_at"),
+    /** "ok" or an error message from the most recent sync attempt. */
+    lastSyncStatus: text("last_sync_status"),
+    /** Result of the last sync: {inserted, skipped, unmatched, stageChanges}. */
+    lastSyncSummary: jsonb("last_sync_summary"),
+    isActive: boolean("is_active").default(true).notNull(),
+  },
+  (t) => [unique("cm_gmail_accounts_email_uq").on(t.email)],
+);
+
+export type CmGmailAccount = typeof cmGmailAccounts.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────
 // cm_api_keys — lets the creator-research skill push results in
 // ─────────────────────────────────────────────────────────────────
 

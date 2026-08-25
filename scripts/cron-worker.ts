@@ -6,8 +6,9 @@
  *   npx tsx scripts/cron-worker.ts
  *
  * Schedule (UTC):
- *   - 13:00 daily  → follow-up due sweep
- *   - 05:00 Sunday → tier-1 metric refresh (followers only)
+ *   - 13:00 daily        → follow-up due sweep
+ *   - 13:30 & 21:30 daily → email sync (Gmail → outreach timelines)
+ *   - 05:00 Sunday       → tier-1 metric refresh (followers only)
  */
 import cron from "node-cron";
 
@@ -38,6 +39,14 @@ cron.schedule("0 13 * * *", () => {
   trigger("/api/cron/follow-ups");
 });
 
+// Twice-daily email sync at 13:30 and 21:30 UTC (morning + late afternoon
+// US Central). 30 min after the follow-up sweep so freshly synced replies
+// are reflected before the next day's sweep, not raced against today's.
+cron.schedule("30 13,21 * * *", () => {
+  console.log("Running email sync…");
+  trigger("/api/cron/email-sync");
+});
+
 // Weekly tier-1 metric refresh, Sundays 05:00 UTC.
 cron.schedule("0 5 * * 0", () => {
   console.log("Running tier-1 metric refresh…");
@@ -46,4 +55,5 @@ cron.schedule("0 5 * * 0", () => {
 
 console.log("Cron worker started:");
 console.log("  - Follow-up sweep: 13:00 UTC daily");
+console.log("  - Email sync:      13:30 & 21:30 UTC daily");
 console.log("  - Metric refresh:  05:00 UTC Sundays");

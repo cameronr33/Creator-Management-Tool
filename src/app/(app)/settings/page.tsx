@@ -7,7 +7,9 @@ import {
 } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { PageHeader, Card, SectionTitle, EmptyState, Badge } from "@/components/ui";
-import { CampaignAdder, TemplateEditor, ApiKeyManager } from "@/components/settings-forms";
+import { CampaignAdder, TemplateEditor, ApiKeyManager, GmailConnectCard } from "@/components/settings-forms";
+import { gmailConfigured } from "@/lib/gmail";
+import { getActiveGmailAccount } from "@/lib/gmail-sync";
 
 export default async function SettingsPage() {
   const client = await resolveClient(await getSelectedClientSlug());
@@ -22,11 +24,12 @@ export default async function SettingsPage() {
     );
   }
 
-  const [clients, campaigns, templates, apiKeys] = await Promise.all([
+  const [clients, campaigns, templates, apiKeys, gmailAccount] = await Promise.all([
     getClients(),
     getCampaigns(client.id),
     getTemplates(client.id),
     getApiKeys(),
+    getActiveGmailAccount(),
   ]);
   const defaultDmTemplate = templates.find((t) => t.isDefault && t.channel === "ig_dm") ?? null;
   const defaultEmailTemplate = templates.find((t) => t.isDefault && t.channel === "email") ?? null;
@@ -80,6 +83,39 @@ export default async function SettingsPage() {
             pre-fills a mailto link with this subject and body.
           </p>
           <TemplateEditor clientId={client.id} channel="email" template={defaultEmailTemplate} />
+        </Card>
+
+        <Card className="p-5">
+          <SectionTitle>Email sync</SectionTitle>
+          <p className="mt-1 mb-3 text-xs text-text-faint">
+            Tracks creator outreach happening over email: threads are matched to creators by
+            business email, logged on their timelines, and stages advance automatically. Runs
+            twice a day (plus Sync now). Tracking only — the app never sends mail. Replies only
+            sync when the connected mailbox is on the thread, so keep it cc&apos;d on every message.
+          </p>
+          <GmailConnectCard
+            configured={gmailConfigured()}
+            account={
+              gmailAccount
+                ? {
+                    email: gmailAccount.email,
+                    connectedAt: gmailAccount.connectedAt.toLocaleDateString(),
+                    lastSyncAt: gmailAccount.lastSyncAt
+                      ? gmailAccount.lastSyncAt.toLocaleString()
+                      : null,
+                    lastSyncStatus: gmailAccount.lastSyncStatus,
+                    lastSyncSummary:
+                      (gmailAccount.lastSyncSummary as {
+                        inserted?: number;
+                        skipped?: number;
+                        unmatched?: number;
+                        stageChanges?: number;
+                        messagesFetched?: number;
+                      } | null) ?? null,
+                  }
+                : null
+            }
+          />
         </Card>
 
         <Card className="p-5">

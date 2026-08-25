@@ -25,6 +25,7 @@
     "verify:outreach-flow": "tsx --env-file=.env.local scripts/verify-outreach-flow.ts",
     "verify:editors": "tsx --env-file=.env.local scripts/verify-editors.ts",
     "verify:email-ingest": "tsx --env-file=.env.local scripts/verify-email-ingest.ts",
+    "verify:gmail-sync": "tsx --env-file=.env.local scripts/verify-gmail-sync.ts",
     "cron": "tsx scripts/cron-worker.ts"
   },
   "dependencies": {
