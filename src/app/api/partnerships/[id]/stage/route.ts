@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { requireAuth, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
 import { changeStage } from "@/lib/mutations";
 import { cmStageEnum } from "@/lib/db/schema";
 
@@ -11,6 +11,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (error) return error;
 
   const { id } = await ctx.params;
+  const scope = await assertPartnershipInSelectedClient(id);
+  if (scope) return scope;
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid stage", parsed.error.flatten());

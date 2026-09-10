@@ -209,8 +209,11 @@ export async function addCreatorSocial(creatorId: string, rawUrl: string) {
   return link;
 }
 
-export async function removeCreatorSocial(socialId: string) {
-  await db.delete(cmCreatorSocials).where(eq(cmCreatorSocials.id, socialId));
+/** Scoped to the creator in the URL so a stray id can't delete another creator's link. */
+export async function removeCreatorSocial(creatorId: string, socialId: string) {
+  await db
+    .delete(cmCreatorSocials)
+    .where(and(eq(cmCreatorSocials.id, socialId), eq(cmCreatorSocials.creatorId, creatorId)));
 }
 
 /** Promote a link to primary and mirror it onto the creator's denormalized fields. */
@@ -218,9 +221,9 @@ export async function setPrimarySocial(creatorId: string, socialId: string) {
   const [social] = await db
     .select()
     .from(cmCreatorSocials)
-    .where(eq(cmCreatorSocials.id, socialId))
+    .where(and(eq(cmCreatorSocials.id, socialId), eq(cmCreatorSocials.creatorId, creatorId)))
     .limit(1);
-  if (!social) throw new Error("Link not found");
+  if (!social) throw new Error("Link not found for this creator");
 
   await db
     .update(cmCreatorSocials)

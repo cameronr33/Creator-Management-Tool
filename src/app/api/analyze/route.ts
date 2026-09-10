@@ -26,18 +26,19 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return badRequest("Invalid request", parsed.error.flatten());
 
   try {
-    const { request, created } = await requestFullAnalysis(
+    const { request, created, rerunQuickPass } = await requestFullAnalysis(
       parsed.data.partnershipId,
       session.user.id,
     );
     // Schedule the ~30-90s Apify round trip to run after the response is
     // sent, rather than awaiting it — the click returns immediately and the
-    // UI's status poll picks up quickPassAt once it lands. Only for a freshly
-    // created request; re-clicking onto an existing open one doesn't re-fire it.
-    if (created) {
+    // UI's status poll picks up quickPassAt once it lands. Fires for a fresh
+    // request, and again for an open one whose instant pass never landed or
+    // is over an hour old (a re-click means "refresh the estimates").
+    if (created || rerunQuickPass) {
       after(() => runQuickAnalysisInBackground(request.id));
     }
-    return NextResponse.json({ ok: true, request, created });
+    return NextResponse.json({ ok: true, request, created, rerunQuickPass });
   } catch (e) {
     return badRequest((e as Error).message);
   }

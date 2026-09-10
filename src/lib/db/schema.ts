@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   pgEnum,
@@ -267,6 +268,12 @@ export const cmCreators = pgTable(
     unique("cm_creators_client_username_uq").on(t.clientId, t.username),
     index("cm_creators_client_idx").on(t.clientId),
     index("cm_creators_refreshed_idx").on(t.lastRefreshedAt),
+    // The sort behind every list page.
+    index("cm_creators_client_followers_idx").on(t.clientId, t.followers.desc().nullsLast()),
+    // The email roster's businessEmail lookup.
+    index("cm_creators_business_email_idx")
+      .on(t.businessEmail)
+      .where(sql`${t.businessEmail} is not null`),
   ],
 );
 
@@ -382,6 +389,8 @@ export const cmPartnerships = pgTable(
     unique("cm_partnerships_creator_campaign_uq").on(t.creatorId, t.campaignId),
     index("cm_partnerships_stage_idx").on(t.stage),
     index("cm_partnerships_campaign_idx").on(t.campaignId),
+    // Email roster: most recently updated open partnership per creator.
+    index("cm_partnerships_creator_updated_idx").on(t.creatorId, t.updatedAt.desc()),
   ],
 );
 
@@ -422,6 +431,10 @@ export const cmOutreachEvents = pgTable(
     index("cm_outreach_occurred_idx").on(t.occurredAt),
     unique("cm_outreach_external_uq").on(t.externalId),
     index("cm_outreach_thread_idx").on(t.threadId),
+    // The outreach-state aggregate and the timeline both filter by
+    // partnership then split/sort by these — the fastest-growing table.
+    index("cm_outreach_partnership_direction_idx").on(t.partnershipId, t.direction),
+    index("cm_outreach_partnership_occurred_idx").on(t.partnershipId, t.occurredAt.desc()),
   ],
 );
 
@@ -502,6 +515,7 @@ export const cmDeliverables = pgTable(
   (t) => [
     index("cm_deliverables_partnership_idx").on(t.partnershipId),
     index("cm_deliverables_posted_idx").on(t.postedAt),
+    index("cm_deliverables_partnership_posted_idx").on(t.partnershipId, t.postedAt.desc()),
   ],
 );
 
@@ -579,8 +593,38 @@ export const cmResearchRuns = pgTable(
     startedAt: timestamp("started_at").defaultNow().notNull(),
     completedAt: timestamp("completed_at"),
   },
-  (t) => [index("cm_research_runs_client_idx").on(t.clientId)],
+  (t) => [
+    index("cm_research_runs_client_idx").on(t.clientId),
+    index("cm_research_runs_client_started_idx").on(t.clientId, t.startedAt.desc()),
+  ],
 );
+
+// ─────────────────────────────────────────────────────────────────
+// cm_job_runs — heartbeat for every background loop.
+//
+// A cron that dies is otherwise indistinguishable from one with nothing to
+// do: the dashboard keeps recomputing plausible queues and nothing turns red.
+// Each /api/cron/* handler writes a row here (status ok / idle / error) so
+// Settings can show "last ran X ago" and flag a loop that is overdue.
+// ─────────────────────────────────────────────────────────────────
+
+export const cmJobRuns = pgTable(
+  "cm_job_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** "follow_ups" | "email_sync" | "refresh_metrics" */
+    job: text("job").notNull(),
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    finishedAt: timestamp("finished_at"),
+    /** "ok" (did work) | "idle" (nothing to do — still a healthy run) | "error" */
+    status: text("status").default("running").notNull(),
+    summary: jsonb("summary"),
+    error: text("error"),
+  },
+  (t) => [index("cm_job_runs_job_started_idx").on(t.job, t.startedAt.desc())],
+);
+
+export type CmJobRun = typeof cmJobRuns.$inferSelect;
 
 // ─────────────────────────────────────────────────────────────────
 // cm_research_requests — "Full Analysis" button state.
@@ -657,6 +701,102 @@ export const cmGmailAccounts = pgTable(
 );
 
 export type CmGmailAccount = typeof cmGmailAccounts.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────
+// cm_creator_emails — every address a creator is known to use.
+//
+// cmCreators.businessEmail is the single Apify-scraped PUBLIC address, which
+// is frequently not the address a creator actually replies from. The email
+// sync matches threads against the union of businessEmail and these rows,
+// so linking a discovered address here is what makes a creator's threads
+// start syncing.
+// ─────────────────────────────────────────────────────────────────
+
+export const cmCreatorEmails = pgTable(
+  "cm_creator_emails",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    creatorId: uuid("creator_id")
+      .notNull()
+      .references(() => cmCreators.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    /** "manual" | "apify" | "sync" — where the address came from. */
+    source: text("source").default("manual").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    unique("cm_creator_emails_creator_email_uq").on(t.creatorId, t.email),
+    index("cm_creator_emails_email_idx").on(t.email),
+  ],
+);
+
+export type CmCreatorEmail = typeof cmCreatorEmails.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────
+// cm_email_suggestions — external addresses seen on cc'd outreach threads
+// that match no creator yet. The sync's "anchor": a sync that finds nothing
+// is only healthy if this list is empty too. The operator links each one to
+// a creator (→ cm_creator_emails) or ignores it.
+// ─────────────────────────────────────────────────────────────────
+
+export const cmEmailSuggestionStatusEnum = pgEnum("cm_email_suggestion_status", [
+  "open",
+  "linked",
+  "ignored",
+]);
+
+export const cmEmailSuggestions = pgTable(
+  "cm_email_suggestions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    displayName: text("display_name"),
+    messageCount: integer("message_count").default(0).notNull(),
+    firstSeenAt: timestamp("first_seen_at"),
+    lastSeenAt: timestamp("last_seen_at"),
+    sampleSubject: text("sample_subject"),
+    /** Best-guess creator from name/handle similarity; the operator confirms. */
+    suggestedCreatorId: uuid("suggested_creator_id").references(() => cmCreators.id, {
+      onDelete: "set null",
+    }),
+    linkedCreatorId: uuid("linked_creator_id").references(() => cmCreators.id, {
+      onDelete: "set null",
+    }),
+    status: cmEmailSuggestionStatusEnum("status").default("open").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    unique("cm_email_suggestions_email_uq").on(t.email),
+    index("cm_email_suggestions_status_idx").on(t.status),
+  ],
+);
+
+export type CmEmailSuggestion = typeof cmEmailSuggestions.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────
+// cm_client_settings — per-client knobs owned by THIS app.
+//
+// sa_clients is shared with the analytics dashboard, so anything that is
+// only true for Creator Manager (which clients this tool shows, follow-up
+// cadence) lives here instead of on the shared row.
+// ─────────────────────────────────────────────────────────────────
+
+export const cmClientSettings = pgTable("cm_client_settings", {
+  clientId: uuid("client_id")
+    .primaryKey()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  /** Hide the client from Creator Manager without touching the shared roster. */
+  hidden: boolean("hidden").default(false).notNull(),
+  /**
+   * Overrides for src/lib/outreach.ts DEFAULT_THRESHOLDS, e.g.
+   * {"initialOutreachAfterDays":3,"followUp1AfterDays":5,...}. Null = defaults.
+   */
+  followUpThresholds: jsonb("follow_up_thresholds"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type CmClientSettings = typeof cmClientSettings.$inferSelect;
 
 // ─────────────────────────────────────────────────────────────────
 // cm_api_keys — lets the creator-research skill push results in

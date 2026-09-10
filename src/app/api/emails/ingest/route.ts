@@ -2,11 +2,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireApiKey, badRequest } from "@/lib/api-helpers";
 import { ingestEmails } from "@/lib/email-ingest";
+import { getActiveGmailAccount } from "@/lib/gmail-sync";
+import { emailDomain } from "@/lib/gmail";
 
 /**
- * POST /api/emails/ingest — API-key auth, for the email-sync skill.
- * Accepts raw Gmail message facts; the server owns all matching logic.
- * Idempotent: re-sent messages are deduped on the Gmail message id.
+ * POST /api/emails/ingest — API-key auth, for the email-sync skill (manual
+ * fallback to the in-app sync). Accepts raw Gmail message facts; the server
+ * owns all matching logic. Idempotent: re-sent messages are deduped on the
+ * Gmail message id. "Outbound" is only recognized from the connected
+ * mailbox's domain when one is connected.
  */
 const messageSchema = z.object({
   externalId: z.string().min(1),
@@ -29,6 +33,9 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid email batch", parsed.error.flatten());
 
-  const result = await ingestEmails(parsed.data.messages);
+  const account = await getActiveGmailAccount();
+  const result = await ingestEmails(parsed.data.messages, {
+    teamDomain: account ? emailDomain(account.email) : null,
+  });
   return NextResponse.json({ ok: true, ...result });
 }

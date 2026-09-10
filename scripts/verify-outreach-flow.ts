@@ -10,9 +10,10 @@
  */
 import { eq } from "drizzle-orm";
 import { db, schema } from "./db";
-import { renderTemplate, firstName, igDmUrl, igProfileUrl, mailtoUrl } from "../src/lib/outreach";
+import { renderTemplate, firstName, igDmUrl, igProfileUrl, mailtoUrl, deriveOutreachState } from "../src/lib/outreach";
 import { applyAutoStage } from "../src/lib/auto-stage";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
+import { getOutreachStates } from "../src/lib/queries";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail?: string) {
@@ -46,6 +47,10 @@ async function main() {
   check("mailto encodes subject spaces as %20 not +", mail.includes("subject=Hi%20there"), mail);
   check("mailto encodes newline", mail.includes("Line%20one%0ALine%20two"), mail);
   check("mailto without subject", mailtoUrl("a@b.com", null, "x") === "mailto:a@b.com?body=x");
+  check(
+    "mailto pre-fills the sync mailbox as cc",
+    mailtoUrl("a@b.com", "Hi", "x", "cameron@sentic.io").includes("cc=cameron%40sentic.io"),
+  );
 
   console.log("\n── Live: event logging round-trip (cleaned up after) ──");
   const [client] = await db
@@ -98,6 +103,35 @@ async function main() {
     });
     const replied = await applyAutoStage(partnershipId, "inbound_message");
     check("reply advanced contacted → in_conversation", replied?.to === "in_conversation");
+
+    // The list-page SQL aggregate must agree with the pure per-event derivation
+    // the detail page uses — same numbers, same dates, same flags.
+    const rawEvents = await db
+      .select({
+        occurredAt: schema.cmOutreachEvents.occurredAt,
+        direction: schema.cmOutreachEvents.direction,
+        kind: schema.cmOutreachEvents.kind,
+        isMigrated: schema.cmOutreachEvents.isMigrated,
+      })
+      .from(schema.cmOutreachEvents)
+      .where(eq(schema.cmOutreachEvents.partnershipId, partnershipId));
+    const now = new Date();
+    const pure = deriveOutreachState(rawEvents, now);
+    const agg = (await getOutreachStates([partnershipId], now)).get(partnershipId)!;
+    check("aggregate totalOutbound == pure", agg.totalOutbound === pure.totalOutbound, `${agg.totalOutbound} vs ${pure.totalOutbound}`);
+    check("aggregate followUpCount == pure", agg.followUpCount === pure.followUpCount);
+    check("aggregate hasReplied == pure", agg.hasReplied === pure.hasReplied);
+    check(
+      "aggregate lastOutboundAt == pure (to the second)",
+      Math.abs((agg.lastOutboundAt?.getTime() ?? 0) - (pure.lastOutboundAt?.getTime() ?? 0)) < 1000,
+      `${agg.lastOutboundAt?.toISOString()} vs ${pure.lastOutboundAt?.toISOString()}`,
+    );
+    check(
+      "aggregate repliedAt == pure (to the second)",
+      Math.abs((agg.repliedAt?.getTime() ?? 0) - (pure.repliedAt?.getTime() ?? 0)) < 1000,
+    );
+    check("aggregate daysSinceLastOutbound == pure", agg.daysSinceLastOutbound === pure.daysSinceLastOutbound);
+    check("aggregate datesAreMigrated == pure", agg.datesAreMigrated === pure.datesAreMigrated);
 
     // outreachReason persists through the partnerships PATCH shape.
     await db

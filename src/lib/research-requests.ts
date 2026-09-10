@@ -21,7 +21,7 @@ const OPEN_STATUSES = ["queued", "running"] as const;
 export async function requestFullAnalysis(
   partnershipId: string,
   userId?: string,
-): Promise<{ request: CmResearchRequest; created: boolean }> {
+): Promise<{ request: CmResearchRequest; created: boolean; rerunQuickPass: boolean }> {
   const [row] = await db
     .select({
       creatorId: cmPartnerships.creatorId,
@@ -46,7 +46,17 @@ export async function requestFullAnalysis(
     .orderBy(desc(cmResearchRequests.requestedAt))
     .limit(1);
 
-  if (existing) return { request: existing, created: false };
+  if (existing) {
+    // Re-clicking onto an open request: the accurate pass is still pending, so
+    // don't queue a duplicate — but DO re-run the instant pass when the
+    // previous one never landed (after() died) or is stale, otherwise the
+    // button is a permanent no-op for this creator.
+    const staleMs = 60 * 60 * 1000;
+    const quickPassMissing = existing.quickPassAt == null;
+    const quickPassStale = existing.quickPassAt != null && Date.now() - existing.quickPassAt.getTime() > staleMs;
+    const rerunQuickPass = existing.status === "queued" && (quickPassMissing || quickPassStale);
+    return { request: existing, created: false, rerunQuickPass };
+  }
 
   const [created] = await db
     .insert(cmResearchRequests)
@@ -59,7 +69,7 @@ export async function requestFullAnalysis(
     })
     .returning();
 
-  return { request: created, created: true };
+  return { request: created, created: true, rerunQuickPass: false };
 }
 
 /**

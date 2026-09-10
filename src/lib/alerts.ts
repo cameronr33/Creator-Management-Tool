@@ -6,7 +6,7 @@ import {
   cmAlerts,
   type CmAlertType,
 } from "@/lib/db/schema";
-import { getOutreachStates } from "@/lib/queries";
+import { getOutreachStates, getFollowUpThresholdsByClient } from "@/lib/queries";
 import { changeStage } from "@/lib/mutations";
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 
@@ -24,8 +24,6 @@ export interface SweepResult {
  * the second follow-up.
  */
 export async function runFollowUpSweep(clientId?: string): Promise<SweepResult> {
-  const t = DEFAULT_THRESHOLDS;
-
   const conds = [inArray(cmPartnerships.stage, ["shortlisted", "contacted"] as const)];
   const partnerships = await db
     .select({
@@ -38,7 +36,10 @@ export async function runFollowUpSweep(clientId?: string): Promise<SweepResult> 
     .where(clientId ? and(eq(cmCreators.clientId, clientId), ...conds) : and(...conds));
 
   const ids = partnerships.map((p) => p.id);
-  const states = await getOutreachStates(ids);
+  const [states, thresholdsByClient] = await Promise.all([
+    getOutreachStates(ids),
+    getFollowUpThresholdsByClient([...new Set(partnerships.map((p) => p.clientId))]),
+  ]);
 
   // Existing open alerts, to diff against.
   const existingAlerts = ids.length
@@ -60,9 +61,12 @@ export async function runFollowUpSweep(clientId?: string): Promise<SweepResult> 
 
   for (const p of partnerships) {
     const st = states.get(p.id);
+    const t = thresholdsByClient.get(p.clientId) ?? DEFAULT_THRESHOLDS;
     const wanted: { type: CmAlertType } | null = (() => {
       if (!st) return null;
       if (st.hasReplied) return null;
+      // Migrated sheet rows have no real dates — never alert or auto-close on them.
+      if (st.datesAreMigrated) return null;
       if (p.stage === "shortlisted" && st.totalOutbound === 0) {
         return { type: "initial_outreach_due" };
       }
@@ -75,7 +79,7 @@ export async function runFollowUpSweep(clientId?: string): Promise<SweepResult> 
     })();
 
     // Auto-retire: two follow-ups, still silent past the threshold.
-    if (st && !st.hasReplied && st.followUpCount >= 2 && (st.daysSinceLastOutbound ?? 0) >= t.markNoResponseAfterDays) {
+    if (st && !st.hasReplied && !st.datesAreMigrated && st.followUpCount >= 2 && (st.daysSinceLastOutbound ?? 0) >= t.markNoResponseAfterDays) {
       await changeStage(p.id, "no_response");
       movedToNoResponse++;
       // Resolve any lingering alerts for this partnership.

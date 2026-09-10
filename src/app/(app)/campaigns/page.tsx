@@ -21,7 +21,7 @@ export default async function CampaignsPage() {
 
   const [campaigns, rows] = await Promise.all([
     getCampaigns(client.id),
-    getCreatorRows(client.id),
+    getCreatorRows(client.id, { withOutreach: false }),
   ]);
 
   const byCampaign = new Map<string, typeof rows>();

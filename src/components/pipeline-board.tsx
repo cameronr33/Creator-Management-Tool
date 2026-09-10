@@ -23,11 +23,20 @@ const COLUMNS: { key: string; label: string; stages: CmStage[] }[] = [
   { key: "closed", label: "Closed", stages: ["passed", "declined", "no_response"] as CmStage[] },
 ];
 
+const CLOSE_OPTIONS: { stage: CmStage; label: string }[] = [
+  { stage: "passed", label: "We passed" },
+  { stage: "declined", label: "They declined" },
+  { stage: "no_response", label: "No response" },
+];
+
 export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
   const router = useRouter();
   const [items, setItems] = useState(cards);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
+  // A drop on "Closed" has to say WHO ended it — that's what the terminal
+  // stages and exit reasons are for — so it asks instead of assuming "passed".
+  const [pendingClose, setPendingClose] = useState<string | null>(null);
 
   const move = async (partnershipId: string, toStage: CmStage) => {
     const card = items.find((c) => c.partnershipId === partnershipId);
@@ -57,7 +66,10 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
             }}
             onDragLeave={() => setOverCol((c) => (c === col.key ? null : c))}
             onDrop={() => {
-              if (dragId) move(dragId, dropStage);
+              if (dragId) {
+                if (col.key === "closed") setPendingClose(dragId);
+                else move(dragId, dropStage);
+              }
               setDragId(null);
               setOverCol(null);
             }}
@@ -72,6 +84,30 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
               </span>
             </div>
             <div className="flex min-h-16 flex-col gap-2 px-2 pb-2">
+              {col.key === "closed" && pendingClose && (
+                <div className="rounded-lg border border-accent bg-surface p-2 text-xs">
+                  <div className="mb-1.5 font-medium text-text">
+                    Close {items.find((c) => c.partnershipId === pendingClose)?.name ?? "this creator"} as…
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {CLOSE_OPTIONS.map((o) => (
+                      <button
+                        key={o.stage}
+                        onClick={() => {
+                          move(pendingClose, o.stage);
+                          setPendingClose(null);
+                        }}
+                        className="rounded-md bg-accent px-2 py-1 text-white hover:bg-indigo-700"
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                    <button onClick={() => setPendingClose(null)} className="px-2 py-1 text-text-muted hover:text-text">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
               {colCards.map((c) => (
                 <div
                   key={c.partnershipId}

@@ -14,6 +14,7 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:apply": "tsx --env-file=.env.local scripts/apply-schema.ts",
+    "db:deploy": "tsx scripts/apply-schema.ts",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env.local scripts/seed-admin.ts",
     "import:hella": "tsx --env-file=.env.local scripts/import-hella.ts",
@@ -26,6 +27,10 @@
     "verify:editors": "tsx --env-file=.env.local scripts/verify-editors.ts",
     "verify:email-ingest": "tsx --env-file=.env.local scripts/verify-email-ingest.ts",
     "verify:gmail-sync": "tsx --env-file=.env.local scripts/verify-gmail-sync.ts",
+    "gmail:diagnose": "tsx --env-file=.env.local scripts/gmail-diagnose.ts",
+    "verify:invariants": "tsx --env-file=.env.local scripts/verify-invariants.ts",
+    "seed:clients": "tsx --env-file=.env.local scripts/seed-clients.ts",
+    "fix:duplicate-shipments": "tsx --env-file=.env.local scripts/fix-duplicate-shipments.ts",
     "cron": "tsx scripts/cron-worker.ts"
   },
   "dependencies": {

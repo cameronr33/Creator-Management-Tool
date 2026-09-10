@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, isNotNull, notInArray } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   clients,
   cmCreators,
+  cmCreatorEmails,
   cmPartnerships,
   cmOutreachEvents,
 } from "@/lib/db/schema";
@@ -18,7 +19,13 @@ import { applyAutoStage } from "@/lib/auto-stage";
  * reply-all is invisible to this pipeline.
  */
 
-const TERMINAL_STAGES = ["passed", "declined", "no_response"] as const;
+/**
+ * Stages the email sync ignores. `no_response` is deliberately NOT here: the
+ * follow-up loop closes creators who went quiet, and their late reply is
+ * exactly the message we most want to catch — so they stay on the roster and
+ * an inbound message reopens them (see auto-stage `inbound_message`).
+ */
+const ROSTER_EXCLUDED_STAGES = ["passed", "declined"] as const;
 
 export interface EmailRosterContact {
   partnershipId: string;
@@ -30,7 +37,13 @@ export interface EmailRosterContact {
   stage: string;
 }
 
-/** Creators with a business email and at least one open (non-terminal) partnership. */
+/**
+ * Every known address of every creator with an open (non-terminal)
+ * partnership — one contact row per (creator, address). Addresses are the
+ * union of the Apify-scraped businessEmail and cm_creator_emails (linked
+ * from sync discovery or added by hand), because the public address is
+ * frequently not the one a creator actually writes from.
+ */
 export async function getEmailRoster(): Promise<EmailRosterContact[]> {
   const rows = await db
     .select({
@@ -46,29 +59,41 @@ export async function getEmailRoster(): Promise<EmailRosterContact[]> {
     .from(cmPartnerships)
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
     .innerJoin(clients, eq(cmCreators.clientId, clients.id))
-    .where(
-      and(
-        isNotNull(cmCreators.businessEmail),
-        notInArray(cmPartnerships.stage, [...TERMINAL_STAGES]),
-      ),
-    )
+    .where(notInArray(cmPartnerships.stage, [...ROSTER_EXCLUDED_STAGES]))
     .orderBy(desc(cmPartnerships.updatedAt));
 
-  // One contact per creator — the most recently updated open partnership wins.
-  const seen = new Set<string>();
+  // One partnership per creator — the most recently updated open one wins.
+  const byCreator = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) if (!byCreator.has(r.creatorId)) byCreator.set(r.creatorId, r);
+  if (byCreator.size === 0) return [];
+
+  const extra = await db
+    .select({ creatorId: cmCreatorEmails.creatorId, email: cmCreatorEmails.email })
+    .from(cmCreatorEmails)
+    .where(inArray(cmCreatorEmails.creatorId, [...byCreator.keys()]));
+  const extraByCreator = new Map<string, string[]>();
+  for (const e of extra) {
+    const list = extraByCreator.get(e.creatorId) ?? [];
+    list.push(e.email);
+    extraByCreator.set(e.creatorId, list);
+  }
+
   const contacts: EmailRosterContact[] = [];
-  for (const r of rows) {
-    if (seen.has(r.creatorId)) continue;
-    seen.add(r.creatorId);
-    contacts.push({
-      partnershipId: r.partnershipId,
-      creatorId: r.creatorId,
-      clientSlug: r.clientSlug,
-      name: r.name,
-      username: r.username,
-      businessEmail: r.businessEmail as string,
-      stage: r.stage,
-    });
+  for (const r of byCreator.values()) {
+    const addresses = new Set<string>();
+    if (r.businessEmail) addresses.add(r.businessEmail.toLowerCase());
+    for (const e of extraByCreator.get(r.creatorId) ?? []) addresses.add(e.toLowerCase());
+    for (const businessEmail of addresses) {
+      contacts.push({
+        partnershipId: r.partnershipId,
+        creatorId: r.creatorId,
+        clientSlug: r.clientSlug,
+        name: r.name,
+        username: r.username,
+        businessEmail,
+        stage: r.stage,
+      });
+    }
   }
   return contacts;
 }
@@ -90,28 +115,35 @@ export interface EmailMatch {
   direction: "inbound" | "outbound";
 }
 
+function normAddress(addr: string): string {
+  const m = addr.match(/<([^>]+)>/);
+  return (m ? m[1] : addr).trim().toLowerCase();
+}
+
 /**
- * Pure matcher. A message FROM the creator's businessEmail is inbound; a
- * message TO/cc the creator is outbound (sent by the team). Case-insensitive;
- * tolerates "Display Name <addr>" forms.
+ * Pure matcher. A message FROM a creator address is inbound. A message TO/cc
+ * a creator is outbound only when it was actually sent by the team — the
+ * sender's domain must match `teamDomain` (the connected mailbox's domain).
+ * Without that check a creator's manager cc'ing them would be logged as our
+ * follow-up and silently advance the pipeline. When no teamDomain is known
+ * (no mailbox connected), the sender check is skipped — documented fallback
+ * for the manual skill path. Case-insensitive; tolerates "Name <addr>" forms.
  */
 export function matchEmailMessage(
   message: Pick<IncomingEmailMessage, "from" | "to" | "cc">,
   contactsByEmail: Map<string, { partnershipId: string }>,
+  teamDomain?: string | null,
 ): EmailMatch | null {
-  const norm = (addr: string) => {
-    const m = addr.match(/<([^>]+)>/);
-    return (m ? m[1] : addr).trim().toLowerCase();
-  };
-
-  const from = norm(message.from);
+  const from = normAddress(message.from);
   const fromContact = contactsByEmail.get(from);
   if (fromContact) {
     return { partnershipId: fromContact.partnershipId, direction: "inbound" };
   }
 
+  if (teamDomain && from.split("@")[1] !== teamDomain.toLowerCase()) return null;
+
   for (const addr of [...message.to, ...message.cc]) {
-    const contact = contactsByEmail.get(norm(addr));
+    const contact = contactsByEmail.get(normAddress(addr));
     if (contact) {
       return { partnershipId: contact.partnershipId, direction: "outbound" };
     }
@@ -126,14 +158,28 @@ export interface IngestEmailsResult {
   stageChanges: { partnershipId: string; from: string; to: string }[];
 }
 
-export async function ingestEmails(messages: IncomingEmailMessage[]): Promise<IngestEmailsResult> {
+export interface IngestEmailsOptions {
+  /** Pass the roster the caller already loaded to save a full scan. */
+  roster?: EmailRosterContact[];
+  /** Domain of the connected mailbox; gates "outbound" classification. */
+  teamDomain?: string | null;
+}
+
+export async function ingestEmails(
+  messages: IncomingEmailMessage[],
+  opts: IngestEmailsOptions = {},
+): Promise<IngestEmailsResult> {
   const result: IngestEmailsResult = { inserted: 0, skipped: 0, unmatched: [], stageChanges: [] };
   if (messages.length === 0) return result;
 
-  const roster = await getEmailRoster();
-  const contactsByEmail = new Map(
-    roster.map((c) => [c.businessEmail.toLowerCase(), { partnershipId: c.partnershipId }]),
-  );
+  const roster = opts.roster ?? (await getEmailRoster());
+  // Roster is ordered most-recently-updated first; first wins so an address
+  // shared by two creators files against the live partnership, not the stale one.
+  const contactsByEmail = new Map<string, { partnershipId: string }>();
+  for (const c of roster) {
+    const key = c.businessEmail.toLowerCase();
+    if (!contactsByEmail.has(key)) contactsByEmail.set(key, { partnershipId: c.partnershipId });
+  }
 
   // Prior-outbound lookup decides initial vs follow_up per partnership.
   const partnershipIds = [...new Set(roster.map((c) => c.partnershipId))];
@@ -156,9 +202,9 @@ export async function ingestEmails(messages: IncomingEmailMessage[]): Promise<In
   );
 
   for (const msg of ordered) {
-    const match = matchEmailMessage(msg, contactsByEmail);
+    const match = matchEmailMessage(msg, contactsByEmail, opts.teamDomain);
     if (!match) {
-      result.unmatched.push({ externalId: msg.externalId, reason: "no roster address on the message" });
+      result.unmatched.push({ externalId: msg.externalId, reason: "no roster address on the message, or sender is not the team" });
       continue;
     }
 

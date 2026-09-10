@@ -149,36 +149,56 @@ export async function runQuickAnalysis(requestId: string): Promise<QuickAnalysis
     // still worth keeping, so swallow this rather than failing the request.
   }
 
+  // FROZEN RULE: provisional Apify numbers never overwrite accurate ones.
+  // A creator whose views came from the Chrome-grid pass (ig_public_chrome)
+  // keeps those views and their vision-written reel descriptions; the instant
+  // pass may only refresh followers/cadence/date range for them. And an empty
+  // Apify result (private account, soft actor failure) must not zero anything.
+  const hasAccurateViews = creator.viewsSource === "ig_public_chrome";
+  const gotReels = agg.reelCount > 0;
+
   await db
     .update(cmCreators)
     .set({
       followers: profile?.followersCount ?? creator.followers,
       businessEmail: profile?.businessEmail ?? creator.businessEmail,
-      reelsPulled: agg.reelCount,
-      cadencePerWeek: String(agg.cadencePerWeek),
-      dateRangeStart: agg.dateOldest,
-      dateRangeEnd: agg.dateNewest,
-      avgViews: agg.avgViews,
-      medianViews: agg.medianViews,
-      maxViews: agg.maxViews,
-      viewsSource: "apify",
+      ...(gotReels
+        ? {
+            reelsPulled: agg.reelCount,
+            cadencePerWeek: String(agg.cadencePerWeek),
+            dateRangeStart: agg.dateOldest,
+            dateRangeEnd: agg.dateNewest,
+          }
+        : {}),
+      ...(gotReels && !hasAccurateViews
+        ? {
+            avgViews: agg.avgViews,
+            medianViews: agg.medianViews,
+            maxViews: agg.maxViews,
+            viewsSource: "apify" as const,
+          }
+        : {}),
       contentTypeSummary: summary ?? creator.contentTypeSummary,
       lastRefreshedAt: now,
       updatedAt: now,
     })
     .where(eq(cmCreators.id, creator.id));
 
-  await db.delete(cmCreatorReels).where(eq(cmCreatorReels.creatorId, creator.id));
-  for (const [i, reel] of agg.top3.entries()) {
-    if (!reel.shortCode) continue;
-    await db.insert(cmCreatorReels).values({
+  const replacementReels = agg.top3
+    .filter((r) => !!r.shortCode)
+    .map((reel, i) => ({
       creatorId: creator.id,
       rank: i + 1,
-      shortcode: reel.shortCode,
+      shortcode: reel.shortCode as string,
       url: `https://www.instagram.com/reel/${reel.shortCode}/`,
       views: reel.videoPlayCount,
       description: captionDescription(reel.caption),
-    });
+    }));
+  // Only replace reels when we have replacements AND the existing ones aren't
+  // the accurate pass's vision-described set.
+  if (replacementReels.length > 0 && !hasAccurateViews) {
+    await db.delete(cmCreatorReels).where(eq(cmCreatorReels.creatorId, creator.id));
+    await db.insert(cmCreatorReels).values(replacementReels);
   }
 
   await db

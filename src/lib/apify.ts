@@ -47,10 +47,12 @@ export async function fetchProfiles(usernames: string[]): Promise<ApifyProfile[]
 
   const directUrls = usernames.map((u) => `https://www.instagram.com/${u}/`);
   const res = await fetch(
-    `${APIFY_BASE}/acts/${INSTAGRAM_SCRAPER}/run-sync-get-dataset-items?token=${token()}`,
+    `${APIFY_BASE}/acts/${INSTAGRAM_SCRAPER}/run-sync-get-dataset-items`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // Bearer header, never ?token= — query strings land in access logs.
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      signal: AbortSignal.timeout(150_000),
       body: JSON.stringify({
         directUrls,
         resultsType: "details",
@@ -66,13 +68,18 @@ export async function fetchProfiles(usernames: string[]): Promise<ApifyProfile[]
   }
 
   const items = (await res.json()) as Record<string, unknown>[];
-  return items.map((it) => ({
-    username: String(it.username ?? "").toLowerCase(),
-    fullName: (it.fullName as string) ?? null,
-    followersCount: typeof it.followersCount === "number" ? it.followersCount : null,
-    businessEmail: (it.businessEmail as string) ?? (it.publicEmail as string) ?? null,
-    verified: Boolean(it.verified),
-  }));
+  const wanted = new Set(usernames.map((u) => u.toLowerCase()));
+  return items
+    .map((it) => ({
+      username: String(it.username ?? "").toLowerCase(),
+      fullName: (it.fullName as string) ?? null,
+      followersCount: typeof it.followersCount === "number" ? it.followersCount : null,
+      businessEmail: (it.businessEmail as string) ?? (it.publicEmail as string) ?? null,
+      verified: Boolean(it.verified),
+    }))
+    // A redirected/renamed handle can come back as a different profile —
+    // never attach a stranger's numbers to a creator.
+    .filter((p) => wanted.has(p.username));
 }
 
 /**
@@ -85,10 +92,12 @@ export async function fetchProfiles(usernames: string[]): Promise<ApifyProfile[]
  */
 export async function fetchReels(username: string, limit = 30): Promise<ApifyReel[]> {
   const res = await fetch(
-    `${APIFY_BASE}/acts/${INSTAGRAM_SCRAPER}/run-sync-get-dataset-items?token=${token()}`,
+    `${APIFY_BASE}/acts/${INSTAGRAM_SCRAPER}/run-sync-get-dataset-items`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // Bearer header, never ?token= — query strings land in access logs.
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      signal: AbortSignal.timeout(150_000),
       body: JSON.stringify({
         directUrls: [`https://www.instagram.com/${username}/`],
         resultsType: "posts",
@@ -135,10 +144,12 @@ export interface ApifyPost {
 export async function fetchPosts(urls: string[]): Promise<ApifyPost[]> {
   if (urls.length === 0) return [];
   const res = await fetch(
-    `${APIFY_BASE}/acts/${INSTAGRAM_SCRAPER}/run-sync-get-dataset-items?token=${token()}`,
+    `${APIFY_BASE}/acts/${INSTAGRAM_SCRAPER}/run-sync-get-dataset-items`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // Bearer header, never ?token= — query strings land in access logs.
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      signal: AbortSignal.timeout(150_000),
       body: JSON.stringify({
         directUrls: urls,
         resultsType: "posts",

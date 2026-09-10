@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requireApiKey, badRequest } from "@/lib/api-helpers";
 import { db } from "@/lib/db";
 import { cmResearchRequests, cmResearchRequestStatusEnum } from "@/lib/db/schema";
@@ -36,12 +36,33 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (d.error !== undefined) update.error = d.error;
   if (d.researchRunId !== undefined) update.researchRunId = d.researchRunId;
 
+  // Claiming is compare-and-set: only a `queued` row can become `running`, so
+  // two runners polling the same queue can't both take the same request.
   const [row] = await db
     .update(cmResearchRequests)
     .set(update)
-    .where(eq(cmResearchRequests.id, id))
+    .where(
+      d.status === "running"
+        ? and(eq(cmResearchRequests.id, id), eq(cmResearchRequests.status, "queued"))
+        : eq(cmResearchRequests.id, id),
+    )
     .returning();
 
-  if (!row) return badRequest("Request not found");
+  if (!row) {
+    if (d.status === "running") {
+      const [existing] = await db
+        .select({ status: cmResearchRequests.status })
+        .from(cmResearchRequests)
+        .where(eq(cmResearchRequests.id, id))
+        .limit(1);
+      if (existing) {
+        return NextResponse.json(
+          { error: `Already ${existing.status} — claimed by another runner` },
+          { status: 409 },
+        );
+      }
+    }
+    return badRequest("Request not found");
+  }
   return NextResponse.json({ ok: true, request: row });
 }

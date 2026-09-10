@@ -60,13 +60,14 @@ export function Badge({
   tone = "neutral",
 }: {
   children: ReactNode;
-  tone?: "neutral" | "accent" | "warn" | "good" | "muted";
+  tone?: "neutral" | "accent" | "warn" | "good" | "bad" | "muted";
 }) {
   const tones: Record<string, string> = {
     neutral: "bg-surface-2 text-text-muted ring-border",
     accent: "bg-accent-soft text-accent ring-indigo-200",
     warn: "bg-amber-50 text-amber-800 ring-amber-200",
     good: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    bad: "bg-red-50 text-red-700 ring-red-200",
     muted: "bg-surface-2 text-text-faint ring-border",
   };
   return (

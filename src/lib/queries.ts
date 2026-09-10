@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -15,18 +16,86 @@ import {
   cmMessageTemplates,
   cmResearchRuns,
   cmApiKeys,
+  cmClientSettings,
   type CmStage,
 } from "@/lib/db/schema";
-import { deriveOutreachState, type OutreachState } from "@/lib/outreach";
+import {
+  deriveOutreachState,
+  daysBetween,
+  DEFAULT_THRESHOLDS,
+  type OutreachState,
+  type FollowUpThresholds,
+} from "@/lib/outreach";
 
 export type ActiveClient = { id: string; name: string; slug: string };
 
-export async function getClients(): Promise<ActiveClient[]> {
-  return db
-    .select({ id: clients.id, name: clients.name, slug: clients.slug })
+/**
+ * Clients this tool shows: active in the shared roster and not hidden here.
+ * Wrapped in React `cache()` so the layout, page and every helper that calls
+ * resolveClient() share ONE query per request instead of 3–4 (Neon HTTP
+ * makes each one a round trip).
+ */
+export const getClients = cache(async (): Promise<ActiveClient[]> => {
+  const rows = await db
+    .select({ id: clients.id, name: clients.name, slug: clients.slug, hidden: cmClientSettings.hidden })
     .from(clients)
+    .leftJoin(cmClientSettings, eq(cmClientSettings.clientId, clients.id))
     .where(eq(clients.isActive, true))
     .orderBy(clients.name);
+  return rows.filter((r) => !r.hidden).map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
+});
+
+export interface ClientWithSettings extends ActiveClient {
+  hidden: boolean;
+  followUpThresholds: Partial<FollowUpThresholds> | null;
+}
+
+/** Every active client in the shared roster with this app's per-client knobs. */
+export async function getClientsWithSettings(): Promise<ClientWithSettings[]> {
+  const rows = await db
+    .select({
+      id: clients.id,
+      name: clients.name,
+      slug: clients.slug,
+      hidden: cmClientSettings.hidden,
+      followUpThresholds: cmClientSettings.followUpThresholds,
+    })
+    .from(clients)
+    .leftJoin(cmClientSettings, eq(cmClientSettings.clientId, clients.id))
+    .where(eq(clients.isActive, true))
+    .orderBy(clients.name);
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    hidden: r.hidden ?? false,
+    followUpThresholds: (r.followUpThresholds as Partial<FollowUpThresholds> | null) ?? null,
+  }));
+}
+
+/**
+ * Follow-up cadence for a set of clients: per-client overrides merged over
+ * DEFAULT_THRESHOLDS. The reference the follow-up loop controls toward now
+ * has an owner (Settings) instead of being a hardcoded number.
+ */
+export async function getFollowUpThresholdsByClient(
+  clientIds: string[],
+): Promise<Map<string, FollowUpThresholds>> {
+  const map = new Map<string, FollowUpThresholds>();
+  if (clientIds.length === 0) return map;
+  const rows = await db
+    .select({ clientId: cmClientSettings.clientId, t: cmClientSettings.followUpThresholds })
+    .from(cmClientSettings)
+    .where(inArray(cmClientSettings.clientId, clientIds));
+  for (const id of clientIds) map.set(id, DEFAULT_THRESHOLDS);
+  for (const r of rows) {
+    map.set(r.clientId, { ...DEFAULT_THRESHOLDS, ...((r.t as Partial<FollowUpThresholds> | null) ?? {}) });
+  }
+  return map;
+}
+
+export async function getFollowUpThresholds(clientId: string): Promise<FollowUpThresholds> {
+  return (await getFollowUpThresholdsByClient([clientId])).get(clientId) ?? DEFAULT_THRESHOLDS;
 }
 
 /** Resolve the active client from a slug, falling back to the first client. */
@@ -75,7 +144,12 @@ export interface CreatorRow {
 
 export async function getCreatorRows(
   clientId: string,
-  opts?: { campaignId?: string; stage?: CmStage },
+  opts?: {
+    campaignId?: string;
+    stage?: CmStage;
+    /** Only the grid and worklist render outreach state; the board and campaigns don't pay for it. */
+    withOutreach?: boolean;
+  },
 ): Promise<CreatorRow[]> {
   const conds = [eq(cmCreators.clientId, clientId)];
   if (opts?.campaignId) conds.push(eq(cmPartnerships.campaignId, opts.campaignId));
@@ -109,6 +183,9 @@ export async function getCreatorRows(
     .orderBy(desc(cmCreators.followers));
 
   if (rows.length === 0) return [];
+  if (opts?.withOutreach === false) {
+    return rows.map((r) => ({ ...r, lastOutboundAt: null, repliedAt: null, followUpCount: 0 }));
+  }
 
   const partnershipIds = rows.map((r) => r.partnershipId);
   const outreachByPartnership = await getOutreachStates(partnershipIds);
@@ -124,32 +201,58 @@ export async function getCreatorRows(
   });
 }
 
-/** Derive outreach state for many partnerships in one query. */
+/**
+ * Outreach state for many partnerships in ONE aggregate query — one row per
+ * partnership instead of every event ever logged. Must stay equivalent to
+ * the pure deriveOutreachState() used on the detail page (verified in
+ * scripts/verify-outreach-flow.ts).
+ */
 export async function getOutreachStates(
   partnershipIds: string[],
+  now: Date = new Date(),
 ): Promise<Map<string, OutreachState>> {
   const map = new Map<string, OutreachState>();
   if (partnershipIds.length === 0) return map;
 
-  const events = await db
+  const rows = await db
     .select({
       partnershipId: cmOutreachEvents.partnershipId,
-      occurredAt: cmOutreachEvents.occurredAt,
-      direction: cmOutreachEvents.direction,
-      kind: cmOutreachEvents.kind,
-      isMigrated: cmOutreachEvents.isMigrated,
+      totalOutbound: sql<number>`count(*) filter (where ${cmOutreachEvents.direction} = 'outbound')::int`,
+      followUpCount: sql<number>`count(*) filter (where ${cmOutreachEvents.direction} = 'outbound' and ${cmOutreachEvents.kind} = 'follow_up')::int`,
+      firstContactAt: sql<Date | null>`min(${cmOutreachEvents.occurredAt}) filter (where ${cmOutreachEvents.direction} = 'outbound')`,
+      lastOutboundAt: sql<Date | null>`max(${cmOutreachEvents.occurredAt}) filter (where ${cmOutreachEvents.direction} = 'outbound')`,
+      lastContactAt: sql<Date | null>`max(${cmOutreachEvents.occurredAt})`,
+      repliedAt: sql<Date | null>`min(${cmOutreachEvents.occurredAt}) filter (where ${cmOutreachEvents.direction} = 'inbound')`,
+      allOutboundMigrated: sql<boolean | null>`bool_and(${cmOutreachEvents.isMigrated}) filter (where ${cmOutreachEvents.direction} = 'outbound')`,
     })
     .from(cmOutreachEvents)
-    .where(inArray(cmOutreachEvents.partnershipId, partnershipIds));
+    .where(inArray(cmOutreachEvents.partnershipId, partnershipIds))
+    .groupBy(cmOutreachEvents.partnershipId);
 
-  const grouped = new Map<string, typeof events>();
-  for (const e of events) {
-    const arr = grouped.get(e.partnershipId) ?? [];
-    arr.push(e);
-    grouped.set(e.partnershipId, arr);
-  }
-  for (const id of partnershipIds) {
-    map.set(id, deriveOutreachState(grouped.get(id) ?? []));
+  // Raw sql`` results come back as strings; `timestamp` (no tz) columns are
+  // stored as UTC and drizzle's own column mapper reads them as UTC, so do
+  // the same here rather than letting Date() assume local time.
+  const toDate = (v: Date | string | null) => {
+    if (v == null) return null;
+    if (v instanceof Date) return v;
+    const hasTz = /(?:[zZ]|[+-]\d{2}(?::?\d{2})?)$/.test(v);
+    return new Date(hasTz ? v : `${v.replace(" ", "T")}Z`);
+  };
+  const empty = deriveOutreachState([]);
+  for (const id of partnershipIds) map.set(id, empty);
+  for (const r of rows) {
+    const lastOutboundAt = toDate(r.lastOutboundAt);
+    map.set(r.partnershipId, {
+      totalOutbound: r.totalOutbound,
+      followUpCount: r.followUpCount,
+      firstContactAt: toDate(r.firstContactAt),
+      lastOutboundAt,
+      lastContactAt: toDate(r.lastContactAt),
+      repliedAt: toDate(r.repliedAt),
+      hasReplied: r.repliedAt != null,
+      daysSinceLastOutbound: lastOutboundAt ? daysBetween(lastOutboundAt, now) : null,
+      datesAreMigrated: r.totalOutbound > 0 && r.allOutboundMigrated === true,
+    });
   }
   return map;
 }
@@ -186,7 +289,9 @@ export async function getPartnershipDetail(partnershipId: string) {
     await Promise.all([
       db.select().from(cmCreatorReels).where(eq(cmCreatorReels.creatorId, row.creator.id)).orderBy(cmCreatorReels.rank),
       db.select().from(cmCreatorSocials).where(eq(cmCreatorSocials.creatorId, row.creator.id)).orderBy(desc(cmCreatorSocials.isPrimary)),
-      db.select().from(cmOutreachEvents).where(eq(cmOutreachEvents.partnershipId, partnershipId)).orderBy(desc(cmOutreachEvents.occurredAt)),
+      // Bounded: the email sync writes into this table, and a long-running
+      // thread would otherwise ship every message body on every page view.
+      db.select().from(cmOutreachEvents).where(eq(cmOutreachEvents.partnershipId, partnershipId)).orderBy(desc(cmOutreachEvents.occurredAt)).limit(100),
       db.select().from(cmProductsRequested).where(eq(cmProductsRequested.partnershipId, partnershipId)),
       db.select().from(cmShipments).where(eq(cmShipments.partnershipId, partnershipId)).orderBy(desc(cmShipments.createdAt)),
       db.select().from(cmDeliverables).where(eq(cmDeliverables.partnershipId, partnershipId)).orderBy(desc(cmDeliverables.postedAt)),
@@ -237,17 +342,41 @@ export async function getDefaultTemplates(clientId: string) {
   };
 }
 
+/** Run history for /import — never the rawPayload blob (the whole ingest, megabytes). */
 export async function getResearchRuns(clientId: string, limit = 15) {
   return db
-    .select()
+    .select({
+      id: cmResearchRuns.id,
+      clientId: cmResearchRuns.clientId,
+      campaignId: cmResearchRuns.campaignId,
+      source: cmResearchRuns.source,
+      status: cmResearchRuns.status,
+      handleCount: cmResearchRuns.handleCount,
+      createdCount: cmResearchRuns.createdCount,
+      updatedCount: cmResearchRuns.updatedCount,
+      errors: cmResearchRuns.errors,
+      startedAt: cmResearchRuns.startedAt,
+      completedAt: cmResearchRuns.completedAt,
+    })
     .from(cmResearchRuns)
     .where(eq(cmResearchRuns.clientId, clientId))
     .orderBy(desc(cmResearchRuns.startedAt))
     .limit(limit);
 }
 
+/** Never selects keyHash — it must not cross into the RSC payload. */
 export async function getApiKeys() {
-  return db.select().from(cmApiKeys).orderBy(desc(cmApiKeys.createdAt));
+  return db
+    .select({
+      id: cmApiKeys.id,
+      name: cmApiKeys.name,
+      keyPrefix: cmApiKeys.keyPrefix,
+      lastUsedAt: cmApiKeys.lastUsedAt,
+      revokedAt: cmApiKeys.revokedAt,
+      createdAt: cmApiKeys.createdAt,
+    })
+    .from(cmApiKeys)
+    .orderBy(desc(cmApiKeys.createdAt));
 }
 
 export async function getTemplates(clientId: string) {

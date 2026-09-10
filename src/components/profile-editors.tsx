@@ -132,6 +132,64 @@ export function EditableProfile({ creator }: { creator: CmCreator }) {
   );
 }
 
+/* ── Email addresses ──────────────────────────────────────────── */
+
+/**
+ * Every address this creator is known to use. The public (Apify) address is
+ * shown on the profile; these extras are what the email sync also matches —
+ * the address a creator actually replies from is usually not the public one.
+ */
+export function EmailsEditor({
+  creatorId,
+  emails,
+}: {
+  creatorId: string;
+  emails: { id: string; email: string; source: string }[];
+}) {
+  const { pending, run } = useAction();
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const add = async () => {
+    setError(null);
+    const r = await run(() => send(`/api/creators/${creatorId}/emails`, { email: value }));
+    if (r.ok) setValue("");
+    else setError((r.data as { error?: string })?.error ?? "Could not add");
+  };
+  const remove = (email: string) =>
+    run(() => send(`/api/creators/${creatorId}/emails`, { email }, "DELETE"));
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {emails.map((e) => (
+        <span
+          key={e.id}
+          className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-2 py-0.5 text-xs text-text-muted"
+          title={`source: ${e.source}`}
+        >
+          {e.email}
+          <button onClick={() => remove(e.email)} disabled={pending} className="hover:text-red-600" aria-label="Remove email">
+            <X size={11} />
+          </button>
+        </span>
+      ))}
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && value && add()}
+        placeholder="+ other email they use"
+        className="w-48 rounded-md border border-border bg-surface px-2 py-0.5 text-xs outline-none focus:border-accent"
+      />
+      {value && (
+        <button onClick={add} disabled={pending} className="text-xs text-accent hover:underline">
+          Add
+        </button>
+      )}
+      {error && <span className="text-xs text-red-600">{error}</span>}
+    </div>
+  );
+}
+
 /* ── Social links ─────────────────────────────────────────────── */
 
 export function SocialsEditor({

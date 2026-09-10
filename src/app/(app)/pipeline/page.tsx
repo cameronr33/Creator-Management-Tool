@@ -1,4 +1,4 @@
-import { resolveClient, getCreatorRows, getCampaigns } from "@/lib/queries";
+import { resolveClient, getCreatorRows } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { PipelineBoard, type BoardCard } from "@/components/pipeline-board";
@@ -21,8 +21,7 @@ export default async function PipelinePage({
     );
   }
 
-  await getCampaigns(client.id);
-  const rows = await getCreatorRows(client.id, { campaignId: sp.campaign || undefined });
+  const rows = await getCreatorRows(client.id, { campaignId: sp.campaign || undefined, withOutreach: false });
   const cards: BoardCard[] = rows.map((r) => ({
     partnershipId: r.partnershipId,
     name: r.name,

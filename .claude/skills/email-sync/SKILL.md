@@ -14,23 +14,23 @@ description: Sync creator outreach email threads from the connected Gmail into C
 > message id, so mixing them is safe.
 
 Creator outreach email is sent by a teammate from their own mailbox with
-**cameron@sentic.io cc'd**. This skill reads those threads from the connected
-Gmail and pushes them into Creator Manager so the outreach timeline, follow-up
-queue, and pipeline stages stay current without anyone hand-logging
-touchpoints.
+**the sync mailbox cc'd** (whichever account is connected under Settings →
+Email sync). This skill reads those threads from the Gmail connector and
+pushes them into Creator Manager so the outreach timeline, follow-up queue,
+and pipeline stages stay current without anyone hand-logging touchpoints.
 
 **Tracking only.** This skill never drafts, sends, or replies to any email.
 
-**Coverage caveat (tell the user when relevant):** only threads where
-cameron@sentic.io is on To/Cc are visible. If a creator replies without
+**Coverage caveat (tell the user when relevant):** only threads where the
+sync mailbox is on To/Cc are visible. If a creator replies without
 reply-all, that reply cannot be synced — the teammate should keep the cc on
-every message.
+every message (the app pre-fills it in `mailto:` links).
 
 ## Prerequisites
 
 - `CM_API_URL` (e.g. `http://localhost:3002`) and `CM_API_KEY` (Settings →
   API keys) in the environment, same as the creator-research skill.
-- The Gmail MCP connector for cameron@sentic.io, available to Claude in this
+- The Gmail MCP connector for the sync mailbox, available to Claude in this
   session. **The python script cannot read mail** — MCP tools are
   Claude-only; the script exists solely to talk to the app's API.
 

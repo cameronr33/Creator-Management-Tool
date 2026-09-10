@@ -7,6 +7,11 @@ description: Verify the Creator Manager app end-to-end before declaring any chan
 
 Never report a change to Creator Manager as complete on the strength of a successful edit alone. Verify it the way a reviewer would, and do not hand back partially verified work. Each step is quantitative so it can self-check.
 
+This is the **graph of loops** described in `AGENTS.md`, run in order: fast
+(1) → feature (3) → audit (3e) → live (4/5). Independent review (a
+fresh-context agent or `/code-review`) is the watcher loop and runs at
+milestones, not inside this skill.
+
 Run from the repo root: `C:\Users\camer\Downloads\CLAUDE CODE\creator-manager`.
 
 ## 1. Static gates
@@ -129,6 +134,26 @@ All five are self-cleaning (throwaway `__verify_` rows, cascade-deleted).
   Settings with `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` set. The cron
   route without a connected account must return
   `{ok: true, skipped: "no Gmail account connected"}`, not an error.
+
+## 3e. Frozen invariants (audit loop — read-only, run against the live data)
+
+```bash
+npm run verify:invariants
+```
+
+Asserts the rules no loop may tune: stage never contradicts its tables
+(≥ fulfilling ⇒ shipment; posted ⇒ deliverable), estimates are never labeled
+authoritative, one open research request per creator, one shipment per
+partnership, one active Gmail account, no duplicated synced messages, and
+**zero `__verify_` rows left behind by the other scripts**. A failure here
+means the data is wrong, not the check — fix the data or the code path that
+wrote it. Never edit an invariant to make it pass without a human decision
+recorded in the commit message.
+
+Anchor for the email loop: `npm run gmail:diagnose` shows whether roster
+addresses appear in the mailbox at all. A sync reporting `ok` with
+`messagesFetched: 0` and open suggestions means the addresses on file are
+wrong, not that nobody wrote.
 
 ## 4. Live route smoke-test
 

@@ -144,6 +144,8 @@ export function GmailConnectCard({
       unmatched?: number;
       stageChanges?: number;
       messagesFetched?: number;
+      suggestionsOpen?: number;
+      windowDays?: number;
     } | null;
   } | null;
 }) {
@@ -159,7 +161,7 @@ export function GmailConnectCard({
     setPending(false);
     if (res.ok) {
       setResult(
-        `Synced: ${data.inserted ?? 0} new touchpoint(s), ${data.stageChanges?.length ?? 0} stage change(s), ${data.unmatched?.length ?? 0} unmatched.`,
+        `Synced ${data.windowDays ?? "?"}d: ${data.messagesFetched ?? 0} matched message(s), ${data.inserted ?? 0} new touchpoint(s), ${data.stageChanges?.length ?? 0} stage change(s), ${data.suggestionsOpen ?? 0} unmatched sender(s) to review.`,
       );
       router.refresh();
     } else {
@@ -212,7 +214,7 @@ export function GmailConnectCard({
           <>
             Last sync {account.lastSyncAt}
             {account.lastSyncStatus === "ok" && s
-              ? ` — ${s.inserted ?? 0} new, ${s.unmatched ?? 0} unmatched, ${s.stageChanges ?? 0} stage change(s)`
+              ? ` — ${s.messagesFetched ?? 0} matched message(s) in ${s.windowDays ?? 14}d, ${s.inserted ?? 0} new, ${s.stageChanges ?? 0} stage change(s)`
               : account.lastSyncStatus
                 ? ` — failed: ${account.lastSyncStatus}`
                 : null}
@@ -221,6 +223,12 @@ export function GmailConnectCard({
           "Never synced — runs automatically twice a day, or sync now."
         )}
       </div>
+      {account.lastSyncStatus === "ok" && s && (s.messagesFetched ?? 0) === 0 && (s.suggestionsOpen ?? 0) > 0 && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          The sync is running but matching nothing — the addresses on file aren&apos;t the ones the
+          conversations use. Link the unmatched senders below to their creators.
+        </p>
+      )}
       {result && <p className="text-xs text-text-muted">{result}</p>}
       <div className="flex gap-2">
         <button

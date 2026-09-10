@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { requireAuth, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
+import { httpUrl, isoDate } from "@/lib/validation";
 import { applyAutoStage } from "@/lib/auto-stage";
 import { db } from "@/lib/db";
 import { cmDeliverables, cmPlatformEnum } from "@/lib/db/schema";
@@ -10,8 +11,8 @@ import { fetchPosts } from "@/lib/apify";
 const schema = z.object({
   partnershipId: z.string().uuid(),
   platform: z.enum(cmPlatformEnum.enumValues).default("instagram"),
-  url: z.string().url(),
-  postedAt: z.string().nullable().optional(),
+  url: httpUrl,
+  postedAt: isoDate.nullable().optional(),
   caption: z.string().nullable().optional(),
   /** Default path: pull views/likes/comments/postedAt from Apify (provisional). */
   fetchMetrics: z.boolean().default(false),
@@ -24,13 +25,16 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
+  const { session, error } = await requireAuth();
   if (error) return error;
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid deliverable", parsed.error.flatten());
   const d = parsed.data;
+
+  const scope = await assertPartnershipInSelectedClient(d.partnershipId);
+  if (scope) return scope;
 
   let warning: string | null = null;
   let fetched: {
@@ -82,7 +86,7 @@ export async function POST(req: NextRequest) {
   });
 
   // A live post advances the pipeline to posted.
-  const stageChanged = await applyAutoStage(d.partnershipId, "deliverable_added");
+  const stageChanged = await applyAutoStage(d.partnershipId, "deliverable_added", session.user.id);
 
   return NextResponse.json({ ok: true, stageChanged, warning });
 }

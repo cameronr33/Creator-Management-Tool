@@ -49,6 +49,19 @@ async function main() {
     "unknown addresses → null",
     matchEmailMessage({ from: "a@x.com", to: ["b@y.com"], cc: [] }, contacts) === null,
   );
+  console.log("\n── teamDomain gating (a third party cc'ing the creator is NOT our outreach) ──");
+  check(
+    "team sender to creator → outbound",
+    matchEmailMessage({ from: "Sam <sam@sentic.io>", to: [TEST_EMAIL], cc: [] }, contacts, "sentic.io")?.direction === "outbound",
+  );
+  check(
+    "creator's manager cc'ing the creator → null (not outbound)",
+    matchEmailMessage({ from: "manager@talentco.com", to: ["sam@sentic.io"], cc: [TEST_EMAIL] }, contacts, "sentic.io") === null,
+  );
+  check(
+    "creator reply still inbound regardless of teamDomain",
+    matchEmailMessage({ from: TEST_EMAIL, to: ["sam@sentic.io"], cc: [] }, contacts, "sentic.io")?.direction === "inbound",
+  );
 
   console.log("\n── Live: ingest lifecycle (cleaned up after) ──");
   const [client] = await db
@@ -80,6 +93,23 @@ async function main() {
     const roster = await getEmailRoster();
     const mine = roster.find((c) => c.partnershipId === partnershipId);
     check("appears on the roster with businessEmail", mine?.businessEmail === TEST_EMAIL);
+
+    // A linked extra address (cm_creator_emails) joins the roster too.
+    const ALT_EMAIL = "__verify_ei_alt@example.com";
+    await db.insert(schema.cmCreatorEmails).values({ creatorId, email: ALT_EMAIL, source: "sync" });
+    const roster2 = await getEmailRoster();
+    check(
+      "extra linked address is on the roster for the same partnership",
+      roster2.some((c) => c.partnershipId === partnershipId && c.businessEmail === ALT_EMAIL),
+    );
+
+    // Roster keeps no_response creators (their late reply must be catchable),
+    // drops passed/declined.
+    await db.update(schema.cmPartnerships).set({ stage: "no_response" }).where(eq(schema.cmPartnerships.id, partnershipId));
+    check("no_response stays on the roster", (await getEmailRoster()).some((c) => c.partnershipId === partnershipId));
+    await db.update(schema.cmPartnerships).set({ stage: "declined" }).where(eq(schema.cmPartnerships.id, partnershipId));
+    check("declined drops off the roster", !(await getEmailRoster()).some((c) => c.partnershipId === partnershipId));
+    await db.update(schema.cmPartnerships).set({ stage: "shortlisted" }).where(eq(schema.cmPartnerships.id, partnershipId));
 
     // Outbound from the teammate (creator on To), then the creator replies.
     const outbound1 = {

@@ -103,9 +103,14 @@ export function igProfileUrl(username: string): string {
   return `https://www.instagram.com/${encodeURIComponent(username)}/`;
 }
 
-/** mailto: link with the subject and body pre-filled. */
-export function mailtoUrl(email: string, subject: string | null, body: string): string {
+/**
+ * mailto: link with the subject and body pre-filled. `cc` is the connected
+ * sync mailbox — the email loop can only see threads that mailbox is on, so
+ * the cc is pre-filled rather than left to memory.
+ */
+export function mailtoUrl(email: string, subject: string | null, body: string, cc?: string | null): string {
   const params = new URLSearchParams();
+  if (cc) params.set("cc", cc);
   if (subject) params.set("subject", subject);
   if (body) params.set("body", body);
   const qs = params.toString().replace(/\+/g, "%20");

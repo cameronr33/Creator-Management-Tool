@@ -1,10 +1,21 @@
 # Two services deploy from this repo:
 #   web    — the Next.js app (this config's start command)
 #   cron   — the scheduled loop worker (override startCommand to: npx tsx scripts/cron-worker.ts)
+#
+# NOTE: Railway's config-as-code (this file) is deprecated in favour of
+# Infrastructure as Code; existing files keep working until 2026-12-01.
+# Migrate before then — see https://docs.railway.com/infrastructure-as-code
 [build]
   builder = "nixpacks"
 
 [deploy]
+  # Schema lands BEFORE the new container serves traffic, so a deploy can never
+  # run code against a table that doesn't exist yet. apply-schema.ts is
+  # idempotent (duplicate-object errors are treated as no-ops) and reads
+  # DATABASE_URL from Railway's injected env, so it is safe to re-run.
+  # Pre-deploy runs in a separate container: no volume, no filesystem writes.
+  preDeployCommand = ["npm run db:deploy"]
   startCommand = "npm run start"
-  restartPolicyType = "on_failure"
-  restartPolicyMaxRetries = 3
+  # Restart forever: a cron worker that exhausts its retries dies silently, and
+  # the app's only signal would be a stale cm_job_runs heartbeat.
+  restartPolicyType = "always"

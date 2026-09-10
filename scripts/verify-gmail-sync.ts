@@ -15,12 +15,16 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "./db";
 import {
   buildSearchQueries,
+  buildDiscoveryQuery,
+  parseEmailAddress,
+  emailDomain,
   header,
   splitAddresses,
   extractPlainText,
   normalizeMessage,
   type GmailMessage,
 } from "../src/lib/gmail";
+import { suggestCreatorForAddress } from "../src/lib/email-suggestions";
 import { encrypt, decrypt } from "../src/lib/encryption";
 
 let failures = 0;
@@ -75,6 +79,56 @@ async function main() {
   check("body is the decoded plain text", n?.bodyText === "Plain body — sounds great!");
   const noFrom = normalizeMessage({ ...msg, payload: { headers: [] } });
   check("message without From is dropped, not crashed", noFrom === null);
+  const badDate = normalizeMessage({ ...msg, internalDate: "not-a-number" });
+  check("message with invalid internalDate is dropped, not a RangeError", badDate === null);
+
+  console.log("\n── discovery helpers ──");
+  check("buildDiscoveryQuery", buildDiscoveryQuery("cameron@sentic.io", 90) === "cc:cameron@sentic.io newer_than:90d");
+  check("parseEmailAddress: display-name form", JSON.stringify(parseEmailAddress("Robin Shute <Robin@Example.com>")) === JSON.stringify({ name: "Robin Shute", email: "robin@example.com" }));
+  check("parseEmailAddress: quoted display name", parseEmailAddress('"Shute, Robin" <r@x.com>')?.name === "Shute, Robin");
+  check("parseEmailAddress: bare address", JSON.stringify(parseEmailAddress(" A@B.COM ")) === JSON.stringify({ name: null, email: "a@b.com" }));
+  check("parseEmailAddress: garbage → null", parseEmailAddress("undisclosed-recipients:;") === null);
+  check("emailDomain", emailDomain("Someone@Sentic.IO") === "sentic.io");
+
+  console.log("\n── suggestCreatorForAddress (name/handle similarity) ──");
+  const creators = [
+    { id: "1", name: "Robin Shute", username: "robinshuteracing" },
+    { id: "2", name: "Keaton Lee", username: "crazykkustomz" },
+    { id: "3", name: "Michael Dey", username: "wewrench" },
+    { id: "4", name: "Mike Dey", username: "mikedeybuilds" },
+  ];
+  check("full display name match", suggestCreatorForAddress("rs@gmail.com", "Robin Shute", creators)?.id === "1");
+  check("local-part contains both name tokens", suggestCreatorForAddress("robinshute.racing@gmail.com", null, creators)?.id === "1");
+  check("handle in local part", suggestCreatorForAddress("crazykkustomz@yahoo.com", null, creators)?.id === "2");
+  check("single short token alone is not enough", suggestCreatorForAddress("lee@x.com", null, creators) === null);
+  check("ambiguous tie → null (human decides)", suggestCreatorForAddress("d@x.com", "Dey", creators) === null);
+  check("unrelated address → null", suggestCreatorForAddress("vendor@parts.com", "Parts Co", creators) === null);
+  // Regression: real false positives the first version of this heuristic
+  // produced against the live mailbox. A shared FIRST name is not evidence.
+  check(
+    "shared first name only → null (Eric Muehlstein ≠ Eric Kendricks)",
+    suggestCreatorForAddress("eric@frontlineprop.com", "Eric Muehlstein", [
+      { id: "e", name: "Eric Kendricks", username: "erickendricks" },
+    ]) === null,
+  );
+  check(
+    "shared surname-as-firstname → null (Lee Severino ≠ Keaton Lee)",
+    suggestCreatorForAddress("lee.severino@lumahotelsf.com", "Lee Severino", [
+      { id: "k", name: "Keaton Lee", username: "crazykkustomz" },
+    ]) === null,
+  );
+  check(
+    "shared family name, different person → null (Mike ≠ Tatum Maciejack)",
+    suggestCreatorForAddress("mike@nosincustoms.com", "Mike Maciejack", [
+      { id: "t", name: "Tatum Maciejack", username: "tatummaciejack" },
+    ]) === null,
+  );
+  check(
+    "same person on a different company mailbox → matched (the case this feature exists for)",
+    suggestCreatorForAddress("mike@wewrench.com", "Michael Dey", [
+      { id: "m", name: "Michael Dey", username: "wewrench" },
+    ])?.id === "m",
+  );
 
   console.log("\n── Live: cm_gmail_accounts round-trip (cleaned up after) ──");
   const TEST_EMAIL = "__verify_gmail_sync__@example.com";

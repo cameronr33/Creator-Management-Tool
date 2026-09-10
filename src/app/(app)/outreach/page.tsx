@@ -1,6 +1,7 @@
 import { resolveClient, getDefaultTemplates, getCreatorRows } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { getDashboardStalls } from "@/lib/dashboard";
+import { getActiveGmailAccount } from "@/lib/gmail-sync";
 import { PageHeader, EmptyState } from "@/components/ui";
 import {
   OutreachWorklist,
@@ -21,20 +22,20 @@ export default async function OutreachPage() {
     );
   }
 
-  const [stalls, templates, rows] = await Promise.all([
+  const [stalls, templates, rows, gmailAccount] = await Promise.all([
     getDashboardStalls(client.id),
     getDefaultTemplates(client.id),
     getCreatorRows(client.id),
+    getActiveGmailAccount(),
   ]);
 
   const rowByPartnership = new Map(rows.map((r) => [r.partnershipId, r]));
 
   const entries: WorklistEntry[] = stalls.followUpsDue.map((s) => {
-    const kind: "initial" | "follow_up" = s.detail.includes("initial") ? "initial" : "follow_up";
     const row = rowByPartnership.get(s.partnershipId);
     return {
       ...s,
-      kind,
+      kind: s.kind ?? "follow_up",
       businessEmail: row?.businessEmail ?? null,
       contentPillar: row?.contentPillar ?? null,
       outreachReason: row?.outreachReason ?? null,
@@ -46,6 +47,7 @@ export default async function OutreachPage() {
     email: templates.email
       ? { subject: templates.email.subject, body: templates.email.body }
       : null,
+    ccEmail: gmailAccount?.email ?? null,
   };
 
   return (

@@ -75,16 +75,26 @@ plus terminal `passed` / `declined` / `no_response` (split by who ended it).
 
 Both are driven by `scripts/cron-worker.ts` on a Railway worker service.
 
-- **Email sync** (`/api/cron/email-sync`, 13:30 & 21:30 UTC daily) — built
+- **Email sync** (`/api/cron/email-sync`, 12:30 & 21:30 UTC daily) — built
   into the app itself, no Claude involved. Reads the Gmail mailbox connected
   in Settings → Email sync (read-only OAuth grant), matches threads to
-  creators by business email, logs touchpoints to their timelines, and
-  auto-advances stages (reply → `in_conversation`). Also runnable on demand
-  via the **Sync now** button. **Tracking only** — the app never sends mail.
-  Coverage limit: only threads where the connected mailbox is on To/Cc are
-  visible — keep it cc'd on every outreach message. (The
-  `.claude/skills/email-sync` skill remains as a manual fallback that pushes
-  through `/api/emails/ingest` with an API key.)
+  creators by **every address they're known to use** (the Apify public email
+  plus `cm_creator_emails`), logs touchpoints to their timelines, and
+  auto-advances stages (reply → `in_conversation`, including reopening
+  `no_response`). A second **discovery** pass scans the cc'd threads
+  themselves and lists every external address that matches no creator as an
+  *unmatched sender* with a suggested creator — one click links it and pulls
+  that creator's threads immediately. Also runnable on demand via **Sync
+  now**. **Tracking only** — the app never sends mail. Coverage limit: only
+  threads where the connected mailbox is on To/Cc are visible; the worklist's
+  `mailto:` links pre-fill that cc. (The `.claude/skills/email-sync` skill
+  remains as a manual fallback through `/api/emails/ingest`.)
+- **Automation health** (Settings) — every loop above writes a `cm_job_runs`
+  heartbeat (`ok` / `idle` / `error`); a loop overdue by 1.5× its interval is
+  flagged, so a dead cron worker is visible instead of silent.
+- **Per-client settings** (Settings → Clients) — which shared-roster clients
+  this tool shows, and each client's follow-up cadence (the thresholds the
+  follow-up loop controls toward, with an owner instead of a constant).
 
 ### Email sync setup (one-time, Google Cloud)
 
@@ -131,8 +141,14 @@ npm run verify:auto-stage      # auto-stage rule matrix + live lifecycle (self-c
 npm run verify:outreach-flow   # send-flow rendering/logging assertions (self-cleans)
 npm run verify:editors         # address parser, metric labeling, shipment path (self-cleans)
 npm run verify:email-ingest    # Gmail matcher + idempotent ingest (self-cleans)
-npm run verify:gmail-sync      # Gmail helpers + encrypted account round-trip (self-cleans)
+npm run verify:gmail-sync      # Gmail helpers, address discovery heuristics, encrypted account round-trip (self-cleans)
+npm run verify:invariants      # FROZEN rules, read-only against live data — the audit loop (see AGENTS.md)
+npm run gmail:diagnose         # anchor: do roster addresses appear in the mailbox at all?
 ```
+
+The build process itself is a graph of loops (fast → feature → watcher →
+audit → reference) with frozen nodes and anchors — `AGENTS.md` is the
+authoritative description and every agent reads it first.
 
 ## Gotchas
 

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { requireAuth, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
+import { isoDate } from "@/lib/validation";
 import { applyAutoStage } from "@/lib/auto-stage";
 import { db } from "@/lib/db";
 import {
@@ -17,7 +18,7 @@ const schema = z.object({
   kind: z.enum(cmOutreachKindEnum.enumValues),
   body: z.string().optional(),
   subject: z.string().optional(),
-  occurredAt: z.string().optional(),
+  occurredAt: isoDate.optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -28,6 +29,9 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid outreach event", parsed.error.flatten());
   const d = parsed.data;
+
+  const scope = await assertPartnershipInSelectedClient(d.partnershipId);
+  if (scope) return scope;
 
   await db.insert(cmOutreachEvents).values({
     partnershipId: d.partnershipId,

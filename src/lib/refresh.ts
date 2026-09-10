@@ -25,7 +25,12 @@ export async function refreshCreatorMetrics(opts?: {
   const limit = opts?.limit ?? 50;
   const cutoff = new Date(Date.now() - staleDays * 86_400_000);
 
-  const staleCond = or(isNull(cmCreators.lastRefreshedAt), lt(cmCreators.lastRefreshedAt, cutoff));
+  // Only Instagram profiles: the scraper is Instagram-specific, so a TikTok or
+  // website-only creator would be looked up as a stranger's IG handle.
+  const staleCond = and(
+    eq(cmCreators.platform, "instagram"),
+    or(isNull(cmCreators.lastRefreshedAt), lt(cmCreators.lastRefreshedAt, cutoff)),
+  );
   const where = opts?.clientId ? and(eq(cmCreators.clientId, opts.clientId), staleCond) : staleCond;
 
   const candidates = await db
@@ -52,9 +57,9 @@ export async function refreshCreatorMetrics(opts?: {
   for (const c of candidates) {
     const p = byUser.get(c.username);
     if (!p) {
-      // Still stamp lastRefreshedAt so a permanently-private account isn't
-      // retried every single run.
-      await db.update(cmCreators).set({ lastRefreshedAt: now }).where(eq(cmCreators.id, c.id));
+      // Don't stamp lastRefreshedAt: a "fresh" timestamp on a failed lookup
+      // would make a private/renamed handle look healthy forever. It stays
+      // stale and is retried next run; the error is the signal.
       errors.push(`${c.username}: no profile returned`);
       continue;
     }

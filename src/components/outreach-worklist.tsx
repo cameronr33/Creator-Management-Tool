@@ -26,6 +26,8 @@ export interface WorklistEntry {
 export interface WorklistTemplates {
   ig_dm: WorklistTemplate | null;
   email: WorklistTemplate | null;
+  /** The connected sync mailbox — pre-filled as cc so email threads get tracked. */
+  ccEmail?: string | null;
 }
 
 export function OutreachWorklist({
@@ -99,7 +101,7 @@ function WorklistItem({ entry, templates }: { entry: WorklistEntry; templates: W
     if (channel === "ig_dm") {
       window.open(igDmUrl(entry.username), "_blank", "noopener");
     } else if (entry.businessEmail) {
-      window.open(mailtoUrl(entry.businessEmail, subject, message), "_self");
+      window.open(mailtoUrl(entry.businessEmail, subject, message, templates.ccEmail), "_self");
     }
   };
 

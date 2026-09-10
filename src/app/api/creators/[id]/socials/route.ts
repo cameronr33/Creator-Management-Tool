@@ -35,14 +35,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { error } = await requireAuth();
   if (error) return error;
 
+  const { id } = await ctx.params;
   const body = await req.json().catch(() => null);
   const parsed = deleteSchema.safeParse(body);
   if (!parsed.success) return badRequest("Missing socialId");
 
-  await removeCreatorSocial(parsed.data.socialId);
+  await removeCreatorSocial(id, parsed.data.socialId);
   return NextResponse.json({ ok: true });
 }

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
@@ -11,10 +11,11 @@ import {
   cmResearchRuns,
 } from "@/lib/db/schema";
 import { normalizeUsername, normalizeInstagramUrl, instagramShortcode } from "@/lib/csv";
+import { httpUrl } from "@/lib/validation";
 
 export const reelSchema = z.object({
   rank: z.number().int().min(1).max(10),
-  url: z.string().url(),
+  url: httpUrl,
   views: z.number().nullable().optional(),
   description: z.string().nullable().optional(),
 });
@@ -56,6 +57,8 @@ export interface IngestResult {
   created: number;
   updated: number;
   reelsWritten: number;
+  /** Per-creator failures. Non-empty means the run is recorded as `failed`. */
+  errors: string[];
 }
 
 async function resolveClientId(clientRef: string): Promise<string | null> {
@@ -142,14 +145,32 @@ export async function ingestResearch(
         lastRefreshedAt: now,
       };
 
+      // On conflict, only overwrite what this payload actually carries. A
+      // partial CSV (no Views Source column, no email) must not null out what
+      // a fuller run or a human already put there.
+      const conflictSet: Record<string, unknown> = { name: values.name, updatedAt: now, researchedAt: now, lastRefreshedAt: now };
+      for (const [k, v] of Object.entries(values)) {
+        if (k === "clientId" || k === "username" || k === "name") continue;
+        if (v !== null && v !== undefined) conflictSet[k] = v;
+      }
+      // Never downgrade accurate public Views to an Apify estimate.
+      if (values.viewsSource === "apify") {
+        conflictSet.viewsSource = sql`case when ${cmCreators.viewsSource} = 'ig_public_chrome' then ${cmCreators.viewsSource} else 'apify'::cm_metrics_source end`;
+        for (const k of ["avgViews", "medianViews", "maxViews"] as const) {
+          if (values[k] != null) {
+            conflictSet[k] = sql`case when ${cmCreators.viewsSource} = 'ig_public_chrome' then ${cmCreators[k]} else ${values[k]} end`;
+          }
+        }
+      }
+
       const [creator] = await db
         .insert(cmCreators)
         .values(values)
         .onConflictDoUpdate({
           target: [cmCreators.clientId, cmCreators.username],
-          set: { ...values, updatedAt: now },
+          set: conflictSet,
         })
-        .returning({ id: cmCreators.id });
+        .returning({ id: cmCreators.id, viewsSource: cmCreators.viewsSource });
 
       if (existing.length) updated++;
       else created++;
@@ -167,18 +188,23 @@ export async function ingestResearch(
         })
         .onConflictDoNothing();
 
-      // Replace reels.
-      await db.delete(cmCreatorReels).where(eq(cmCreatorReels.creatorId, creator.id));
-      for (const reel of c.reels ?? []) {
-        await db.insert(cmCreatorReels).values({
-          creatorId: creator.id,
-          rank: reel.rank,
-          url: reel.url,
-          shortcode: instagramShortcode(reel.url),
-          views: reel.views ?? null,
-          description: reel.description ?? null,
-        });
-        reelsWritten++;
+      // Replace reels — but only when the payload brings reels, and never
+      // replace an accurate pass's vision-described set with an estimate's.
+      const incomingReels = c.reels ?? [];
+      const downgrade = values.viewsSource === "apify" && creator.viewsSource === "ig_public_chrome";
+      if (incomingReels.length > 0 && !downgrade) {
+        await db.delete(cmCreatorReels).where(eq(cmCreatorReels.creatorId, creator.id));
+        await db.insert(cmCreatorReels).values(
+          incomingReels.map((reel) => ({
+            creatorId: creator.id,
+            rank: reel.rank,
+            url: reel.url,
+            shortcode: instagramShortcode(reel.url),
+            views: reel.views ?? null,
+            description: reel.description ?? null,
+          })),
+        );
+        reelsWritten += incomingReels.length;
       }
 
       // Ensure a partnership exists WITHOUT disturbing existing pipeline state.
@@ -210,5 +236,5 @@ export async function ingestResearch(
     })
     .where(eq(cmResearchRuns.id, run.id));
 
-  return { runId: run.id, clientId, campaignId, created, updated, reelsWritten };
+  return { runId: run.id, clientId, campaignId, created, updated, reelsWritten, errors };
 }

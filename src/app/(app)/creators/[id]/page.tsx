@@ -26,11 +26,13 @@ import {
 import {
   EditableProfile,
   SocialsEditor,
+  EmailsEditor,
   AddressEditor,
   ProductEditor,
 } from "@/components/profile-editors";
 import { FullAnalysisButton } from "@/components/full-analysis-button";
 import { getLatestRequestForPartnership } from "@/lib/research-requests";
+import { getCreatorEmails } from "@/lib/email-suggestions";
 import { compactNumber, fullNumber, money, shortDate, relativeDays } from "@/lib/format";
 import { renderTemplate, firstName } from "@/lib/outreach";
 import { formatAddress } from "@/lib/address";
@@ -51,7 +53,10 @@ export default async function CreatorDetailPage({
   const { creator, partnership, campaign, reels, socials, events, products, shipments, deliverables, outreach, otherPartnerships } = detail;
   const shipment = shipments[0] ?? null;
 
-  const client = await resolveClient(await getSelectedClientSlug());
+  const [client, creatorEmails] = await Promise.all([
+    resolveClient(await getSelectedClientSlug()),
+    getCreatorEmails(creator.id),
+  ]);
   const template = client ? await getDefaultTemplate(client.id) : null;
   const suggested = template
     ? renderTemplate(template.body, {
@@ -110,6 +115,7 @@ export default async function CreatorDetailPage({
         <div className="mt-3 space-y-2">
           {creator.contentPillar && <Badge tone="accent">{creator.contentPillar}</Badge>}
           <SocialsEditor creatorId={creator.id} socials={socials} />
+          <EmailsEditor creatorId={creator.id} emails={creatorEmails} />
           <EditableProfile creator={creator} />
         </div>
         {otherPartnerships.length > 0 && (

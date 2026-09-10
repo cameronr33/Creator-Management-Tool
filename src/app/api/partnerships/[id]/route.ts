@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { requireAuth, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
+import { httpUrl, isoDate, money } from "@/lib/validation";
 import { applyAutoStage } from "@/lib/auto-stage";
 import { db } from "@/lib/db";
 import {
@@ -15,9 +16,9 @@ const schema = z.object({
   agreementType: z.enum(cmAgreementTypeEnum.enumValues).nullable().optional(),
   agreedTerms: z.string().nullable().optional(),
   compensationType: z.enum(cmCompensationTypeEnum.enumValues).optional(),
-  feeAmount: z.union([z.number(), z.string()]).nullable().optional(),
-  briefUrl: z.string().nullable().optional(),
-  briefSentAt: z.string().nullable().optional(),
+  feeAmount: money.nullable().optional().or(z.literal("")),
+  briefUrl: httpUrl.nullable().optional().or(z.literal("")),
+  briefSentAt: isoDate.nullable().optional(),
   exitReason: z.enum(cmExitReasonEnum.enumValues).nullable().optional(),
   notes: z.string().nullable().optional(),
   recipientName: z.string().nullable().optional(),
@@ -43,10 +44,13 @@ const ADDRESS_KEYS = [
 ] as const;
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { error } = await requireAuth();
+  const { session, error } = await requireAuth();
   if (error) return error;
 
   const { id } = await ctx.params;
+  const scope = await assertPartnershipInSelectedClient(id);
+  if (scope) return scope;
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid fields", parsed.error.flatten());
@@ -56,6 +60,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   for (const [k, v] of Object.entries(data)) {
     if (v === undefined) continue;
     if (k === "feeAmount") update[k] = v === null || v === "" ? null : String(v);
+    else if (k === "briefUrl") update[k] = v === "" ? null : v;
     else if (k === "briefSentAt") update[k] = v ? new Date(v as string) : null;
     else update[k] = v;
   }
@@ -77,7 +82,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       .where(eq(cmPartnerships.id, id))
       .limit(1);
     if (row?.addressLine1 && row.city && row.region && row.postalCode) {
-      stageChanged = await applyAutoStage(id, "address_complete");
+      stageChanged = await applyAutoStage(id, "address_complete", session.user.id);
     }
   }
 

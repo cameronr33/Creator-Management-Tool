@@ -26,7 +26,8 @@ const ALL_STAGES = schema.cmStageEnum.enumValues;
 /** The expected rule table, restated independently of the implementation. */
 const EXPECTED: Record<AutoStageTrigger, { from: CmStage[]; to: CmStage }> = {
   outbound_message: { from: ["researched", "shortlisted"], to: "contacted" },
-  inbound_message: { from: ["contacted"], to: "in_conversation" },
+  // no_response is the one terminal a creator's OWN late reply reopens.
+  inbound_message: { from: ["contacted", "no_response"], to: "in_conversation" },
   address_complete: { from: ["awaiting_address"], to: "fulfilling" },
   shipment_shipped: { from: ["agreed", "awaiting_address"], to: "fulfilling" },
   shipment_delivered: {
@@ -51,17 +52,24 @@ async function main() {
   const matrixSize = Object.keys(EXPECTED).length * ALL_STAGES.length;
   check(`full ${matrixSize}-cell matrix matches the expected rule table`, failures === 0);
   check(
-    "terminal stages are never advanced by any trigger",
-    (["passed", "declined", "no_response"] as CmStage[]).every((s) =>
+    "passed/declined are never advanced by any trigger",
+    (["passed", "declined"] as CmStage[]).every((s) =>
       (Object.keys(EXPECTED) as AutoStageTrigger[]).every((t) => nextStageFor(s, t) === null),
     ),
   );
   check(
-    "no rule moves a stage backward",
-    (Object.keys(EXPECTED) as AutoStageTrigger[]).every((t) =>
-      EXPECTED[t].from.every(
-        (f) => ALL_STAGES.indexOf(EXPECTED[t].to) > ALL_STAGES.indexOf(f),
+    "no_response reopens ONLY on the creator's own reply",
+    nextStageFor("no_response", "inbound_message") === "in_conversation" &&
+      (["outbound_message", "address_complete", "shipment_shipped", "shipment_delivered", "deliverable_added"] as AutoStageTrigger[]).every(
+        (t) => nextStageFor("no_response", t) === null,
       ),
+  );
+  check(
+    "no rule moves an ACTIVE stage backward",
+    (Object.keys(EXPECTED) as AutoStageTrigger[]).every((t) =>
+      EXPECTED[t].from
+        .filter((f) => f !== "no_response")
+        .every((f) => ALL_STAGES.indexOf(EXPECTED[t].to) > ALL_STAGES.indexOf(f)),
     ),
   );
 
@@ -140,6 +148,16 @@ async function main() {
 
     const missing = await applyAutoStage("00000000-0000-0000-0000-000000000000", "outbound_message");
     check("unknown partnership returns null, not a throw", missing === null);
+
+    // The reopen path: auto-closed creator replies late.
+    await db
+      .update(schema.cmPartnerships)
+      .set({ stage: "no_response" })
+      .where(eq(schema.cmPartnerships.id, partnershipId));
+    const reopened = await applyAutoStage(partnershipId, "inbound_message");
+    check("late reply reopens no_response → in_conversation", reopened?.from === "no_response" && reopened?.to === "in_conversation");
+    const notReopened = await applyAutoStage(partnershipId, "outbound_message");
+    check("our own outbound never advances in_conversation", notReopened === null);
   } finally {
     await db.delete(schema.cmCreators).where(eq(schema.cmCreators.id, creatorId));
     await db.delete(schema.cmCampaigns).where(eq(schema.cmCampaigns.id, campaignId));

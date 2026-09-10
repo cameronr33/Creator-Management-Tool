@@ -24,6 +24,7 @@ export async function GET() {
   res.cookies.set("gmail_oauth_state", state, {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 600,
     path: "/",
   });

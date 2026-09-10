@@ -24,7 +24,8 @@ export interface ParsedSocialLink {
 }
 
 /** Platforms the Apify tier-1 enrich can actually fetch. */
-export const ENRICHABLE_PLATFORMS: SocialPlatform[] = ["instagram", "tiktok", "youtube"];
+/** Only Instagram has a scraper wired up (apify~instagram-scraper). */
+export const ENRICHABLE_PLATFORMS: SocialPlatform[] = ["instagram"];
 
 export const PLATFORM_LABELS: Record<SocialPlatform, string> = {
   instagram: "Instagram",

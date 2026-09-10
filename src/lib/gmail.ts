@@ -136,6 +136,39 @@ export async function getMessage(accessToken: string, id: string): Promise<Gmail
   return api(accessToken, `/messages/${id}?format=full`);
 }
 
+/** Headers only — ~10x cheaper than format=full; used by address discovery. */
+export async function getMessageMetadata(accessToken: string, id: string): Promise<GmailMessage> {
+  const params = new URLSearchParams({ format: "metadata" });
+  for (const h of ["From", "To", "Cc", "Subject", "Date"]) params.append("metadataHeaders", h);
+  return api(accessToken, `/messages/${id}?${params}`);
+}
+
+/**
+ * Discovery query: every message where the connected mailbox is cc'd —
+ * i.e. the outreach threads themselves, regardless of whether the app knows
+ * the counterpart address yet. Both directions land here.
+ */
+export function buildDiscoveryQuery(mailbox: string, windowDays: number): string {
+  return `cc:${mailbox} newer_than:${windowDays}d`;
+}
+
+/** "Name <a@b.com>" | "\"Name\" <a@b.com>" | "a@b.com" → { name, email } (email lowercased). */
+export function parseEmailAddress(raw: string): { name: string | null; email: string } | null {
+  const m = raw.match(/^\s*(?:"?([^"<]*?)"?\s*)?<([^>]+)>\s*$/);
+  if (m) {
+    const email = m[2].trim().toLowerCase();
+    if (!email.includes("@")) return null;
+    const name = m[1]?.trim() || null;
+    return { name, email };
+  }
+  const email = raw.trim().toLowerCase();
+  return email.includes("@") ? { name: null, email } : null;
+}
+
+export function emailDomain(email: string): string {
+  return email.split("@")[1]?.toLowerCase() ?? "";
+}
+
 /* ── Pure normalization helpers (unit-tested offline) ─────────── */
 
 /**
@@ -203,11 +236,13 @@ export interface NormalizedGmailMessage {
 export function normalizeMessage(msg: GmailMessage): NormalizedGmailMessage | null {
   const from = header(msg.payload, "From");
   if (!from) return null;
+  const ts = Number(msg.internalDate);
+  if (!Number.isFinite(ts) || ts <= 0) return null;
   const bodyText = extractPlainText(msg.payload) ?? msg.snippet ?? null;
   return {
     externalId: msg.id,
     threadId: msg.threadId ?? null,
-    occurredAt: new Date(Number(msg.internalDate)).toISOString(),
+    occurredAt: new Date(ts).toISOString(),
     from,
     to: splitAddresses(header(msg.payload, "To")),
     cc: splitAddresses(header(msg.payload, "Cc")),

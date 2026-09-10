@@ -16,7 +16,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await ingestResearch(parsed.data, "skill_api");
-    return NextResponse.json({ ok: true, ...result });
+    // A batch where some creators failed is not a success — say so, with the
+    // failures, instead of a green `ok` that hides them in the run row.
+    return NextResponse.json(
+      { ok: result.errors.length === 0, ...result },
+      { status: result.errors.length === 0 ? 200 : 207 },
+    );
   } catch (err) {
     return badRequest((err as Error).message);
   }

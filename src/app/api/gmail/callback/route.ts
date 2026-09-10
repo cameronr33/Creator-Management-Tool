@@ -16,8 +16,12 @@ export async function GET(req: NextRequest) {
   if (error) return error;
 
   const url = new URL(req.url);
-  const settings = (msg: string) =>
-    NextResponse.redirect(new URL(`/settings?gmail=${encodeURIComponent(msg)}`, url.origin));
+  // Every exit clears the one-shot state cookie, success or not.
+  const settings = (msg: string) => {
+    const res = NextResponse.redirect(new URL(`/settings?gmail=${encodeURIComponent(msg)}`, url.origin));
+    res.cookies.delete("gmail_oauth_state");
+    return res;
+  };
 
   const oauthError = url.searchParams.get("error");
   if (oauthError) return settings(`error:${oauthError}`);
@@ -60,9 +64,7 @@ export async function GET(req: NextRequest) {
         },
       });
 
-    const res = settings("connected");
-    res.cookies.delete("gmail_oauth_state");
-    return res;
+    return settings("connected");
   } catch (err) {
     console.error("[gmail/callback]", err);
     return settings("error:exchange_failed");
