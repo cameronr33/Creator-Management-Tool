@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Copy, Check, Send, Mail, MessageCircle, ExternalLink } from "lucide-react";
 import { Button, Field, Input, Textarea, Segmented, Callout } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
+import { toast } from "@/components/toast";
 import { renderTemplate, firstName, igDmUrl, igProfileUrl, mailtoUrl, unfilledPlaceholders } from "@/lib/outreach";
 
 /**
@@ -65,6 +66,10 @@ export function MessageComposer({
   const [override, setOverride] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [opened, setOpened] = useState(false);
+  // The reason field only turns red after a copy was attempted without it —
+  // a form that opens already shouting is one nobody reads.
+  const [attempted, setAttempted] = useState(false);
+  const reasonRef = useRef<HTMLInputElement>(null);
 
   const template = templates[channel];
   const vars = useMemo(
@@ -92,7 +97,13 @@ export function MessageComposer({
   };
 
   const copyAndOpen = async () => {
-    if (!message || missing.length) return;
+    if (!message) return;
+    if (missing.length) {
+      setAttempted(true);
+      if (missing.includes("reason")) reasonRef.current?.focus();
+      toast(`Fill in ${missing.map((m) => `[${m}]`).join(", ")} before copying`, { tone: "bad" });
+      return;
+    }
     await navigator.clipboard.writeText(message);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
@@ -162,15 +173,20 @@ export function MessageComposer({
           {usesReason && (
             <Field
               label="Why them? One line about their content — it goes into the message"
-              hint={missing.includes("reason") ? undefined : "Saved for next time as soon as you click away."}
-              error={missing.includes("reason") ? "The message still says [reason] — fill this in first." : undefined}
+              hint={
+                missing.includes("reason")
+                  ? "Replaces [reason] in the message. Saved for next time when you click away."
+                  : "Saved for next time as soon as you click away."
+              }
+              error={attempted && missing.includes("reason") ? "The message still says [reason] — fill this in first." : undefined}
             >
               <Input
+                ref={reasonRef}
                 compact
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 onBlur={persistReason}
-                invalid={missing.includes("reason")}
+                invalid={attempted && missing.includes("reason")}
                 placeholder='e.g. "loved your brake-swap reel"'
               />
             </Field>
@@ -202,7 +218,7 @@ export function MessageComposer({
               className="bg-surface-2/60"
             />
           </Field>
-          {missing.filter((m) => m !== "reason").length > 0 && (
+          {attempted && missing.filter((m) => m !== "reason").length > 0 && (
             <Callout tone="warn">
               The message still contains{" "}
               {missing
@@ -228,9 +244,9 @@ export function MessageComposer({
           <Button
             variant={opened ? "secondary" : "primary"}
             onClick={copyAndOpen}
-            disabled={!message || missing.length > 0}
+            disabled={!message}
             icon={copied ? <Check size={14} /> : <Copy size={14} />}
-            title={missing.length ? "Fill in the placeholders first" : "Copies the message and opens the app"}
+            title="Copies the message and opens the app"
           >
             {copied ? "Copied" : openLabel}
           </Button>

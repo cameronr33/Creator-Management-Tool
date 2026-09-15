@@ -20,7 +20,7 @@ import { EmailSuggestions } from "@/components/email-suggestions";
 import { ClientVisibility, FollowUpCadence } from "@/components/client-settings";
 import { gmailConfigured } from "@/lib/gmail";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
-import { listOpenSuggestions, getAllCreatorRefs } from "@/lib/email-suggestions";
+import { listOpenSuggestions, countOpenSuggestions, getAllCreatorRefs } from "@/lib/email-suggestions";
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 import { getJobHealth } from "@/lib/job-runs";
 
@@ -64,7 +64,7 @@ export default async function SettingsPage({
     );
   }
 
-  const [clients, campaigns, templates, apiKeys, gmailAccount, suggestions, creatorRefs, jobHealth] =
+  const [clients, campaigns, templates, apiKeys, gmailAccount, suggestions, openCount, creatorRefs, jobHealth] =
     await Promise.all([
       getClientsWithSettings(),
       getCampaigns(client.id),
@@ -72,6 +72,7 @@ export default async function SettingsPage({
       getApiKeys(),
       getActiveGmailAccount(),
       listOpenSuggestions(),
+      countOpenSuggestions(),
       getAllCreatorRefs(),
       getJobHealth(),
     ]);
@@ -111,9 +112,9 @@ export default async function SettingsPage({
             title={
               <>
                 Email senders to link{" "}
-                {suggestions.length > 0 && (
+                {openCount > 0 && (
                   <Badge tone="warn" className="ml-1 normal-case tracking-normal">
-                    {suggestions.length}
+                    {openCount}
                   </Badge>
                 )}
               </>
@@ -143,6 +144,11 @@ export default async function SettingsPage({
                   }))}
                   creators={creatorRefs.map((c) => ({ id: c.id, name: c.name, clientName: c.clientName }))}
                 />
+                {openCount > suggestions.length && (
+                  <p className="text-xs text-text-muted">
+                    Showing the first {suggestions.length} of {openCount} — the rest appear as these are linked or hidden.
+                  </p>
+                )}
               </>
             ) : (
               <Callout

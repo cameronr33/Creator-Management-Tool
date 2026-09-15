@@ -54,8 +54,10 @@ export default async function DashboardPage() {
               </Button>
             }
           >
-            <strong>{unmatched}</strong> email sender{unmatched === 1 ? "" : "s"} on cc&apos;d threads{" "}
-            {unmatched === 1 ? "isn't" : "aren't"} linked to a creator yet, so their replies aren&apos;t being tracked.
+            <strong>{unmatched}</strong>
+            {` email sender${unmatched === 1 ? "" : "s"} on cc'd threads ${
+              unmatched === 1 ? "isn't" : "aren't"
+            } linked to a creator yet, so their replies aren't being tracked.`}
           </Callout>
         )}
 
@@ -161,7 +163,7 @@ function StallQueue({
             <li key={it.partnershipId} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
               <Link
                 href={`/creators/${it.partnershipId}`}
-                className="flex min-w-0 flex-1 items-center gap-2.5 transition hover:opacity-80"
+                className="flex min-w-[11rem] flex-1 items-center gap-2.5 transition hover:opacity-80"
               >
                 <Avatar name={it.name} />
                 <div className="min-w-0 flex-1">

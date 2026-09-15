@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { ArrowLeft, CircleHelp, Loader2 } from "lucide-react";
 import type { CmStage } from "@/lib/db/schema";
 import { stageHint, stageLabel, stageStyle } from "@/lib/stages";
@@ -227,9 +227,15 @@ export function Callout({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm", CALLOUT_TONES[tone], className)}>
+    <div
+      className={cn(
+        "flex flex-wrap items-start gap-x-2.5 gap-y-2 rounded-lg border px-3.5 py-2.5 text-sm",
+        CALLOUT_TONES[tone],
+        className,
+      )}
+    >
       {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-[14rem] flex-1">
         {title && <div className="font-medium">{title}</div>}
         {children && <div className={cn("leading-relaxed", title ? "mt-0.5 text-[13px] opacity-90" : "")}>{children}</div>}
       </div>
@@ -490,9 +496,10 @@ const FIELD_BASE =
 
 const FIELD_INVALID = "border-bad-line focus:border-bad focus:ring-bad-soft";
 
-type NativeInput = Omit<ComponentPropsWithoutRef<"input">, "size">;
-type NativeSelect = Omit<ComponentPropsWithoutRef<"select">, "size">;
-type NativeTextarea = ComponentPropsWithoutRef<"textarea">;
+// React 19: `ref` is an ordinary prop, so these accept one without forwardRef.
+type NativeInput = Omit<ComponentProps<"input">, "size">;
+type NativeSelect = Omit<ComponentProps<"select">, "size">;
+type NativeTextarea = ComponentProps<"textarea">;
 
 export function Input({
   compact,

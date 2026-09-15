@@ -264,7 +264,7 @@ export default async function CreatorDetailPage({
               icon={<FlaskConical size={14} />}
               actions={<FullAnalysisButton partnershipId={partnership.id} initialRequest={latestRequest} />}
             />
-            <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
+            <div className="mt-3 grid grid-cols-3 gap-3 xl:grid-cols-6">
               {metrics.map((m) => (
                 <div key={m.label}>
                   <div className="text-xs text-text-muted">{m.label}</div>
