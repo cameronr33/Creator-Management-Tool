@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   clients,
@@ -8,6 +8,7 @@ import {
   cmOutreachEvents,
 } from "@/lib/db/schema";
 import { applyAutoStage } from "@/lib/auto-stage";
+import { cleanEmailBody } from "@/lib/email-body";
 
 /**
  * Server side of the Gmail sync (Track B). The sync skill sends raw Gmail
@@ -215,7 +216,9 @@ export async function ingestEmails(
           ? ("follow_up" as const)
           : ("initial" as const);
 
-    const inserted = await db
+    // A re-synced message refreshes only how it is displayed (cleaned body,
+    // from/to) — never its direction, kind, or the pipeline stage.
+    const [row] = await db
       .insert(cmOutreachEvents)
       .values({
         partnershipId: match.partnershipId,
@@ -223,15 +226,24 @@ export async function ingestEmails(
         direction: match.direction,
         channel: "email",
         kind,
-        body: msg.bodyText,
+        body: cleanEmailBody(msg.bodyText),
         subject: msg.subject,
+        fromAddress: msg.from,
+        toAddress: msg.to.join(", ") || null,
         externalId: msg.externalId,
         threadId: msg.threadId,
       })
-      .onConflictDoNothing({ target: cmOutreachEvents.externalId })
-      .returning({ id: cmOutreachEvents.id });
+      .onConflictDoUpdate({
+        target: cmOutreachEvents.externalId,
+        set: {
+          body: sql`excluded.body`,
+          fromAddress: sql`excluded.from_address`,
+          toAddress: sql`excluded.to_address`,
+        },
+      })
+      .returning({ id: cmOutreachEvents.id, isNew: sql<boolean>`(xmax = 0)` });
 
-    if (inserted.length === 0) {
+    if (!row?.isNew) {
       result.skipped++; // already synced — the unique externalId absorbed it
       continue;
     }

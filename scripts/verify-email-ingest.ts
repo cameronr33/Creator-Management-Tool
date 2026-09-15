@@ -133,6 +133,37 @@ async function main() {
     const r2 = await ingestEmails([outbound1]);
     check("double-ingest skipped", r2.inserted === 0 && r2.skipped === 1, JSON.stringify(r2));
 
+    // Display fields: from/to stored, Cc not kept, body cleaned of quoted history.
+    const [stored1] = await db
+      .select()
+      .from(schema.cmOutreachEvents)
+      .where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_msg1"));
+    check("from address stored", stored1?.fromAddress === "teammate@agency.com", stored1?.fromAddress ?? "null");
+    check("to address stored, cc not included", stored1?.toAddress === TEST_EMAIL, stored1?.toAddress ?? "null");
+
+    // A re-sync refreshes how an existing message displays — without a second
+    // row, without counting it as new, and without re-running auto-stage.
+    const stageBefore = (
+      await db.select({ s: schema.cmPartnerships.stage }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId))
+    )[0]?.s;
+    const r2b = await ingestEmails([
+      {
+        ...outbound1,
+        bodyText:
+          "Hi — we'd love to work with you.\n\nOn Tue, Aug 18, 2026 at 9:00 AM Someone <s@x.com>\nwrote:\n\n> earlier quoted text",
+      },
+    ]);
+    const [stored1b] = await db
+      .select()
+      .from(schema.cmOutreachEvents)
+      .where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_msg1"));
+    const stageAfter = (
+      await db.select({ s: schema.cmPartnerships.stage }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId))
+    )[0]?.s;
+    check("re-sync counted as skipped, not inserted", r2b.inserted === 0 && r2b.skipped === 1, JSON.stringify(r2b));
+    check("re-sync stored the cleaned body (quoted history gone)", stored1b?.body === "Hi — we'd love to work with you.", JSON.stringify(stored1b?.body));
+    check("re-sync did not change the pipeline stage", stageBefore === stageAfter, `${stageBefore} → ${stageAfter}`);
+
     const r3 = await ingestEmails([
       {
         externalId: "__verify_ei_msg2",

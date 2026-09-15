@@ -36,6 +36,7 @@ import { getCreatorEmails } from "@/lib/email-suggestions";
 import { compactNumber, fullNumber, money, shortDate, relativeDays } from "@/lib/format";
 import { renderTemplate, firstName } from "@/lib/outreach";
 import { formatAddress } from "@/lib/address";
+import { displayNames } from "@/lib/email-body";
 import { isTerminal } from "@/lib/stages";
 
 export default async function CreatorDetailPage({
@@ -209,16 +210,24 @@ export default async function CreatorDetailPage({
                   <li key={e.id} className="flex gap-3 text-sm">
                     <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${e.direction === "inbound" ? "bg-emerald-500" : "bg-accent"}`} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-text">
-                          {e.direction === "inbound" ? "They replied" : e.kind === "initial" ? "Initial outreach" : e.kind === "follow_up" ? "Follow-up" : "Note"}
-                        </span>
+                      <div className="flex flex-wrap items-center gap-x-2">
+                        {e.fromAddress ? (
+                          <span className="font-medium text-text" title={`From: ${e.fromAddress}`}>
+                            {displayNames(e.fromAddress)}
+                            <span className="font-normal text-text-faint"> → </span>
+                            {displayNames(e.toAddress) || "—"}
+                          </span>
+                        ) : (
+                          <span className="font-medium text-text">
+                            {e.direction === "inbound" ? "They replied" : e.kind === "initial" ? "Initial outreach" : e.kind === "follow_up" ? "Follow-up" : "Note"}
+                          </span>
+                        )}
                         <span className="text-xs text-text-faint">
                           {e.isMigrated ? "date unknown (migrated)" : relativeDays(e.occurredAt)} · {e.channel.replace("_", " ")}
                         </span>
                       </div>
                       {e.body && e.body !== "migrated from sheet; original date unknown" && (
-                        <p className="text-text-muted">{e.body}</p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-text-muted">{e.body}</p>
                       )}
                     </div>
                   </li>

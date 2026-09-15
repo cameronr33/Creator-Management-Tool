@@ -413,6 +413,10 @@ export const cmOutreachEvents = pgTable(
     body: text("body"),
     /** Email subject line; null for DMs and manually logged touchpoints. */
     subject: text("subject"),
+    /** Synced email only: the From header ("Name <address>"). */
+    fromAddress: text("from_address"),
+    /** Synced email only: the To header, comma-separated. Cc is not kept. */
+    toAddress: text("to_address"),
     /**
      * External message id for synced events (Gmail message id). Unique so
      * re-running the email sync is idempotent — Postgres unique constraints
