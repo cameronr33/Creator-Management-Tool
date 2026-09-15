@@ -45,6 +45,12 @@ them. Changing one requires a human decision and an explanation in the commit.
    scanned for secret-shaped strings before staging.
 6. **A check is never weakened to make it pass.** If a check fails, the code
    or the data is wrong. If a check was wrong, say why in the commit.
+7. **The UI is built only from the design tokens and primitives.** Colours
+   come from `globals.css`, controls from `ui.tsx`, feedback from
+   `useSave()`/`toast()`; no raw Tailwind palette classes, nothing under
+   11px, no silent saves. `verify:design` is the anchor. The explanation of
+   the app (`/help`, stage hints, the "Next:" line) is generated from the
+   same tables the app runs on — never hand-written prose that can drift.
 
 ## Green must mean grounded
 
@@ -73,3 +79,9 @@ here — it looks like health. So:
   review your own diff in the same context.
 - Read `README.md` for the domain model (stages, two-tier metrics, loops) and
   `.claude/skills/verify-creator-tool/SKILL.md` for the exact commands.
+- UI work: reach for a primitive in `src/components/ui.tsx` before writing a
+  `<button>` or `<input>`; wrap every control in `Field`; save through
+  `useSave()`; confirm destructive actions with `ConfirmButton`. If a new
+  colour or control is needed, add the token/primitive first, then use it.
+  Copy is written for a teammate on day one — plain words, who/what/next,
+  no vendor names ("estimated", not "Apify").

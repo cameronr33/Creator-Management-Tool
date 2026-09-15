@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Link2, EyeOff, Loader2 } from "lucide-react";
+import { Link2, EyeOff } from "lucide-react";
+import { Button, Select } from "@/components/ui";
+import { ConfirmButton } from "@/components/confirm-button";
+import { api, useSave } from "@/components/use-save";
+import { toast } from "@/components/toast";
 
 export interface SuggestionRow {
   id: string;
@@ -35,8 +38,8 @@ export function EmailSuggestions({
 }) {
   if (suggestions.length === 0) {
     return (
-      <p className="text-xs text-text-faint">
-        No unmatched senders — every address on cc&apos;d threads is linked to a creator (or ignored).
+      <p className="text-sm text-text-muted">
+        Nobody to link — every address on cc&apos;d threads is linked to a creator or marked as not one.
       </p>
     );
   }
@@ -49,70 +52,58 @@ export function EmailSuggestions({
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-text-muted">
-        <strong>{suggestions.length} unmatched sender(s)</strong> on cc&apos;d threads. Link each to
-        its creator so their conversations start syncing — or ignore addresses that aren&apos;t
-        creators (vendors, clients, tools).
-      </p>
-      <ul className="divide-y divide-border rounded-lg border border-border">
-        {suggestions.map((s) => (
-          <SuggestionItem key={s.id} s={s} byClient={byClient} />
-        ))}
-      </ul>
-    </div>
+    <ul className="divide-y divide-border rounded-lg border border-border">
+      {suggestions.map((s) => (
+        <SuggestionItem key={s.id} s={s} byClient={byClient} />
+      ))}
+    </ul>
   );
 }
 
 function SuggestionItem({ s, byClient }: { s: SuggestionRow; byClient: Map<string, CreatorOption[]> }) {
-  const router = useRouter();
+  const { pending, run } = useSave();
   const [creatorId, setCreatorId] = useState(s.suggestedCreatorId ?? "");
-  const [pending, setPending] = useState<"link" | "ignore" | null>(null);
-  const [note, setNote] = useState<string | null>(null);
 
-  const act = async (action: "link" | "ignore") => {
-    setPending(action);
-    setNote(null);
-    const res = await fetch(`/api/emails/suggestions/${s.id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(action === "link" ? { action, creatorId } : { action }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setPending(null);
-    if (!res.ok) {
-      setNote(data?.error ?? "Failed");
-      return;
+  const link = async () => {
+    const r = await run(
+      () => api<{ synced?: { result?: { inserted?: number } } }>(`/api/emails/suggestions/${s.id}`, { action: "link", creatorId }),
+      {},
+    );
+    if (r.ok) {
+      const n = r.data.synced?.result?.inserted;
+      toast(`Linked ${s.email}`, {
+        tone: "good",
+        detail: n != null ? `${n} message(s) pulled onto their timeline.` : undefined,
+      });
     }
-    if (action === "link") {
-      const n = data?.synced?.result?.inserted;
-      setNote(n != null ? `Linked — pulled ${n} touchpoint(s).` : "Linked.");
-    }
-    router.refresh();
   };
 
+  const ignore = () =>
+    run(() => api(`/api/emails/suggestions/${s.id}`, { action: "ignore" }), {
+      success: `${s.email} marked as not a creator`,
+    });
+
   return (
-    <li className="flex flex-wrap items-center gap-2 px-3 py-2">
+    <li className="flex flex-wrap items-center gap-2 px-3 py-2.5">
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm text-text">
           {s.displayName ? <span className="font-medium">{s.displayName} </span> : null}
           <span className="text-text-muted">{s.email}</span>
         </div>
-        <div className="truncate text-xs text-text-faint">
+        <div className="truncate text-xs text-text-muted">
           {s.messageCount} message{s.messageCount === 1 ? "" : "s"}
           {s.lastSeenAt ? ` · last ${s.lastSeenAt}` : ""}
           {s.sampleSubject ? ` · “${s.sampleSubject}”` : ""}
         </div>
-        {note && <div className="text-xs text-emerald-700">{note}</div>}
       </div>
-      <select
+      <Select
+        compact
         value={creatorId}
         onChange={(e) => setCreatorId(e.target.value)}
-        className="max-w-[14rem] rounded-lg border border-border bg-surface px-2 py-1 text-xs"
+        aria-label="Creator to link"
+        className="w-56"
       >
-        <option value="">
-          {s.suggestedCreatorName ? `Suggested: ${s.suggestedCreatorName}` : "Choose creator…"}
-        </option>
+        <option value="">{s.suggestedCreatorName ? `Suggested: ${s.suggestedCreatorName}` : "Choose the creator…"}</option>
         {[...byClient.entries()].map(([client, list]) => (
           <optgroup key={client} label={client}>
             {list.map((c) => (
@@ -122,21 +113,18 @@ function SuggestionItem({ s, byClient }: { s: SuggestionRow; byClient: Map<strin
             ))}
           </optgroup>
         ))}
-      </select>
-      <button
-        onClick={() => act("link")}
-        disabled={!creatorId || pending !== null}
-        className="flex items-center gap-1 rounded-lg bg-accent px-2 py-1 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
-      >
-        {pending === "link" ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />} Link
-      </button>
-      <button
-        onClick={() => act("ignore")}
-        disabled={pending !== null}
-        className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs text-text-muted transition hover:bg-surface-2 disabled:opacity-50"
-      >
-        <EyeOff size={12} /> Ignore
-      </button>
+      </Select>
+      <Button size="sm" variant="primary" icon={<Link2 size={13} />} onClick={link} pending={pending} disabled={!creatorId}>
+        Link
+      </Button>
+      <ConfirmButton
+        label="Not a creator"
+        icon={<EyeOff size={13} />}
+        question="Hide this address for good?"
+        confirmLabel="Yes, hide it"
+        pending={pending}
+        onConfirm={ignore}
+      />
     </li>
   );
 }

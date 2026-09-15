@@ -1,0 +1,260 @@
+import Link from "next/link";
+import type { Metadata } from "next";
+import { LayoutDashboard, Send, Kanban, Users, ArrowRight } from "lucide-react";
+import { PageHeader, Card, CardHeader, StagePill, Badge } from "@/components/ui";
+import { stagesByGroup, AUTO_TRIGGER_LABELS, stageLabel, STAGES } from "@/lib/stages";
+import { AUTO_STAGE_RULES, type AutoStageTrigger } from "@/lib/auto-stage";
+import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
+
+export const metadata: Metadata = { title: "How it works" };
+
+/**
+ * The onboarding page. Everything here is generated from the same tables
+ * the app runs on (STAGES, AUTO_STAGE_RULES, DEFAULT_THRESHOLDS), so the
+ * explanation can't drift from the behaviour.
+ */
+export default function HelpPage() {
+  const triggers = Object.keys(AUTO_STAGE_RULES) as AutoStageTrigger[];
+  const autoTargets = new Map<string, AutoStageTrigger[]>();
+  for (const t of triggers) {
+    const to = AUTO_STAGE_RULES[t].to;
+    autoTargets.set(to, [...(autoTargets.get(to) ?? []), t]);
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="How Creator Manager works"
+        help="Everything a new teammate needs on day one: the daily loop, what each stage means, what moves by itself, and where things live."
+      />
+      <div className="mx-auto max-w-3xl space-y-6 p-6">
+        <Card id="daily-loop" className="p-5">
+          <CardHeader
+            title="The daily loop"
+            description="Four screens, in the order a day goes. Each one answers a single question."
+          />
+          <ol className="mt-4 space-y-3">
+            <Step
+              n={1}
+              icon={<LayoutDashboard size={16} />}
+              href="/"
+              title="Dashboard — what's stuck?"
+              body="Four to-do lists: messages to send, addresses we're waiting on, products to ship, videos we're waiting on. Every row has its next action built in, so most days start and end here."
+            />
+            <Step
+              n={2}
+              icon={<Send size={16} />}
+              href="/outreach"
+              title="Outreach — send what's due"
+              body="Each creator's message is pre-written from the client's template. Add one line about their content, press Copy & open (it opens Instagram or your email app with the message ready), send it there, then press I sent it. The stage moves to Contacted on its own."
+            />
+            <Step
+              n={3}
+              icon={<Kanban size={16} />}
+              href="/pipeline"
+              title="Pipeline — the whole funnel"
+              body="One column per stage. Drag a card to move it, or use the card's Move menu. Closing a deal asks who ended it and why, so the reason is never lost."
+            />
+            <Step
+              n={4}
+              icon={<Users size={16} />}
+              href="/creators"
+              title="Creators — look anyone up"
+              body="Search and filter by campaign or stage, then open the record: conversation, agreement, product, shipping and posted videos in one page."
+            />
+          </ol>
+        </Card>
+
+        <Card id="stages" className="p-5">
+          <CardHeader
+            title="Stages — what is this creator waiting on?"
+            description="A stage answers exactly one question. Shipping status, contract status and posted videos live on the record itself, not in the stage."
+          />
+          <div className="mt-4 space-y-5">
+            {stagesByGroup().map((g) => (
+              <div key={g.group}>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-faint">{g.label}</div>
+                <ul className="divide-y divide-border rounded-lg border border-border">
+                  {g.stages.map((s) => {
+                    const auto = autoTargets.get(s.value) ?? [];
+                    return (
+                      <li key={s.value} className="grid grid-cols-1 gap-1 px-3 py-2.5 sm:grid-cols-[10rem_1fr] sm:gap-3">
+                        <div>
+                          <StagePill stage={s.value} />
+                        </div>
+                        <div className="text-sm text-text-muted">
+                          {s.hint}
+                          {auto.length > 0 && (
+                            <div className="mt-1 text-xs text-text-faint">
+                              Moves here by itself when {auto.map((t) => AUTO_TRIGGER_LABELS[t]).join(", or when ")}.
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card id="automatic" className="p-5">
+          <CardHeader
+            title="What moves by itself"
+            description="You never have to babysit the stage dropdown after doing real work. These are the only automatic moves, and they never go backwards."
+          />
+          <ul className="mt-4 space-y-2">
+            {triggers.map((t) => {
+              const rule = AUTO_STAGE_RULES[t];
+              return (
+                <li key={t} className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
+                  <span className="flex flex-wrap items-center gap-1">
+                    {rule.from.map((f) => (
+                      <StagePill key={f} stage={f} />
+                    ))}
+                  </span>
+                  <ArrowRight size={14} className="shrink-0 text-text-faint" />
+                  <StagePill stage={rule.to} />
+                  <span>when {AUTO_TRIGGER_LABELS[t]}</span>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-4 text-xs leading-relaxed text-text-faint">
+            Nothing ever moves a creator into {stageLabel("negotiating")}, {stageLabel("agreed")},{" "}
+            {stageLabel("awaiting_address")} or {stageLabel("completed")} automatically — those are judgement calls
+            you make on the record or the board. A creator closed as {stageLabel("no_response")} is the one
+            exception: their own late reply reopens them.
+          </p>
+        </Card>
+
+        <Card id="follow-ups" className="p-5">
+          <CardHeader
+            title="Follow-ups"
+            description="The Outreach list is built from the timeline, so nobody has to remember who's overdue."
+          />
+          <ul className="mt-3 space-y-1.5 text-sm text-text-muted">
+            <li>
+              Shortlisted and never messaged for <strong>{DEFAULT_THRESHOLDS.initialOutreachAfterDays} days</strong> → first message due.
+            </li>
+            <li>
+              Messaged, no reply for <strong>{DEFAULT_THRESHOLDS.followUp1AfterDays} days</strong> → follow-up 1 due.
+            </li>
+            <li>
+              Still nothing <strong>{DEFAULT_THRESHOLDS.followUp2AfterDays} days</strong> after that → follow-up 2 due.
+            </li>
+            <li>
+              <strong>{DEFAULT_THRESHOLDS.markNoResponseAfterDays} days</strong> after the second follow-up → closed as{" "}
+              {stageLabel("no_response")} automatically.
+            </li>
+          </ul>
+          <p className="mt-3 text-xs text-text-faint">
+            These are the defaults; each client can have its own cadence under Settings → Follow-up cadence. Rows imported
+            from the old spreadsheet have no real dates, so they are flagged for a human check instead of being given an
+            invented clock.
+          </p>
+        </Card>
+
+        <Card id="numbers" className="p-5">
+          <CardHeader title="Estimated vs verified numbers" />
+          <div className="mt-3 space-y-2 text-sm text-text-muted">
+            <p>
+              View counts come from two places. The quick, automatic one is a scraper that under-reports Instagram&apos;s
+              public view numbers — sometimes by a lot on viral posts. Those numbers wear an{" "}
+              <Badge tone="muted" title="Estimated — from the scraper, not Instagram's public count">
+                est
+              </Badge>{" "}
+              badge everywhere.
+            </p>
+            <p>
+              Verified numbers come from a full research run on a logged-in machine (press <strong>Run full research</strong>{" "}
+              on a creator&apos;s record and it&apos;s queued). Nothing automatic ever overwrites a verified number with an
+              estimate. Don&apos;t put an estimated number in a client report.
+            </p>
+          </div>
+        </Card>
+
+        <Card id="email" className="p-5">
+          <CardHeader title="Email tracking" />
+          <div className="mt-3 space-y-2 text-sm text-text-muted">
+            <p>
+              The app reads one shared mailbox (read-only) twice a day and files every creator email onto the right
+              record — and moves the stage when a creator replies. It never sends mail.
+            </p>
+            <p>
+              <strong>The one rule:</strong> keep that mailbox on cc for every creator email you send. The Outreach page
+              pre-fills it. If it isn&apos;t on the thread, the app can&apos;t see the reply.
+            </p>
+            <p>
+              When someone writes from an address the app doesn&apos;t know yet, they show up under{" "}
+              <Link href="/settings#email-sync" className="text-accent hover:underline">
+                Settings → Email senders to link
+              </Link>
+              . Linking one takes a click and pulls their conversation in immediately. Please check that list when the
+              sidebar shows a number next to Settings.
+            </p>
+          </div>
+        </Card>
+
+        <Card id="words" className="p-5">
+          <CardHeader title="Words we use" />
+          <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-[11rem_1fr]">
+            <Term word="Creator">A person or channel — their profile links, follower count and research. One record, reused across clients and campaigns.</Term>
+            <Term word="Partnership">One creator working one campaign. That&apos;s what moves through the stages; a creator can have several.</Term>
+            <Term word="Campaign">A client&apos;s effort that creators are recruited for, e.g. &ldquo;Evergreen creators&rdquo; or &ldquo;Suspension&rdquo;.</Term>
+            <Term word="Content type (pillar)">What the creator mostly posts — overlanding, DIY, shop builds. Fills the message template.</Term>
+            <Term word="Posts / week">How often they post, from the research sample.</Term>
+            <Term word="Brief">The document telling the creator what to make. &ldquo;Mark brief sent&rdquo; records the date.</Term>
+            <Term word="Posted video">A live post we tracked — its link, date and views.</Term>
+            <Term word="Exit reason">Why a deal closed, split by who ended it: we passed, they declined, or they stopped replying.</Term>
+            <Term word="Timeline">Every message in or out, plus notes. Emails arrive on it by themselves.</Term>
+          </dl>
+        </Card>
+
+        <p className="text-xs text-text-faint">
+          There are {STAGES.length} stages. This page is generated from the app&apos;s own rules, so if it says something
+          happens, it does.
+        </p>
+      </div>
+    </>
+  );
+}
+
+function Step({
+  n,
+  icon,
+  href,
+  title,
+  body,
+}: {
+  n: number;
+  icon: React.ReactNode;
+  href: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <li className="flex gap-3">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent">
+        {n}
+      </span>
+      <div className="min-w-0">
+        <Link href={href} className="inline-flex items-center gap-1.5 text-sm font-medium text-text hover:text-accent">
+          <span className="text-text-faint">{icon}</span>
+          {title}
+        </Link>
+        <p className="mt-0.5 text-sm leading-relaxed text-text-muted">{body}</p>
+      </div>
+    </li>
+  );
+}
+
+function Term({ word, children }: { word: string; children: React.ReactNode }) {
+  return (
+    <>
+      <dt className="font-medium text-text">{word}</dt>
+      <dd className="text-text-muted">{children}</dd>
+    </>
+  );
+}

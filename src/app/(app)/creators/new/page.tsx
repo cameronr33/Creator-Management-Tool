@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { resolveClient, getCampaigns } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { AddCreatorForm } from "@/components/add-creator-form";
+
+export const metadata: Metadata = { title: "Add creator" };
 
 export default async function NewCreatorPage() {
   const client = await resolveClient(await getSelectedClientSlug());
@@ -20,7 +23,12 @@ export default async function NewCreatorPage() {
 
   return (
     <>
-      <PageHeader title="Add creator" subtitle={client.name} />
+      <PageHeader
+        title="Add creator"
+        client={client.name}
+        back={{ href: "/creators", label: "Creators" }}
+        help="For a creator you already know about. Paste their profile link, auto-fill what you can, and pick the campaign — research runs add creators automatically, so this is only for the ones you find yourself."
+      />
       <div className="p-6">
         <AddCreatorForm
           clientId={client.id}

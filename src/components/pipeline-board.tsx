@@ -2,10 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { STAGES, stageStyle } from "@/lib/stages";
+import { MoveRight, X } from "lucide-react";
+import {
+  STAGES,
+  stagesByGroup,
+  stageHint,
+  stageLabel,
+  isTerminal,
+  EXIT_REASONS_BY_STAGE,
+  STAGE_GROUP_LABELS,
+} from "@/lib/stages";
 import type { CmStage } from "@/lib/db/schema";
 import { compactNumber } from "@/lib/format";
+import { StagePill, Select, Button, IconButton, cn } from "@/components/ui";
+import { api, useSave } from "@/components/use-save";
 
 export interface BoardCard {
   partnershipId: string;
@@ -18,38 +28,114 @@ export interface BoardCard {
 
 // Active stages get their own column; the three terminal stages collapse into
 // one "Closed" column so the board stays about live work.
-const COLUMNS: { key: string; label: string; stages: CmStage[] }[] = [
-  ...STAGES.filter((s) => !s.terminal).map((s) => ({ key: s.value, label: s.label, stages: [s.value] as CmStage[] })),
-  { key: "closed", label: "Closed", stages: ["passed", "declined", "no_response"] as CmStage[] },
+const COLUMNS: { key: string; label: string; hint: string; group: string; stages: CmStage[] }[] = [
+  ...STAGES.filter((s) => !s.terminal).map((s) => ({
+    key: s.value,
+    label: s.label,
+    hint: s.hint,
+    group: STAGE_GROUP_LABELS[s.group],
+    stages: [s.value] as CmStage[],
+  })),
+  {
+    key: "closed",
+    label: "Closed",
+    hint: "We passed, they declined, or they stopped replying.",
+    group: STAGE_GROUP_LABELS.closed,
+    stages: ["passed", "declined", "no_response"] as CmStage[],
+  },
 ];
 
-const CLOSE_OPTIONS: { stage: CmStage; label: string }[] = [
-  { stage: "passed", label: "We passed" },
-  { stage: "declined", label: "They declined" },
-  { stage: "no_response", label: "No response" },
-];
+const CLOSE_OPTIONS: CmStage[] = ["passed", "declined", "no_response"];
+
+/** A close in progress: which card, and (once chosen) who ended it. */
+interface Closing {
+  id: string;
+  stage: CmStage | null;
+  /** Where the prompt renders — the Closed column for a drop, the card for the Move menu. */
+  via: "drag" | "menu";
+}
 
 export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
-  const router = useRouter();
+  const { run } = useSave();
   const [items, setItems] = useState(cards);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
-  // A drop on "Closed" has to say WHO ended it — that's what the terminal
-  // stages and exit reasons are for — so it asks instead of assuming "passed".
-  const [pendingClose, setPendingClose] = useState<string | null>(null);
+  const [closing, setClosing] = useState<Closing | null>(null);
+  const [moveMenu, setMoveMenu] = useState<string | null>(null);
 
-  const move = async (partnershipId: string, toStage: CmStage) => {
+  // After a refresh the server hands down new cards; adopt them.
+  const [seenCards, setSeenCards] = useState(cards);
+  if (seenCards !== cards) {
+    setSeenCards(cards);
+    setItems(cards);
+  }
+
+  const move = async (partnershipId: string, toStage: CmStage, exitReason?: string | null) => {
     const card = items.find((c) => c.partnershipId === partnershipId);
     if (!card || card.stage === toStage) return;
-    // Optimistic.
+    const before = items;
     setItems((prev) => prev.map((c) => (c.partnershipId === partnershipId ? { ...c, stage: toStage } : c)));
-    const res = await fetch(`/api/partnerships/${partnershipId}/stage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stage: toStage }),
-    });
-    if (res.ok) router.refresh();
-    else setItems(cards); // revert on failure
+    const r = await run(
+      () =>
+        api(`/api/partnerships/${partnershipId}/stage`, {
+          stage: toStage,
+          exitReason: exitReason === undefined ? undefined : exitReason,
+        }),
+      { success: `${card.name} → ${stageLabel(toStage)}` },
+    );
+    if (!r.ok) setItems(before);
+  };
+
+  const closePrompt = (c: Closing) => {
+    const card = items.find((x) => x.partnershipId === c.id);
+    return (
+      <div className="rounded-lg border border-accent-ring bg-surface p-2.5 text-xs shadow-pop">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <span className="font-medium text-text">Close {card?.name ?? "this creator"}</span>
+          <IconButton label="Cancel" icon={<X size={13} />} onClick={() => setClosing(null)} />
+        </div>
+        {!c.stage ? (
+          <>
+            <div className="mb-1.5 text-text-muted">Who ended it?</div>
+            <div className="flex flex-wrap gap-1">
+              {CLOSE_OPTIONS.map((s) => (
+                <Button key={s} size="sm" title={stageHint(s)} onClick={() => setClosing({ ...c, stage: s })}>
+                  {stageLabel(s)}
+                </Button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mb-1.5 text-text-muted">{stageLabel(c.stage)} — why?</div>
+            <div className="flex flex-wrap gap-1">
+              {(EXIT_REASONS_BY_STAGE[c.stage] ?? []).map((r) => (
+                <Button
+                  key={r.value}
+                  size="sm"
+                  onClick={() => {
+                    move(c.id, c.stage!, r.value);
+                    setClosing(null);
+                  }}
+                >
+                  {r.label}
+                </Button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="mt-2 text-text-faint hover:text-accent"
+              onClick={() => {
+                move(c.id, c.stage!, null);
+                setClosing(null);
+              }}
+            >
+              Skip the reason
+            </button>
+          </>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -67,69 +153,92 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
             onDragLeave={() => setOverCol((c) => (c === col.key ? null : c))}
             onDrop={() => {
               if (dragId) {
-                if (col.key === "closed") setPendingClose(dragId);
+                if (col.key === "closed") setClosing({ id: dragId, stage: null, via: "drag" });
                 else move(dragId, dropStage);
               }
               setDragId(null);
               setOverCol(null);
             }}
-            className={`flex w-64 shrink-0 flex-col rounded-xl border bg-surface-2/50 transition ${
-              overCol === col.key ? "border-accent ring-1 ring-accent" : "border-border"
-            }`}
+            className={cn(
+              "flex w-60 shrink-0 flex-col rounded-xl border bg-surface-2/60 transition",
+              overCol === col.key ? "border-accent-ring ring-2 ring-accent-soft" : "border-border",
+            )}
           >
-            <div className="flex items-center justify-between px-3 py-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">{col.label}</span>
-              <span className="rounded-full bg-surface px-1.5 text-xs font-semibold tabular text-text-faint">
-                {colCards.length}
-              </span>
+            <div className="px-3 pt-2.5 pb-2" title={col.hint}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-text">{col.label}</span>
+                <span className="rounded-full bg-surface px-1.5 text-[11px] font-semibold tabular text-text-muted ring-1 ring-inset ring-border">
+                  {colCards.length}
+                </span>
+              </div>
+              <div className="text-[11px] text-text-faint">{col.group}</div>
             </div>
             <div className="flex min-h-16 flex-col gap-2 px-2 pb-2">
-              {col.key === "closed" && pendingClose && (
-                <div className="rounded-lg border border-accent bg-surface p-2 text-xs">
-                  <div className="mb-1.5 font-medium text-text">
-                    Close {items.find((c) => c.partnershipId === pendingClose)?.name ?? "this creator"} as…
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {CLOSE_OPTIONS.map((o) => (
-                      <button
-                        key={o.stage}
-                        onClick={() => {
-                          move(pendingClose, o.stage);
-                          setPendingClose(null);
-                        }}
-                        className="rounded-md bg-accent px-2 py-1 text-white hover:bg-indigo-700"
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                    <button onClick={() => setPendingClose(null)} className="px-2 py-1 text-text-muted hover:text-text">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
+              {closing?.via === "drag" && col.key === "closed" && closePrompt(closing)}
               {colCards.map((c) => (
                 <div
                   key={c.partnershipId}
                   draggable
-                  onDragStart={() => setDragId(c.partnershipId)}
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    setDragId(c.partnershipId);
+                  }}
                   onDragEnd={() => setDragId(null)}
-                  className={`cursor-grab rounded-lg border border-border bg-surface p-2.5 shadow-sm transition active:cursor-grabbing ${
-                    dragId === c.partnershipId ? "opacity-50" : ""
-                  }`}
+                  className={cn(
+                    "cursor-grab rounded-lg border border-border bg-surface p-2.5 shadow-card transition active:cursor-grabbing",
+                    dragId === c.partnershipId && "opacity-50",
+                  )}
                 >
-                  <Link href={`/creators/${c.partnershipId}`} className="block">
-                    <div className="truncate text-sm font-medium text-text hover:text-accent">{c.name}</div>
-                    <div className="mt-0.5 flex items-center justify-between text-xs text-text-faint">
-                      <span className="truncate">@{c.username}</span>
-                      <span className="tabular">{compactNumber(c.followers)}</span>
-                    </div>
-                    {c.agreementType && col.key === "closed" && (
-                      <span className={`mt-1 inline-block rounded px-1 text-[10px] ring-1 ring-inset ${stageStyle(c.stage)}`}>
-                        {c.stage.replace("_", " ")}
-                      </span>
-                    )}
+                  <Link
+                    href={`/creators/${c.partnershipId}`}
+                    className="block truncate text-sm font-medium text-text hover:text-accent"
+                  >
+                    {c.name}
                   </Link>
+                  <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-text-muted">
+                    <span className="truncate">@{c.username}</span>
+                    <span className="tabular" title="Followers">
+                      {compactNumber(c.followers)}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    {col.key === "closed" ? <StagePill stage={c.stage} /> : <span />}
+                    {moveMenu === c.partnershipId ? (
+                      <Select
+                        compact
+                        autoFocus
+                        aria-label="Move to stage"
+                        value={c.stage}
+                        onBlur={() => setMoveMenu(null)}
+                        onChange={(e) => {
+                          const to = e.target.value as CmStage;
+                          setMoveMenu(null);
+                          if (isTerminal(to)) setClosing({ id: c.partnershipId, stage: to, via: "menu" });
+                          else move(c.partnershipId, to);
+                        }}
+                        className="w-40"
+                      >
+                        {stagesByGroup().map((g) => (
+                          <optgroup key={g.group} label={g.label}>
+                            {g.stages.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </Select>
+                    ) : (
+                      <IconButton
+                        label="Move to another stage"
+                        icon={<MoveRight size={13} />}
+                        onClick={() => setMoveMenu(c.partnershipId)}
+                      />
+                    )}
+                  </div>
+                  {closing?.via === "menu" && closing.id === c.partnershipId && (
+                    <div className="mt-2">{closePrompt(closing)}</div>
+                  )}
                 </div>
               ))}
             </div>

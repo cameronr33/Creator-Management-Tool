@@ -2,10 +2,11 @@ import Link from "next/link";
 import { ExternalLink, Mail, Plus } from "lucide-react";
 import { resolveClient, getCampaigns, getCreatorRows } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
-import { PageHeader, EmptyState, StagePill, Avatar, Badge } from "@/components/ui";
+import { PageHeader, EmptyState, StagePill, Avatar, Badge, Button } from "@/components/ui";
 import { CreatorsFilterBar } from "@/components/creators-filter-bar";
 import { compactNumber, relativeDays } from "@/lib/format";
 import type { CmStage } from "@/lib/db/schema";
+import { EST_VIEWS_NOTE } from "@/lib/copy";
 
 export default async function CreatorsPage({
   searchParams,
@@ -19,7 +20,7 @@ export default async function CreatorsPage({
       <>
         <PageHeader title="Creators" />
         <div className="p-6">
-          <EmptyState title="No client selected" hint="Add a client in Settings or run the import." />
+          <EmptyState title="No client selected" hint="Pick a client in the sidebar first." />
         </div>
       </>
     );
@@ -41,55 +42,48 @@ export default async function CreatorsPage({
     );
   }
 
+  const addButton = (
+    <Button href="/creators/new" variant="primary" icon={<Plus size={15} />}>
+      Add creator
+    </Button>
+  );
+
   return (
     <>
       <PageHeader
         title="Creators"
+        client={client.name}
         subtitle={`${rows.length} shown`}
-        actions={
-          <>
-            <CreatorsFilterBar campaigns={campaigns} />
-            <Link
-              href="/creators/new"
-              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
-            >
-              <Plus size={15} /> Add creator
-            </Link>
-          </>
-        }
-      />
+        help="Everyone tracked for this client. Search by name, handle or content type, filter by campaign or stage, and open a row for the full record."
+        actions={addButton}
+      >
+        <CreatorsFilterBar campaigns={campaigns} />
+      </PageHeader>
       <div className="p-6">
         {rows.length === 0 ? (
           <EmptyState
             title="No creators match"
             hint="Try clearing the filters, or add a creator by pasting their profile link."
-            action={
-              <Link
-                href="/creators/new"
-                className="mt-2 flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
-              >
-                <Plus size={15} /> Add creator
-              </Link>
-            }
+            action={addButton}
           />
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+          <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-card">
             <table className="w-full min-w-[900px] text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-text-faint">
+                <tr className="border-b border-border text-left text-xs font-semibold text-text-muted">
                   <th className="px-4 py-2.5 font-semibold">Creator</th>
-                  <th className="px-4 py-2.5 font-semibold">Pillar</th>
+                  <th className="px-4 py-2.5 font-semibold">Content type</th>
                   <th className="px-4 py-2.5 text-right font-semibold">Followers</th>
                   <th className="px-4 py-2.5 text-right font-semibold">Avg views</th>
                   <th className="px-4 py-2.5 text-right font-semibold">Max views</th>
                   <th className="px-4 py-2.5 font-semibold">Stage</th>
-                  <th className="px-4 py-2.5 font-semibold">Last touch</th>
+                  <th className="px-4 py-2.5 font-semibold">Last contact</th>
                   <th className="px-4 py-2.5 font-semibold">Campaign</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {rows.map((r) => (
-                  <tr key={r.partnershipId} className="group transition hover:bg-surface-2">
+                  <tr key={r.partnershipId} className="group transition hover:bg-surface-2/60">
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2.5">
                         <Avatar name={r.name} />
@@ -111,7 +105,12 @@ export default async function CreatorsPage({
                               <ExternalLink size={11} />
                             </a>
                             {r.businessEmail && (
-                              <a href={`mailto:${r.businessEmail}`} className="hover:text-accent" title={r.businessEmail}>
+                              <a
+                                href={`mailto:${r.businessEmail}`}
+                                className="hover:text-accent"
+                                title={r.businessEmail}
+                                aria-label={`Email ${r.businessEmail}`}
+                              >
                                 <Mail size={11} />
                               </a>
                             )}
@@ -125,9 +124,9 @@ export default async function CreatorsPage({
                       <span className="inline-flex items-center gap-1">
                         {compactNumber(r.avgViews)}
                         {r.viewsSource === "apify" && (
-                          <span title="Apify estimate — understates public Views">
-                            <Badge tone="muted">est</Badge>
-                          </span>
+                          <Badge tone="muted" title={EST_VIEWS_NOTE}>
+                            est
+                          </Badge>
                         )}
                       </span>
                     </td>
@@ -137,9 +136,11 @@ export default async function CreatorsPage({
                     </td>
                     <td className="px-4 py-2.5 text-text-muted">
                       {r.repliedAt ? (
-                        <Badge tone="good">replied</Badge>
+                        <Badge tone="good" title={`Replied ${relativeDays(r.repliedAt)}`}>
+                          replied
+                        </Badge>
                       ) : r.lastOutboundAt ? (
-                        <span title={`${r.followUpCount} follow-up(s)`}>{relativeDays(r.lastOutboundAt)}</span>
+                        <span title={`${r.followUpCount} follow-up(s) sent`}>{relativeDays(r.lastOutboundAt)}</span>
                       ) : (
                         "—"
                       )}

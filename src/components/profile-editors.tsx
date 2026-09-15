@@ -1,132 +1,106 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Pencil, Plus, X, Star, Sparkles, Loader2, ExternalLink, Trash2 } from "lucide-react";
-import { PLATFORM_LABELS, type SocialPlatform } from "@/lib/social-links";
+import { Pencil, Plus, X, Star, RefreshCw, ExternalLink, Trash2 } from "lucide-react";
+import { PLATFORM_LABELS, ENRICHABLE_PLATFORMS, type SocialPlatform } from "@/lib/social-links";
 import { parseAddress } from "@/lib/address";
 import type { CmCreator, CmCreatorSocial, CmPartnership, CmProductRequested } from "@/lib/db/schema";
-
-async function send(url: string, body: unknown, method = "POST") {
-  const res = await fetch(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  return { ok: res.ok && data.ok !== false, data };
-}
-
-function useAction() {
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
-  const run = async (fn: () => Promise<{ ok: boolean; data: unknown }>) => {
-    setPending(true);
-    const r = await fn();
-    setPending(false);
-    if (r.ok) router.refresh();
-    return r;
-  };
-  return { pending, run };
-}
-
-const input =
-  "w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-accent";
+import { Button, IconButton, Field, Input, Textarea, Callout } from "@/components/ui";
+import { ConfirmButton } from "@/components/confirm-button";
+import { api, useSave } from "@/components/use-save";
+import { toast } from "@/components/toast";
 
 /* ── Identity ─────────────────────────────────────────────────── */
 
 export function EditableProfile({ creator }: { creator: CmCreator }) {
-  const { pending, run } = useAction();
+  const { pending, run } = useSave();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(creator.name);
   const [email, setEmail] = useState(creator.businessEmail ?? "");
   const [pillar, setPillar] = useState(creator.contentPillar ?? "");
   const [followers, setFollowers] = useState(creator.followers?.toString() ?? "");
   const [notes, setNotes] = useState(creator.notes ?? "");
-  const [fetchNote, setFetchNote] = useState<string | null>(null);
+  const canRefresh = ENRICHABLE_PLATFORMS.includes(creator.platform as SocialPlatform);
 
   const save = async () => {
-    const r = await run(() =>
-      send(
-        `/api/creators/${creator.id}`,
-        {
-          name: name.trim() || creator.name,
-          businessEmail: email || null,
-          contentPillar: pillar || null,
-          followers: followers ? Number(followers) : null,
-          notes: notes || null,
-        },
-        "PATCH",
-      ),
+    const r = await run(
+      () =>
+        api(
+          `/api/creators/${creator.id}`,
+          {
+            name: name.trim() || creator.name,
+            businessEmail: email || null,
+            contentPillar: pillar || null,
+            followers: followers ? Number(followers) : null,
+            notes: notes || null,
+          },
+          "PATCH",
+        ),
+      { success: "Profile saved" },
     );
     if (r.ok) setOpen(false);
   };
 
-  const fetchDetails = async () => {
-    setFetchNote(null);
-    const r = await run(() => send("/api/enrich", { creatorId: creator.id, save: true }));
-    const d = r.data as { ok?: boolean; error?: string; followers?: number };
-    if (d?.ok) {
-      if (d.followers != null) setFollowers(String(d.followers));
-      setFetchNote("Refreshed from the profile.");
-    } else {
-      setFetchNote(d?.error ?? "Could not fetch.");
-    }
+  const refresh = async () => {
+    const r = await run(() => api<{ followers?: number }>("/api/enrich", { creatorId: creator.id, save: true }), {
+      success: "Followers and public email refreshed from Instagram",
+    });
+    if (r.ok && r.data.followers != null) setFollowers(String(r.data.followers));
   };
 
   if (!open) {
     return (
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setOpen(true)}
-          className="flex items-center gap-1 text-xs text-text-muted transition hover:text-accent"
-        >
-          <Pencil size={12} /> Edit profile
-        </button>
-        <button
-          onClick={fetchDetails}
-          disabled={pending}
-          className="flex items-center gap-1 text-xs text-text-muted transition hover:text-accent disabled:opacity-60"
-        >
-          {pending ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} Fetch
-        </button>
-        {fetchNote && <span className="text-xs text-text-faint">{fetchNote}</span>}
+      <div className="flex flex-wrap items-center gap-1">
+        <Button size="sm" variant="ghost" icon={<Pencil size={13} />} onClick={() => setOpen(true)}>
+          Edit profile
+        </Button>
+        {canRefresh && (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<RefreshCw size={13} />}
+            pending={pending}
+            onClick={refresh}
+            title="Pulls the current follower count and public email from the Instagram profile"
+          >
+            Refresh from Instagram
+          </Button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="mt-2 space-y-2 rounded-lg border border-border bg-surface-2 p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className={input} />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Contact email" className={input} />
-        <input value={pillar} onChange={(e) => setPillar(e.target.value)} placeholder="Content pillar" className={input} />
-        <input
-          value={followers}
-          onChange={(e) => setFollowers(e.target.value.replace(/[^\d]/g, ""))}
-          placeholder="Followers"
-          inputMode="numeric"
-          className={input}
-        />
+    <div className="space-y-3 rounded-lg border border-border bg-surface-2/60 p-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Name">
+          <Input compact value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Contact email" hint="The public one. Other addresses they write from are linked separately.">
+          <Input compact value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+        </Field>
+        <Field label="Content type" hint="Overlanding, DIY, shop builds… fills the message template.">
+          <Input compact value={pillar} onChange={(e) => setPillar(e.target.value)} />
+        </Field>
+        <Field label="Followers" hint="Manual edits stay until the next refresh.">
+          <Input
+            compact
+            value={followers}
+            onChange={(e) => setFollowers(e.target.value.replace(/[^\d]/g, ""))}
+            inputMode="numeric"
+          />
+        </Field>
       </div>
-      <textarea
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={2}
-        placeholder="Notes about this creator…"
-        className={input}
-      />
+      <Field label="Notes about the creator (all campaigns)">
+        <Textarea compact value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+      </Field>
       <div className="flex gap-2">
-        <button
-          onClick={save}
-          disabled={pending}
-          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
-        >
-          Save
-        </button>
-        <button onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-sm text-text-muted hover:bg-surface">
+        <Button size="sm" variant="primary" onClick={save} pending={pending}>
+          Save profile
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -135,9 +109,10 @@ export function EditableProfile({ creator }: { creator: CmCreator }) {
 /* ── Email addresses ──────────────────────────────────────────── */
 
 /**
- * Every address this creator is known to use. The public (Apify) address is
- * shown on the profile; these extras are what the email sync also matches —
- * the address a creator actually replies from is usually not the public one.
+ * Every address this creator is known to use. The public (scraped) address
+ * is shown on the profile; these extras are what the email sync also
+ * matches — the address a creator actually replies from is usually not the
+ * public one.
  */
 export function EmailsEditor({
   creatorId,
@@ -146,46 +121,52 @@ export function EmailsEditor({
   creatorId: string;
   emails: { id: string; email: string; source: string }[];
 }) {
-  const { pending, run } = useAction();
+  const { pending, run } = useSave();
   const [value, setValue] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const add = async () => {
-    setError(null);
-    const r = await run(() => send(`/api/creators/${creatorId}/emails`, { email: value }));
+    if (!value.trim()) return;
+    const r = await run(() => api(`/api/creators/${creatorId}/emails`, { email: value }), {
+      success: "Email linked — their threads will sync from now on",
+    });
     if (r.ok) setValue("");
-    else setError((r.data as { error?: string })?.error ?? "Could not add");
   };
   const remove = (email: string) =>
-    run(() => send(`/api/creators/${creatorId}/emails`, { email }, "DELETE"));
+    run(() => api(`/api/creators/${creatorId}/emails`, { email }, "DELETE"), { success: "Email unlinked" });
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {emails.map((e) => (
         <span
           key={e.id}
-          className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-2 py-0.5 text-xs text-text-muted"
-          title={`source: ${e.source}`}
+          className="inline-flex items-center gap-1 rounded-md bg-surface-2 py-0.5 pr-0.5 pl-2 text-xs text-text-muted ring-1 ring-inset ring-border"
+          title={e.source === "sync" ? "Linked from an email thread" : "Added by hand"}
         >
           {e.email}
-          <button onClick={() => remove(e.email)} disabled={pending} className="hover:text-red-600" aria-label="Remove email">
-            <X size={11} />
-          </button>
+          <ConfirmButton
+            iconOnly
+            icon={<X size={11} />}
+            label={`Unlink ${e.email}`}
+            question="Unlink?"
+            confirmLabel="Unlink"
+            pending={pending}
+            onConfirm={() => remove(e.email)}
+          />
         </span>
       ))}
-      <input
+      <Input
+        compact
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && value && add()}
-        placeholder="+ other email they use"
-        className="w-48 rounded-md border border-border bg-surface px-2 py-0.5 text-xs outline-none focus:border-accent"
+        onKeyDown={(e) => e.key === "Enter" && add()}
+        placeholder="Another email they write from"
+        aria-label="Another email they write from"
+        className="w-56"
+        type="email"
       />
-      {value && (
-        <button onClick={add} disabled={pending} className="text-xs text-accent hover:underline">
-          Add
-        </button>
-      )}
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      <Button size="sm" variant="ghost" icon={<Plus size={13} />} onClick={add} pending={pending} disabled={!value.trim()}>
+        Link email
+      </Button>
     </div>
   );
 }
@@ -199,19 +180,15 @@ export function SocialsEditor({
   creatorId: string;
   socials: CmCreatorSocial[];
 }) {
-  const { pending, run } = useAction();
+  const { pending, run } = useSave();
   const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const add = async () => {
-    setError(null);
-    const r = await run(() => send(`/api/creators/${creatorId}/socials`, { url }));
+    const r = await run(() => api(`/api/creators/${creatorId}/socials`, { url }), { success: "Link added" });
     if (r.ok) {
       setUrl("");
       setAdding(false);
-    } else {
-      setError((r.data as { error?: string })?.error ?? "Could not add that link.");
     }
   };
 
@@ -221,32 +198,39 @@ export function SocialsEditor({
         {socials.map((s) => (
           <li
             key={s.id}
-            className="group flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-xs"
+            className="flex items-center gap-0.5 rounded-full border border-border bg-surface py-0.5 pr-0.5 pl-2.5 text-xs"
           >
-            {s.isPrimary && <Star size={10} className="fill-amber-400 text-amber-400" />}
-            <a href={s.url} target="_blank" rel="noreferrer" className="text-text-muted hover:text-accent">
+            {s.isPrimary && <Star size={10} className="mr-0.5 fill-warn-line text-warn" aria-label="Primary link" />}
+            <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-text-muted hover:text-accent">
               {PLATFORM_LABELS[s.platform as SocialPlatform]}
               {s.handle ? ` · @${s.handle}` : ""}
+              <ExternalLink size={9} className="text-text-faint" />
             </a>
-            <ExternalLink size={9} className="text-text-faint" />
             {!s.isPrimary && (
               <>
-                <button
-                  onClick={() => run(() => send(`/api/creators/${creatorId}/socials`, { socialId: s.id, makePrimary: true }))}
+                <IconButton
+                  label="Make this the primary link"
+                  icon={<Star size={11} />}
                   disabled={pending}
-                  title="Make primary"
-                  className="opacity-0 transition group-hover:opacity-100 hover:text-amber-500"
-                >
-                  <Star size={10} />
-                </button>
-                <button
-                  onClick={() => run(() => send(`/api/creators/${creatorId}/socials`, { socialId: s.id }, "DELETE"))}
-                  disabled={pending}
-                  title="Remove"
-                  className="opacity-0 transition group-hover:opacity-100 hover:text-red-600"
-                >
-                  <X size={10} />
-                </button>
+                  onClick={() =>
+                    run(() => api(`/api/creators/${creatorId}/socials`, { socialId: s.id, makePrimary: true }), {
+                      success: "Primary link changed — the profile now points here",
+                    })
+                  }
+                />
+                <ConfirmButton
+                  iconOnly
+                  icon={<X size={11} />}
+                  label="Remove link"
+                  question="Remove?"
+                  confirmLabel="Remove"
+                  pending={pending}
+                  onConfirm={() =>
+                    run(() => api(`/api/creators/${creatorId}/socials`, { socialId: s.id }, "DELETE"), {
+                      success: "Link removed",
+                    })
+                  }
+                />
               </>
             )}
           </li>
@@ -254,30 +238,29 @@ export function SocialsEditor({
       </ul>
 
       {adding ? (
-        <div className="flex items-center gap-2">
-          <input
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            compact
             value={url}
             onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && url.trim() && add()}
             placeholder="Paste another profile link"
-            className={`${input} max-w-sm`}
+            aria-label="Profile link"
+            className="max-w-sm"
+            autoFocus
           />
-          <button
-            onClick={add}
-            disabled={pending || !url.trim()}
-            className="rounded-lg bg-accent px-2.5 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
-          >
+          <Button size="sm" variant="primary" onClick={add} pending={pending} disabled={!url.trim()}>
             Add
-          </button>
-          <button onClick={() => setAdding(false)} className="text-sm text-text-muted hover:text-text">
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>
             Cancel
-          </button>
+          </Button>
         </div>
       ) : (
-        <button onClick={() => setAdding(true)} className="flex items-center gap-1 text-xs text-accent hover:underline">
-          <Plus size={12} /> Add link
-        </button>
+        <Button variant="link" icon={<Plus size={13} />} onClick={() => setAdding(true)} className="text-xs">
+          Add a profile link
+        </Button>
       )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }
@@ -285,7 +268,7 @@ export function SocialsEditor({
 /* ── Shipping address ─────────────────────────────────────────── */
 
 export function AddressEditor({ partnership }: { partnership: CmPartnership }) {
-  const { pending, run } = useAction();
+  const { pending, run } = useSave();
   const [open, setOpen] = useState(false);
   const [paste, setPaste] = useState("");
   const [parseIssues, setParseIssues] = useState<string[]>([]);
@@ -301,12 +284,12 @@ export function AddressEditor({ partnership }: { partnership: CmPartnership }) {
   });
   const set = (k: keyof typeof f, v: string) => setF((prev) => ({ ...prev, [k]: v }));
 
-  // The DM almost always contains the address as one line — parse it instead
+  // The DM almost always contains the address as one block — read it instead
   // of retyping six fields. Anything ambiguous is surfaced, never guessed.
   const parsePasted = () => {
     const parsed = parseAddress(paste);
     if (!parsed) {
-      setParseIssues(["Could not parse — fill the fields in manually."]);
+      setParseIssues(["Couldn't read that — fill the fields in by hand."]);
       return;
     }
     setF({
@@ -319,78 +302,81 @@ export function AddressEditor({ partnership }: { partnership: CmPartnership }) {
       country: parsed.country || "US",
     });
     setRaw(parsed.raw);
-    setParseIssues(parsed.issues);
+    setParseIssues(parsed.issues.map((i) => `Couldn't find the ${i.replace(/^no /, "")} — check the fields below.`));
+    if (parsed.isComplete) toast("Address read — check it, then save", { tone: "good" });
   };
 
   const save = async () => {
-    const r = await run(() =>
-      send(
-        `/api/partnerships/${partnership.id}`,
-        {
-          ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v || null])),
-          addressRaw: raw || null,
-        },
-        "PATCH",
-      ),
+    const r = await run(
+      () =>
+        api(
+          `/api/partnerships/${partnership.id}`,
+          {
+            ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v || null])),
+            addressRaw: raw || null,
+          },
+          "PATCH",
+        ),
+      { success: "Address saved" },
     );
     if (r.ok) setOpen(false);
   };
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-xs text-accent hover:underline"
-      >
-        <Pencil size={12} /> {partnership.addressLine1 ? "Edit address" : "Add address"}
-      </button>
+      <Button size="sm" icon={<Pencil size={13} />} onClick={() => setOpen(true)}>
+        {partnership.addressLine1 ? "Edit address" : "Add address"}
+      </Button>
     );
   }
 
   return (
-    <div className="mt-2 space-y-2 rounded-lg border border-border bg-surface-2 p-3">
-      <div className="flex gap-2">
-        <input
-          value={paste}
-          onChange={(e) => setPaste(e.target.value)}
-          placeholder='Paste the whole address from the DM — "Joe, 123 Main St, Austin, TX, 78701"'
-          className={input}
-        />
-        <button
-          onClick={parsePasted}
-          disabled={!paste.trim()}
-          className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-sm text-text-muted transition hover:bg-surface disabled:opacity-50"
-        >
-          Parse
-        </button>
+    <div className="space-y-3 rounded-lg border border-border bg-surface-2/60 p-3">
+      <Field label="Paste the address as they sent it" hint="One line or several — it's read into the fields below.">
+        <div className="flex gap-2">
+          <Textarea
+            compact
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+            rows={3}
+            placeholder={"Joe Hubbard\n3333 Simeon Bunker St\nSaint Charles, MO 63301"}
+          />
+          <Button size="sm" onClick={parsePasted} disabled={!paste.trim()} className="self-start">
+            Read it
+          </Button>
+        </div>
+      </Field>
+      {parseIssues.length > 0 && <Callout tone="warn">{parseIssues.join(" ")}</Callout>}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <Field label="Recipient name">
+          <Input compact value={f.recipientName} onChange={(e) => set("recipientName", e.target.value)} />
+        </Field>
+        <Field label="Street address">
+          <Input compact value={f.addressLine1} onChange={(e) => set("addressLine1", e.target.value)} />
+        </Field>
+        <Field label="Apt, suite (optional)">
+          <Input compact value={f.addressLine2} onChange={(e) => set("addressLine2", e.target.value)} />
+        </Field>
+        <Field label="City">
+          <Input compact value={f.city} onChange={(e) => set("city", e.target.value)} />
+        </Field>
+        <Field label="State">
+          <Input compact value={f.region} onChange={(e) => set("region", e.target.value)} />
+        </Field>
+        <Field label="ZIP">
+          <Input compact value={f.postalCode} onChange={(e) => set("postalCode", e.target.value)} />
+        </Field>
+        <Field label="Country">
+          <Input compact value={f.country} onChange={(e) => set("country", e.target.value)} />
+        </Field>
       </div>
-      {parseIssues.length > 0 && (
-        <ul className="space-y-0.5 text-xs text-amber-700">
-          {parseIssues.map((iss) => (
-            <li key={iss}>⚠ {iss}</li>
-          ))}
-        </ul>
-      )}
-      <input value={f.recipientName} onChange={(e) => set("recipientName", e.target.value)} placeholder="Recipient name" className={input} />
-      <input value={f.addressLine1} onChange={(e) => set("addressLine1", e.target.value)} placeholder="Street address" className={input} />
-      <input value={f.addressLine2} onChange={(e) => set("addressLine2", e.target.value)} placeholder="Apt, suite (optional)" className={input} />
-      <div className="grid grid-cols-4 gap-2">
-        <input value={f.city} onChange={(e) => set("city", e.target.value)} placeholder="City" className={input} />
-        <input value={f.region} onChange={(e) => set("region", e.target.value)} placeholder="State" className={input} />
-        <input value={f.postalCode} onChange={(e) => set("postalCode", e.target.value)} placeholder="ZIP" className={input} />
-        <input value={f.country} onChange={(e) => set("country", e.target.value)} placeholder="Country" className={input} />
-      </div>
       <div className="flex gap-2">
-        <button
-          onClick={save}
-          disabled={pending}
-          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
-        >
+        <Button size="sm" variant="primary" onClick={save} pending={pending}>
           Save address
-        </button>
-        <button onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-sm text-text-muted hover:bg-surface">
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -405,20 +391,22 @@ export function ProductEditor({
   partnershipId: string;
   products: CmProductRequested[];
 }) {
-  const { pending, run } = useAction();
+  const { pending, run } = useSave();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [qty, setQty] = useState("1");
 
   const add = async () => {
-    const r = await run(() =>
-      send("/api/products", {
-        partnershipId,
-        productName: name.trim(),
-        productUrl: url.trim() || null,
-        quantity: Number(qty) || 1,
-      }),
+    const r = await run(
+      () =>
+        api("/api/products", {
+          partnershipId,
+          productName: name.trim(),
+          productUrl: url.trim() || null,
+          quantity: Number(qty) || 1,
+        }),
+      { success: "Product added" },
     );
     if (r.ok) {
       setName("");
@@ -430,10 +418,11 @@ export function ProductEditor({
 
   return (
     <div className="space-y-2">
+      {products.length === 0 && !open && <p className="text-sm text-text-muted">No product agreed yet.</p>}
       {products.length > 0 && (
         <ul className="space-y-1.5">
           {products.map((p) => (
-            <li key={p.id} className="group flex items-start justify-between gap-2 text-sm">
+            <li key={p.id} className="flex items-start justify-between gap-2 text-sm">
               <div className="min-w-0">
                 {p.productUrl ? (
                   <a href={p.productUrl} target="_blank" rel="noreferrer" className="font-medium text-text hover:text-accent">
@@ -442,52 +431,49 @@ export function ProductEditor({
                 ) : (
                   <span className="font-medium text-text">{p.productName}</span>
                 )}
-                <div className="text-xs text-text-faint">
+                <div className="text-xs text-text-muted">
                   {p.category && <span>{p.category}</span>}
                   {p.quantity > 1 && <span>{p.category ? " · " : ""}qty {p.quantity}</span>}
                 </div>
               </div>
-              <button
-                onClick={() => run(() => send("/api/products", { id: p.id }, "DELETE"))}
-                disabled={pending}
-                className="shrink-0 opacity-0 transition group-hover:opacity-100 hover:text-red-600"
-                title="Remove product"
-              >
-                <Trash2 size={13} />
-              </button>
+              <ConfirmButton
+                iconOnly
+                icon={<Trash2 size={13} />}
+                label="Remove product"
+                question="Remove?"
+                confirmLabel="Remove"
+                pending={pending}
+                onConfirm={() => run(() => api("/api/products", { id: p.id }, "DELETE"), { success: "Product removed" })}
+              />
             </li>
           ))}
         </ul>
       )}
 
       {open ? (
-        <div className="space-y-2 rounded-lg border border-border bg-surface-2 p-2.5">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Product name" className={input} />
-          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Product URL (optional)" className={input} />
-          <input
-            value={qty}
-            onChange={(e) => setQty(e.target.value.replace(/[^\d]/g, ""))}
-            placeholder="Qty"
-            inputMode="numeric"
-            className={`${input} w-20`}
-          />
+        <div className="space-y-2 rounded-lg border border-border bg-surface-2/60 p-3">
+          <Field label="Product">
+            <Input compact value={name} onChange={(e) => setName(e.target.value)} placeholder="Rallye 4000 driving lights" autoFocus />
+          </Field>
+          <Field label="Link (optional)">
+            <Input compact value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
+          </Field>
+          <Field label="Quantity" className="w-24">
+            <Input compact value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" />
+          </Field>
           <div className="flex gap-2">
-            <button
-              onClick={add}
-              disabled={pending || !name.trim()}
-              className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
-            >
-              Add
-            </button>
-            <button onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-sm text-text-muted hover:bg-surface">
+            <Button size="sm" variant="primary" onClick={add} pending={pending} disabled={!name.trim()}>
+              Add product
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
-        <button onClick={() => setOpen(true)} className="flex items-center gap-1 text-xs text-accent hover:underline">
-          <Plus size={12} /> Add product
-        </button>
+        <Button size="sm" icon={<Plus size={13} />} onClick={() => setOpen(true)}>
+          Add product
+        </Button>
       )}
     </div>
   );

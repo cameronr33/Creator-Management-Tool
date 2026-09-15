@@ -69,10 +69,20 @@ export function parseAddress(input: string | null | undefined): ParsedAddress | 
     issues: [],
   };
 
-  const parts = raw.split(",").map((p) => p.trim()).filter((p) => p !== "");
+  // Addresses pasted from a DM arrive one line per part; sheet addresses use
+  // commas. Both split the same way.
+  const parts = raw
+    .split(/[,\n]+/)
+    .map((p) => p.trim())
+    .filter((p) => p !== "");
   if (parts.length === 0) {
     result.issues.push("empty address");
     return result;
+  }
+
+  // A trailing country line ("United States", "USA") is noise for a US-only parser.
+  if (parts.length > 1 && /^(united states( of america)?|u\.?s\.?a?\.?)$/i.test(parts[parts.length - 1])) {
+    parts.pop();
   }
 
   // Leading part is the recipient name when it has no digits.

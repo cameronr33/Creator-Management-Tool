@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Plus, X, Sparkles, Loader2, Link2 } from "lucide-react";
-import { STAGES } from "@/lib/stages";
-import { parseSocialUrl, PLATFORM_LABELS } from "@/lib/social-links";
+import { Plus, X, Sparkles, Link2 } from "lucide-react";
+import { stagesByGroup } from "@/lib/stages";
+import { parseSocialUrl, PLATFORM_LABELS, ENRICHABLE_PLATFORMS } from "@/lib/social-links";
+import { Button, IconButton, Field, Input, Select, Callout, Card, CardHeader } from "@/components/ui";
+import { api, useSave } from "@/components/use-save";
+import { toast } from "@/components/toast";
 
 interface Campaign {
   id: string;
@@ -22,6 +24,7 @@ export function AddCreatorForm({
   campaigns: Campaign[];
 }) {
   const router = useRouter();
+  const { pending, run } = useSave();
 
   const [links, setLinks] = useState<string[]>([""]);
   const [name, setName] = useState("");
@@ -31,11 +34,8 @@ export function AddCreatorForm({
   const [email, setEmail] = useState("");
   const [pillar, setPillar] = useState("");
   const [followers, setFollowers] = useState("");
-
   const [fetching, setFetching] = useState(false);
-  const [fetchNote, setFetchNote] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [problems, setProblems] = useState<string[]>([]);
 
   const setLink = (i: number, value: string) =>
     setLinks((prev) => prev.map((l, idx) => (idx === i ? value : l)));
@@ -46,241 +46,188 @@ export function AddCreatorForm({
   // Live preview of what each pasted link is understood to be.
   const parsed = links.map((l) => (l.trim() ? parseSocialUrl(l) : null));
   const primary = parsed.find((p) => p !== null) ?? null;
-  const canFetch =
-    !!primary && ["instagram", "tiktok", "youtube"].includes(primary.platform);
+  const canFetch = !!primary && ENRICHABLE_PLATFORMS.includes(primary.platform);
 
   const fetchDetails = async () => {
     if (!primary) return;
     setFetching(true);
-    setFetchNote(null);
-    const res = await fetch("/api/enrich", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: primary.url }),
-    });
-    const data = await res.json().catch(() => ({}));
+    const r = await api<{ name?: string; followers?: number; businessEmail?: string }>("/api/enrich", { url: primary.url });
     setFetching(false);
-    if (data.ok) {
-      if (data.name && !name) setName(data.name);
-      if (data.followers != null) setFollowers(String(data.followers));
-      if (data.businessEmail && !email) setEmail(data.businessEmail);
-      setFetchNote("Filled in from the profile.");
+    if (r.ok) {
+      if (r.data.name && !name) setName(r.data.name);
+      if (r.data.followers != null) setFollowers(String(r.data.followers));
+      if (r.data.businessEmail && !email) setEmail(r.data.businessEmail);
+      toast("Filled in from the Instagram profile", { tone: "good" });
     } else {
-      setFetchNote(data.error ?? "Could not fetch — fill the fields in manually.");
+      toast(r.data.error ?? "Couldn't fetch the profile — fill the fields in by hand", { tone: "bad" });
     }
   };
 
   const submit = async () => {
-    setSaving(true);
-    setError(null);
-    const res = await fetch("/api/creators", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        clientId,
-        name,
-        links: links.filter((l) => l.trim()),
-        campaignId: campaignId || undefined,
-        campaignName: campaignId ? undefined : newCampaign.trim() || undefined,
-        stage,
-        businessEmail: email || null,
-        contentPillar: pillar || null,
-        followers: followers ? Number(followers) : null,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setSaving(false);
-    if (!res.ok || !data.ok) {
-      setError(data.error ?? "Could not add this creator.");
-      return;
+    const issues: string[] = [];
+    if (!name.trim() && !links.some((l) => l.trim())) issues.push("Add a name or at least one profile link.");
+    if (!campaignId && !newCampaign.trim()) issues.push("Pick a campaign, or type a new campaign name.");
+    setProblems(issues);
+    if (issues.length) return;
+
+    const r = await run(
+      () =>
+        api<{ partnershipId: string; reusedPartnership?: boolean }>("/api/creators", {
+          clientId,
+          name,
+          links: links.filter((l) => l.trim()),
+          campaignId: campaignId || undefined,
+          campaignName: campaignId ? undefined : newCampaign.trim() || undefined,
+          stage,
+          businessEmail: email || null,
+          contentPillar: pillar || null,
+          followers: followers ? Number(followers) : null,
+        }),
+      { refresh: false },
+    );
+    if (!r.ok) return;
+    if (r.data.reusedPartnership) {
+      toast("Already tracked on this campaign — opened the existing record", {
+        detail: "The stage and details you entered were not applied to it.",
+      });
+    } else {
+      toast(`${name.trim() || "Creator"} added`, { tone: "good" });
     }
-    router.push(`/creators/${data.partnershipId}`);
+    router.push(`/creators/${r.data.partnershipId}`);
     router.refresh();
   };
 
-  const nothingEntered = !name.trim() && !links.some((l) => l.trim());
-  const noCampaign = !campaignId && !newCampaign.trim();
-
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      {/* Links */}
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold text-text">Profile links</h2>
-        <p className="mt-0.5 text-xs text-text-muted">
-          Paste any profile — Instagram, Facebook, TikTok, YouTube, X or a website. The first one
-          becomes their primary link.
-        </p>
+      <Card className="p-5">
+        <CardHeader
+          title="Profile links"
+          description="Paste any profile — Instagram, TikTok, YouTube, Facebook, X or a website. The first one becomes their main link."
+        />
         <div className="mt-3 space-y-2">
           {links.map((link, i) => (
             <div key={i}>
               <div className="flex items-center gap-2">
                 <Link2 size={15} className="shrink-0 text-text-faint" />
-                <input
+                <Input
                   value={link}
                   onChange={(e) => setLink(i, e.target.value)}
                   placeholder="https://www.instagram.com/handle"
-                  className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                  aria-label={`Profile link ${i + 1}`}
+                  autoFocus={i === 0}
                 />
                 {(links.length > 1 || link) && (
-                  <button
-                    onClick={() => removeLinkRow(i)}
-                    className="rounded-md p-1.5 text-text-faint transition hover:bg-surface-2 hover:text-red-600"
-                    aria-label="Remove link"
-                  >
-                    <X size={15} />
-                  </button>
+                  <IconButton label="Remove link" icon={<X size={15} />} onClick={() => removeLinkRow(i)} />
                 )}
               </div>
               {parsed[i] && (
-                <div className="ml-7 mt-1 text-xs text-text-faint">
+                <div className="mt-1 ml-7 text-xs text-text-muted">
                   {PLATFORM_LABELS[parsed[i]!.platform]}
                   {parsed[i]!.handle ? ` · @${parsed[i]!.handle}` : ""}
-                  {i === 0 ? " · primary" : ""}
+                  {i === 0 ? " · main link" : ""}
                 </div>
               )}
             </div>
           ))}
         </div>
-        <div className="mt-2 flex items-center gap-3">
-          <button onClick={addLinkRow} className="flex items-center gap-1 text-sm text-accent hover:underline">
-            <Plus size={14} /> Add another link
-          </button>
-          {canFetch && (
-            <button
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button variant="link" icon={<Plus size={14} />} onClick={addLinkRow}>
+            Add another link
+          </Button>
+          {primary && (
+            <Button
+              size="sm"
+              icon={<Sparkles size={14} />}
+              pending={fetching}
+              disabled={!canFetch}
               onClick={fetchDetails}
-              disabled={fetching}
-              className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-sm text-text-muted transition hover:bg-surface-2 disabled:opacity-60"
+              title={canFetch ? "Pulls name, followers and public email from the profile" : "Auto-fill only works for Instagram profiles"}
             >
-              {fetching ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-              Fetch details
-            </button>
+              Auto-fill from Instagram
+            </Button>
           )}
         </div>
-        {fetchNote && <p className="mt-2 text-xs text-text-muted">{fetchNote}</p>}
-      </section>
+      </Card>
 
-      {/* Identity */}
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold text-text">Creator</h2>
+      <Card className="p-5">
+        <CardHeader title="Creator" />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Name">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Full name or brand"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-            />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name or brand" />
           </Field>
           <Field label="Contact email">
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="hello@example.com"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-            />
+            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="hello@example.com" type="email" />
           </Field>
-          <Field label="Content pillar">
-            <input
-              value={pillar}
-              onChange={(e) => setPillar(e.target.value)}
-              placeholder="Overlanding, DIY / Shops…"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-            />
+          <Field label="Content type" hint="Fills the message template, e.g. Overlanding, DIY, Shop builds.">
+            <Input value={pillar} onChange={(e) => setPillar(e.target.value)} />
           </Field>
           <Field label="Followers">
-            <input
+            <Input
               value={followers}
               onChange={(e) => setFollowers(e.target.value.replace(/[^\d]/g, ""))}
-              placeholder="0"
               inputMode="numeric"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm tabular outline-none focus:border-accent"
+              className="tabular"
             />
           </Field>
         </div>
-      </section>
+      </Card>
 
-      {/* Placement */}
-      <section className="rounded-xl border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold text-text">Where do they go?</h2>
+      <Card className="p-5">
+        <CardHeader title="Where do they go?" description={`Adding to ${clientName}. If this handle is already tracked, they're attached to the existing record instead of duplicated.`} />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Campaign">
             {campaigns.length > 0 ? (
-              <select
-                value={campaignId}
-                onChange={(e) => setCampaignId(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-              >
+              <Select value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
                 {campaigns.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
                 <option value="">+ New campaign…</option>
-              </select>
+              </Select>
             ) : (
-              <input
-                value={newCampaign}
-                onChange={(e) => setNewCampaign(e.target.value)}
-                placeholder="Campaign name"
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-              />
-            )}
-            {campaigns.length > 0 && !campaignId && (
-              <input
-                value={newCampaign}
-                onChange={(e) => setNewCampaign(e.target.value)}
-                placeholder="New campaign name"
-                className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-              />
+              <Input value={newCampaign} onChange={(e) => setNewCampaign(e.target.value)} placeholder="Campaign name" />
             )}
           </Field>
-          <Field label="Starting stage">
-            <select
-              value={stage}
-              onChange={(e) => setStage(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-            >
-              {STAGES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
+          {campaigns.length > 0 && !campaignId && (
+            <Field label="New campaign name">
+              <Input value={newCampaign} onChange={(e) => setNewCampaign(e.target.value)} autoFocus />
+            </Field>
+          )}
+          <Field label="Starting stage" hint="Researched = found, no decision yet. Shortlisted = approved for outreach.">
+            <Select value={stage} onChange={(e) => setStage(e.target.value)}>
+              {stagesByGroup().map((g) => (
+                <optgroup key={g.group} label={g.label}>
+                  {g.stages.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
-            </select>
+            </Select>
           </Field>
         </div>
-        <p className="mt-2 text-xs text-text-faint">
-          Adding to <span className="font-medium text-text-muted">{clientName}</span>. If this
-          handle is already tracked, they&apos;ll be attached rather than duplicated.
-        </p>
-      </section>
+      </Card>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {problems.length > 0 && (
+        <Callout tone="bad" title="Before adding:">
+          <ul className="list-disc pl-4">
+            {problems.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </Callout>
+      )}
 
       <div className="flex items-center gap-2">
-        <button
-          onClick={submit}
-          disabled={saving || nothingEntered || noCampaign}
-          className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {saving && <Loader2 size={14} className="animate-spin" />}
+        <Button variant="primary" onClick={submit} pending={pending} icon={<Plus size={15} />}>
           Add creator
-        </button>
-        <Link
-          href="/creators"
-          className="rounded-lg px-3 py-2 text-sm text-text-muted transition hover:bg-surface-2"
-        >
+        </Button>
+        <Button variant="ghost" href="/creators">
           Cancel
-        </Link>
+        </Button>
       </div>
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-text-muted">{label}</span>
-      {children}
-    </label>
   );
 }

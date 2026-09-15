@@ -36,6 +36,22 @@ async function main() {
   check("no-city shape is flagged, not guessed", !a4?.isComplete && (a4?.issues.length ?? 0) > 0, JSON.stringify(a4));
   check("raw preserved for manual fix", a4?.raw === "Mikey Sneed, 2200 Shady Tree Ln, Texas, 77301");
 
+  // Regression: a multi-line paste straight from a DM/email (one part per line,
+  // trailing country) used to yield "no street line" because only commas split.
+  const a5 = parseAddress("Tatum Maciejack\n312 Onyx Dr\nLittle Elm, TX  75068\nUnited States");
+  check(
+    "multi-line DM paste parses (newlines + trailing country)",
+    !!a5?.isComplete &&
+      a5.recipientName === "Tatum Maciejack" &&
+      a5.addressLine1 === "312 Onyx Dr" &&
+      a5.city === "Little Elm" &&
+      a5.region === "TX" &&
+      a5.postalCode === "75068",
+    JSON.stringify(a5),
+  );
+  const a6 = parseAddress("7747 Lakeside Drive\nJurupa Valley, CA 92509\nUSA");
+  check("multi-line without a name still complete, 'USA' dropped", !!a6?.isComplete && a6.recipientName === null, JSON.stringify(a6));
+
   console.log("\n── metricsSource labeling rules (mirrors /api/deliverables) ──");
   // The route's decision table, restated: manual publicViews -> authoritative;
   // Apify views -> provisional; neither -> null.

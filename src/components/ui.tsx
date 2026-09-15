@@ -1,85 +1,178 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { ArrowLeft, CircleHelp, Loader2 } from "lucide-react";
 import type { CmStage } from "@/lib/db/schema";
-import { stageLabel, stageStyle } from "@/lib/stages";
+import { stageHint, stageLabel, stageStyle } from "@/lib/stages";
+
+/**
+ * The design system. Every screen builds from these so the same action
+ * looks the same everywhere — a teammate learns "blue filled = the main
+ * thing to do here, outlined = optional, red outline = destructive" once.
+ * Colours come only from the tokens in globals.css.
+ */
+
+export function cn(...parts: (string | false | null | undefined)[]): string {
+  return parts.filter(Boolean).join(" ");
+}
+
+/* ── Page structure ─────────────────────────────────────────────── */
 
 export function PageHeader({
   title,
   subtitle,
+  help,
+  helpAnchor,
+  client,
+  back,
   actions,
+  children,
 }: {
   title: string;
-  subtitle?: string;
+  /** Dynamic line — counts, the active client. */
+  subtitle?: ReactNode;
+  /** Static line: what this page is for, in one sentence. */
+  help?: string;
+  /** Section id on /help — renders a small "?" link. */
+  helpAnchor?: string;
+  /** Active client name, always visible so nobody edits the wrong client's data. */
+  client?: string | null;
+  back?: { href: string; label: string };
   actions?: ReactNode;
+  /** A second row under the title — filter bars, tabs. */
+  children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-6 py-4">
-      <div>
-        <h1 className="text-lg font-semibold text-text">{title}</h1>
-        {subtitle && <p className="text-sm text-text-muted">{subtitle}</p>}
+    <div className="border-b border-border bg-surface px-6 py-4">
+      {back && (
+        <Link
+          href={back.href}
+          className="mb-2 inline-flex items-center gap-1 text-sm text-text-muted transition hover:text-accent"
+        >
+          <ArrowLeft size={14} /> {back.label}
+        </Link>
+      )}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-semibold tracking-tight text-text">{title}</h1>
+            {client && <Badge tone="accent">{client}</Badge>}
+            {helpAnchor && (
+              <Link
+                href={`/help#${helpAnchor}`}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full text-text-faint transition hover:bg-surface-2 hover:text-accent"
+                title="How this page works"
+                aria-label="How this page works"
+              >
+                <CircleHelp size={15} />
+              </Link>
+            )}
+          </div>
+          {subtitle && <p className="mt-0.5 text-sm text-text-muted">{subtitle}</p>}
+          {help && <p className="mt-1 max-w-2xl text-xs leading-relaxed text-text-faint">{help}</p>}
+        </div>
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {children && <div className="mt-3">{children}</div>}
     </div>
   );
 }
 
-export function Card({
-  children,
+export function Card({ children, className = "", id }: { children: ReactNode; className?: string; id?: string }) {
+  return (
+    <section id={id} className={cn("rounded-xl border border-border bg-surface shadow-card", className)}>
+      {children}
+    </section>
+  );
+}
+
+/** Title row inside a Card: label, optional description, optional actions on the right. */
+export function CardHeader({
+  title,
+  description,
+  icon,
+  actions,
   className = "",
 }: {
-  children: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  icon?: ReactNode;
+  actions?: ReactNode;
   className?: string;
 }) {
   return (
-    <div className={`rounded-xl border border-border bg-surface ${className}`}>
-      {children}
+    <div className={cn("flex flex-wrap items-start justify-between gap-2", className)}>
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          {icon && <span className="text-text-faint">{icon}</span>}
+          <SectionTitle>{title}</SectionTitle>
+        </div>
+        {description && <p className="mt-1 max-w-prose text-xs leading-relaxed text-text-muted">{description}</p>}
+      </div>
+      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </div>
   );
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="text-xs font-semibold uppercase tracking-wide text-text-faint">
-      {children}
-    </h2>
-  );
+  return <h2 className="text-xs font-semibold uppercase tracking-wider text-text-faint">{children}</h2>;
 }
 
-export function StagePill({ stage }: { stage: CmStage }) {
+/* ── Status ─────────────────────────────────────────────────────── */
+
+export function StagePill({ stage, size = "sm" }: { stage: CmStage; size?: "sm" | "md" }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${stageStyle(stage)}`}
+      title={stageHint(stage)}
+      className={cn(
+        "inline-flex items-center whitespace-nowrap rounded-full font-medium ring-1 ring-inset",
+        size === "sm" ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-sm",
+        stageStyle(stage),
+      )}
     >
       {stageLabel(stage)}
     </span>
   );
 }
 
+export type BadgeTone = "neutral" | "accent" | "info" | "warn" | "good" | "bad" | "muted";
+
+const BADGE_TONES: Record<BadgeTone, string> = {
+  neutral: "bg-surface-2 text-text-muted ring-border-strong",
+  accent: "bg-accent-soft text-accent ring-info-line",
+  info: "bg-info-soft text-info ring-info-line",
+  warn: "bg-warn-soft text-warn ring-warn-line",
+  good: "bg-good-soft text-good ring-good-line",
+  bad: "bg-bad-soft text-bad ring-bad-line",
+  muted: "bg-surface-2 text-text-faint ring-border",
+};
+
 export function Badge({
   children,
   tone = "neutral",
+  title,
+  className = "",
 }: {
   children: ReactNode;
-  tone?: "neutral" | "accent" | "warn" | "good" | "bad" | "muted";
+  tone?: BadgeTone;
+  /** Tooltip — use it to explain abbreviations like "est". */
+  title?: string;
+  className?: string;
 }) {
-  const tones: Record<string, string> = {
-    neutral: "bg-surface-2 text-text-muted ring-border",
-    accent: "bg-accent-soft text-accent ring-indigo-200",
-    warn: "bg-amber-50 text-amber-800 ring-amber-200",
-    good: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    bad: "bg-red-50 text-red-700 ring-red-200",
-    muted: "bg-surface-2 text-text-faint ring-border",
-  };
   return (
     <span
-      className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset ${tones[tone]}`}
+      title={title}
+      className={cn(
+        "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+        BADGE_TONES[tone],
+        className,
+      )}
     >
       {children}
     </span>
   );
 }
 
-export function Avatar({ name }: { name: string }) {
+export function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
   const label = name
     .trim()
     .split(/[\s&/]+/)
@@ -88,10 +181,60 @@ export function Avatar({ name }: { name: string }) {
     .map((p) => p[0])
     .join("")
     .toUpperCase();
+  const dims = size === "sm" ? "h-7 w-7 text-[11px]" : size === "lg" ? "h-11 w-11 text-sm" : "h-8 w-8 text-xs";
   return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent">
+    <span
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full bg-accent-soft font-semibold text-accent ring-1 ring-inset ring-info-line",
+        dims,
+      )}
+      aria-hidden="true"
+    >
       {label || "?"}
     </span>
+  );
+}
+
+export function Spinner({ size = 14, className = "" }: { size?: number; className?: string }) {
+  return <Loader2 size={size} className={cn("animate-spin", className)} aria-hidden="true" />;
+}
+
+/* ── Messages ───────────────────────────────────────────────────── */
+
+export type CalloutTone = "info" | "good" | "warn" | "bad";
+
+const CALLOUT_TONES: Record<CalloutTone, string> = {
+  info: "border-info-line bg-info-soft text-info",
+  good: "border-good-line bg-good-soft text-good",
+  warn: "border-warn-line bg-warn-soft text-warn",
+  bad: "border-bad-line bg-bad-soft text-bad",
+};
+
+/** An inline notice — the one way to show a warning, error or success message in the page body. */
+export function Callout({
+  tone = "info",
+  title,
+  children,
+  icon,
+  actions,
+  className = "",
+}: {
+  tone?: CalloutTone;
+  title?: ReactNode;
+  children?: ReactNode;
+  icon?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm", CALLOUT_TONES[tone], className)}>
+      {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
+      <div className="min-w-0 flex-1">
+        {title && <div className="font-medium">{title}</div>}
+        {children && <div className={cn("leading-relaxed", title ? "mt-0.5 text-[13px] opacity-90" : "")}>{children}</div>}
+      </div>
+      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+    </div>
   );
 }
 
@@ -99,16 +242,19 @@ export function EmptyState({
   title,
   hint,
   action,
+  icon,
 }: {
   title: string;
-  hint?: string;
+  hint?: ReactNode;
   action?: ReactNode;
+  icon?: ReactNode;
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong bg-surface px-6 py-12 text-center">
+      {icon && <span className="mb-1 text-text-faint">{icon}</span>}
       <p className="text-sm font-medium text-text">{title}</p>
       {hint && <p className="max-w-md text-sm text-text-muted">{hint}</p>}
-      {action}
+      {action && <div className="mt-2">{action}</div>}
     </div>
   );
 }
@@ -119,25 +265,322 @@ export function StatTile({
   sub,
   href,
   tone = "neutral",
+  title,
 }: {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
   href?: string;
   tone?: "neutral" | "warn" | "accent";
+  /** Tooltip explaining the number. */
+  title?: string;
 }) {
-  const ring =
-    tone === "warn"
-      ? "ring-amber-200"
-      : tone === "accent"
-        ? "ring-indigo-200"
-        : "ring-border";
+  const ring = tone === "warn" ? "ring-warn-line" : tone === "accent" ? "ring-info-line" : "ring-border";
   const inner = (
-    <div className={`rounded-xl border-0 bg-surface p-4 ring-1 ring-inset ${ring} transition hover:ring-border-strong`}>
-      <div className="text-xs font-medium uppercase tracking-wide text-text-faint">{label}</div>
+    <div
+      title={title}
+      className={cn(
+        "rounded-xl bg-surface p-4 shadow-card ring-1 ring-inset transition",
+        ring,
+        href && "hover:ring-accent-ring",
+      )}
+    >
+      <div className="text-xs font-medium text-text-muted">{label}</div>
       <div className="mt-1 text-2xl font-semibold tabular text-text">{value}</div>
-      {sub && <div className="mt-0.5 text-xs text-text-muted">{sub}</div>}
+      {sub && <div className="mt-0.5 text-xs text-text-faint">{sub}</div>}
     </div>
   );
-  return href ? <Link href={href}>{inner}</Link> : inner;
+  return href ? (
+    <Link href={href} className="block rounded-xl">
+      {inner}
+    </Link>
+  ) : (
+    inner
+  );
+}
+
+/* ── Actions ────────────────────────────────────────────────────── */
+
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "link";
+export type ButtonSize = "sm" | "md";
+
+const BUTTON_BASE =
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition select-none disabled:pointer-events-none disabled:opacity-50";
+
+const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
+  primary: "bg-accent text-white shadow-sm hover:bg-accent-hover active:bg-accent-active",
+  secondary: "border border-border bg-surface text-text hover:border-border-strong hover:bg-surface-2",
+  ghost: "text-text-muted hover:bg-surface-2 hover:text-text",
+  danger: "border border-bad-line bg-surface text-bad hover:bg-bad-soft",
+  link: "text-accent hover:underline",
+};
+
+const BUTTON_SIZES: Record<ButtonSize, string> = {
+  sm: "h-8 px-2.5 text-xs",
+  md: "h-9 px-3 text-sm",
+};
+
+export interface ButtonProps {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** Shows a spinner and disables the button. */
+  pending?: boolean;
+  icon?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+  onClick?: () => void;
+  type?: "button" | "submit";
+  disabled?: boolean;
+  title?: string;
+  "aria-label"?: string;
+  /** Renders a Next link styled as a button. */
+  href?: string;
+  target?: string;
+  rel?: string;
+  autoFocus?: boolean;
+}
+
+export function Button({
+  variant = "secondary",
+  size = "md",
+  pending = false,
+  icon,
+  children,
+  className = "",
+  onClick,
+  type = "button",
+  disabled,
+  title,
+  href,
+  target,
+  rel,
+  autoFocus,
+  ...rest
+}: ButtonProps) {
+  const classes = cn(
+    BUTTON_BASE,
+    BUTTON_VARIANTS[variant],
+    variant === "link" ? "h-auto px-0 text-sm" : BUTTON_SIZES[size],
+    className,
+  );
+  const content = (
+    <>
+      {pending ? <Spinner size={size === "sm" ? 13 : 14} /> : icon}
+      {children}
+    </>
+  );
+  if (href && !disabled && !pending) {
+    return (
+      <Link href={href} target={target} rel={rel} className={classes} title={title} aria-label={rest["aria-label"]}>
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled || pending}
+      title={title}
+      aria-label={rest["aria-label"]}
+      autoFocus={autoFocus}
+      className={classes}
+    >
+      {content}
+    </button>
+  );
+}
+
+/** Icon-only button. `label` is required — it's the accessible name and the tooltip. */
+export function IconButton({
+  label,
+  icon,
+  onClick,
+  variant = "ghost",
+  size = "sm",
+  disabled,
+  pending,
+  className = "",
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick?: () => void;
+  variant?: "ghost" | "secondary" | "danger";
+  size?: "sm" | "md";
+  disabled?: boolean;
+  pending?: boolean;
+  className?: string;
+}) {
+  const tone =
+    variant === "danger"
+      ? "text-text-faint hover:bg-bad-soft hover:text-bad"
+      : variant === "secondary"
+        ? "border border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
+        : "text-text-faint hover:bg-surface-2 hover:text-text";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || pending}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-md transition disabled:pointer-events-none disabled:opacity-50",
+        size === "sm" ? "h-7 w-7" : "h-8 w-8",
+        tone,
+        className,
+      )}
+    >
+      {pending ? <Spinner size={13} /> : icon}
+    </button>
+  );
+}
+
+/** A row of mutually exclusive options (DM / Email, Ready / Shipped / Delivered). */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  size = "sm",
+  disabled,
+  "aria-label": ariaLabel,
+}: {
+  options: { value: T; label: ReactNode; title?: string }[];
+  value: T | null;
+  onChange: (v: T) => void;
+  size?: "sm" | "md";
+  disabled?: boolean;
+  "aria-label"?: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className="inline-flex overflow-hidden rounded-md border border-border bg-surface"
+    >
+      {options.map((o, i) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            disabled={disabled}
+            title={o.title}
+            aria-pressed={active}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "inline-flex items-center gap-1 font-medium transition disabled:opacity-50",
+              size === "sm" ? "h-7 px-2.5 text-xs" : "h-9 px-3 text-sm",
+              i > 0 && "border-l border-border",
+              active ? "bg-accent text-white" : "text-text-muted hover:bg-surface-2 hover:text-text",
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Form controls ──────────────────────────────────────────────── */
+
+const FIELD_BASE =
+  "w-full rounded-md border border-border bg-surface text-text placeholder:text-text-faint transition focus:border-accent-ring focus:ring-2 focus:ring-accent-soft focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70";
+
+const FIELD_INVALID = "border-bad-line focus:border-bad focus:ring-bad-soft";
+
+type NativeInput = Omit<ComponentPropsWithoutRef<"input">, "size">;
+type NativeSelect = Omit<ComponentPropsWithoutRef<"select">, "size">;
+type NativeTextarea = ComponentPropsWithoutRef<"textarea">;
+
+export function Input({
+  compact,
+  invalid,
+  className = "",
+  ...props
+}: NativeInput & { compact?: boolean; invalid?: boolean }) {
+  return (
+    <input
+      {...props}
+      className={cn(FIELD_BASE, compact ? "h-8 px-2.5 text-xs" : "h-9 px-3 text-sm", invalid && FIELD_INVALID, className)}
+    />
+  );
+}
+
+export function Select({
+  compact,
+  invalid,
+  className = "",
+  children,
+  ...props
+}: NativeSelect & { compact?: boolean; invalid?: boolean }) {
+  return (
+    <select
+      {...props}
+      className={cn(
+        FIELD_BASE,
+        "select-chevron appearance-none pr-8",
+        compact ? "h-8 pl-2.5 text-xs" : "h-9 pl-3 text-sm",
+        invalid && FIELD_INVALID,
+        className,
+      )}
+    >
+      {children}
+    </select>
+  );
+}
+
+export function Textarea({
+  compact,
+  invalid,
+  className = "",
+  ...props
+}: NativeTextarea & { compact?: boolean; invalid?: boolean }) {
+  return (
+    <textarea
+      {...props}
+      className={cn(FIELD_BASE, compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm", invalid && FIELD_INVALID, className)}
+    />
+  );
+}
+
+/** Label + control + hint/error. Wrap one control so the label is clickable and announced. */
+export function Field({
+  label,
+  hint,
+  error,
+  children,
+  className = "",
+  required,
+  inline,
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  error?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  required?: boolean;
+  /** Label and control side by side (for short controls in a settings row). */
+  inline?: boolean;
+}) {
+  return (
+    <label className={cn("flex min-w-0 gap-1", inline ? "flex-row items-center justify-between gap-3" : "flex-col", className)}>
+      <span className="text-xs font-medium text-text-muted">
+        {label}
+        {required && <span className="text-bad"> *</span>}
+      </span>
+      {children}
+      {error ? (
+        <span className="text-xs text-bad">{error}</span>
+      ) : hint ? (
+        <span className="text-xs text-text-faint">{hint}</span>
+      ) : null}
+    </label>
+  );
+}
+
+/** Visually-hidden text for screen readers. */
+export function SrOnly({ children }: { children: ReactNode }) {
+  return <span className="sr-only">{children}</span>;
 }

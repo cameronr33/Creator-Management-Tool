@@ -135,6 +135,30 @@ All five are self-cleaning (throwaway `__verify_` rows, cascade-deleted).
   route without a connected account must return
   `{ok: true, skipped: "no Gmail account connected"}`, not an error.
 
+## 3d-ii. Design system and teachability (pure, no database)
+
+```bash
+npm run verify:design
+npm run verify:next-step
+```
+
+- **design** is the frozen rule for the brand kit: outside `ui.tsx` and
+  `stages.ts` no source file may use a raw Tailwind palette class
+  (`text-amber-700`, `hover:bg-indigo-700`…), no text may be smaller than
+  11px, and no hex colour may appear outside `globals.css` and the brand
+  mark. New colours are added as tokens in `globals.css`; new controls are
+  added as primitives in `ui.tsx`. It also asserts the primitives exist.
+- **next-step** asserts that every stage yields a "Next:" line on the
+  record page, that the line changes with the facts (shipment status, brief
+  sent, migrated dates), that the stage vocabulary the Help page renders is
+  complete (every stage grouped, hinted, closed stages name who ended it,
+  every auto-stage trigger has a plain-language label), and the composer's
+  unfilled-placeholder guard.
+
+After a UI change, also open the page in the Browser pane: every mutation
+must produce a toast (success or error) — a save that refreshes silently is
+a regression.
+
 ## 3e. Frozen invariants (audit loop — read-only, run against the live data)
 
 ```bash

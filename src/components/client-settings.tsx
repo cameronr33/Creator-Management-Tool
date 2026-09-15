@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Button, Field, Input } from "@/components/ui";
+import { api, useSave } from "@/components/use-save";
 
 export interface ClientSettingRow {
   id: string;
@@ -24,25 +25,17 @@ export interface ThresholdDefaults {
   markNoResponseAfterDays: number;
 }
 
-async function patch(clientId: string, body: unknown) {
-  const res = await fetch(`/api/clients/${clientId}/settings`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  return res.ok;
-}
-
 /** Which shared-roster clients this tool shows. The roster itself is untouched. */
 export function ClientVisibility({ clients }: { clients: ClientSettingRow[] }) {
-  const router = useRouter();
-  const [pending, setPending] = useState<string | null>(null);
+  const { pending, run } = useSave();
+  const [busy, setBusy] = useState<string | null>(null);
 
   const toggle = async (c: ClientSettingRow) => {
-    setPending(c.id);
-    await patch(c.id, { hidden: !c.hidden });
-    setPending(null);
-    router.refresh();
+    setBusy(c.id);
+    await run(() => api(`/api/clients/${c.id}/settings`, { hidden: !c.hidden }, "PATCH"), {
+      success: c.hidden ? `${c.name} is now shown` : `${c.name} hidden from this tool`,
+    });
+    setBusy(null);
   };
 
   return (
@@ -53,11 +46,12 @@ export function ClientVisibility({ clients }: { clients: ClientSettingRow[] }) {
             <input
               type="checkbox"
               checked={!c.hidden}
-              disabled={pending === c.id || c.isCurrent}
+              disabled={(pending && busy === c.id) || c.isCurrent}
               onChange={() => toggle(c)}
+              className="h-4 w-4 accent-accent"
             />
-            <span className={c.hidden ? "text-text-faint" : "text-text"}>{c.name}</span>
-            {c.isCurrent && <span className="text-xs text-accent">current</span>}
+            <span className={c.hidden ? "text-text-muted" : "text-text"}>{c.name}</span>
+            {c.isCurrent && <span className="text-xs text-accent">current — can&apos;t hide</span>}
           </label>
           <span className="text-xs text-text-faint">{c.slug}</span>
         </li>
@@ -66,11 +60,11 @@ export function ClientVisibility({ clients }: { clients: ClientSettingRow[] }) {
   );
 }
 
-const FIELDS: { key: keyof ThresholdDefaults; label: string }[] = [
-  { key: "initialOutreachAfterDays", label: "Initial outreach due after (days shortlisted)" },
-  { key: "followUp1AfterDays", label: "Follow-up 1 due after (days silent)" },
-  { key: "followUp2AfterDays", label: "Follow-up 2 due after (days silent)" },
-  { key: "markNoResponseAfterDays", label: "Auto-close as no response after (days silent, post FU2)" },
+const FIELDS: { key: keyof ThresholdDefaults; label: string; hint: string }[] = [
+  { key: "initialOutreachAfterDays", label: "First message due", hint: "days after shortlisting with nothing sent" },
+  { key: "followUp1AfterDays", label: "Follow-up 1 due", hint: "days of silence after the first message" },
+  { key: "followUp2AfterDays", label: "Follow-up 2 due", hint: "days of silence after follow-up 1" },
+  { key: "markNoResponseAfterDays", label: "Close as no response", hint: "days of silence after follow-up 2" },
 ];
 
 /**
@@ -89,66 +83,61 @@ export function FollowUpCadence({
   current: ClientSettingRow["followUpThresholds"];
   defaults: ThresholdDefaults;
 }) {
-  const router = useRouter();
+  const { pending, run } = useSave();
   const [values, setValues] = useState<Record<string, string>>(
     Object.fromEntries(FIELDS.map((f) => [f.key, String(current?.[f.key] ?? defaults[f.key])])),
   );
-  const [pending, setPending] = useState(false);
-  const [saved, setSaved] = useState<string | null>(null);
 
   const save = async () => {
-    setPending(true);
-    setSaved(null);
     const overrides: Record<string, number> = {};
     for (const f of FIELDS) {
-      const n = Number(values[f.key]);
+      // An emptied box means "use the default", never zero days.
+      const raw = values[f.key];
+      if (raw === "") continue;
+      const n = Number(raw);
       if (Number.isFinite(n) && n !== defaults[f.key]) overrides[f.key] = n;
     }
-    const ok = await patch(clientId, {
-      followUpThresholds: Object.keys(overrides).length ? overrides : null,
-    });
-    setPending(false);
-    setSaved(ok ? "Saved" : "Failed to save");
-    if (ok) router.refresh();
+    const r = await run(
+      () =>
+        api(`/api/clients/${clientId}/settings`, {
+          followUpThresholds: Object.keys(overrides).length ? overrides : null,
+        }, "PATCH"),
+      { success: `Follow-up cadence saved for ${clientName}` },
+    );
+    if (r.ok) {
+      setValues(Object.fromEntries(FIELDS.map((f) => [f.key, String(overrides[f.key] ?? defaults[f.key])])));
+    }
   };
 
   const reset = async () => {
-    setValues(Object.fromEntries(FIELDS.map((f) => [f.key, String(defaults[f.key])])));
-    setPending(true);
-    await patch(clientId, { followUpThresholds: null });
-    setPending(false);
-    setSaved("Reset to defaults");
-    router.refresh();
+    const r = await run(() => api(`/api/clients/${clientId}/settings`, { followUpThresholds: null }, "PATCH"), {
+      success: "Cadence reset to the defaults",
+    });
+    if (r.ok) setValues(Object.fromEntries(FIELDS.map((f) => [f.key, String(defaults[f.key])])));
   };
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-text-faint">Follow-up cadence for {clientName}. Blank = default.</p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {FIELDS.map((f) => (
-          <label key={f.key} className="flex items-center justify-between gap-2 text-xs text-text-muted">
-            <span>{f.label}</span>
-            <input
+          <Field key={f.key} label={f.label} hint={`${f.hint} (default ${defaults[f.key]})`}>
+            <Input
+              compact
+              className="w-24"
               value={values[f.key]}
               onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value.replace(/[^\d]/g, "") }))}
               inputMode="numeric"
-              className="w-16 rounded-lg border border-border bg-surface px-2 py-1 text-right text-sm outline-none focus:border-accent"
             />
-          </label>
+          </Field>
         ))}
       </div>
       <div className="flex items-center gap-2">
-        <button
-          onClick={save}
-          disabled={pending}
-          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
-        >
+        <Button variant="primary" size="sm" onClick={save} pending={pending}>
           Save cadence
-        </button>
-        <button onClick={reset} disabled={pending} className="text-xs text-text-faint hover:text-accent">
+        </Button>
+        <Button variant="ghost" size="sm" onClick={reset} disabled={pending}>
           Reset to defaults
-        </button>
-        {saved && <span className="text-xs text-emerald-700">{saved}</span>}
+        </Button>
       </div>
     </div>
   );

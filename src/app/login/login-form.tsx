@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { AlertCircle } from "lucide-react";
+import { Button, Callout, Field, Input } from "@/components/ui";
 
 export function LoginForm() {
   const router = useRouter();
@@ -21,7 +23,7 @@ export function LoginForm() {
     });
     setPending(false);
     if (res?.error) {
-      setError("Invalid email or password.");
+      setError("That email and password don't match.");
       return;
     }
     router.push("/");
@@ -29,38 +31,21 @@ export function LoginForm() {
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-6"
-    >
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-text">Email</span>
-        <input
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
-          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-text">Password</span>
-        <input
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-        />
-      </label>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button
-        type="submit"
-        disabled={pending}
-        className="mt-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
-      >
+    <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-6 shadow-pop">
+      <Field label="Email">
+        <Input name="email" type="email" required autoComplete="email" autoFocus />
+      </Field>
+      <Field label="Password">
+        <Input name="password" type="password" required autoComplete="current-password" />
+      </Field>
+      {error && (
+        <Callout tone="bad" icon={<AlertCircle size={15} />}>
+          {error}
+        </Callout>
+      )}
+      <Button type="submit" variant="primary" pending={pending} className="mt-1 w-full">
         {pending ? "Signing in…" : "Sign in"}
-      </button>
+      </Button>
     </form>
   );
 }

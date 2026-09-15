@@ -26,7 +26,11 @@ export type AutoStageTrigger =
   | "shipment_delivered"
   | "deliverable_added";
 
-const RULES: Record<AutoStageTrigger, { from: CmStage[]; to: CmStage }> = {
+/**
+ * Exported so the UI can *show* the rules (the Help page and the stage
+ * control) from the same table the engine runs — never a hand-copied list.
+ */
+export const AUTO_STAGE_RULES: Record<AutoStageTrigger, { from: CmStage[]; to: CmStage }> = {
   outbound_message: { from: ["researched", "shortlisted"], to: "contacted" },
   inbound_message: { from: ["contacted", "no_response"], to: "in_conversation" },
   address_complete: { from: ["awaiting_address"], to: "fulfilling" },
@@ -43,7 +47,7 @@ export function nextStageFor(
   current: CmStage,
   trigger: AutoStageTrigger,
 ): CmStage | null {
-  const rule = RULES[trigger];
+  const rule = AUTO_STAGE_RULES[trigger];
   return rule.from.includes(current) ? rule.to : null;
 }
 

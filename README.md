@@ -142,9 +142,42 @@ npm run verify:outreach-flow   # send-flow rendering/logging assertions (self-cl
 npm run verify:editors         # address parser, metric labeling, shipment path (self-cleans)
 npm run verify:email-ingest    # Gmail matcher + idempotent ingest (self-cleans)
 npm run verify:gmail-sync      # Gmail helpers, address discovery heuristics, encrypted account round-trip (self-cleans)
+npm run verify:design          # brand tokens/primitives only — no raw palette classes, nothing under 11px (pure)
+npm run verify:next-step       # every stage has a "Next:" line; stage vocabulary + Help page are complete (pure)
 npm run verify:invariants      # FROZEN rules, read-only against live data — the audit loop (see AGENTS.md)
 npm run gmail:diagnose         # anchor: do roster addresses appear in the mailbox at all?
 ```
+
+## Design system
+
+The UI is the Sentic brand kit applied to a dense internal tool: Inter, a
+navy sidebar, one blue action colour, lime for "alive" signals. Everything is
+built from two files:
+
+- `src/app/globals.css` — the tokens. Surfaces, text (`--text`,
+  `--text-muted`, `--text-faint` — all ≥ 4.5:1 on white), the action colour
+  (`--accent`, `-hover`, `-soft`, `-ring`), four semantic tones
+  (`info`/`good`/`warn`/`bad`, each with `-soft` background and `-line`
+  hairline), the sidebar palette and the raw brand colours. Add a colour here
+  or don't add it.
+- `src/components/ui.tsx` — the primitives: `PageHeader` (title, client badge,
+  one-line purpose, `?` link to Help), `Card`/`CardHeader`, `Button`
+  (`primary` = the one thing to do here, `secondary`, `ghost`, `danger`,
+  `link`), `IconButton` (label required), `Input`/`Select`/`Textarea`,
+  `Field` (label + hint + error), `Callout`, `Badge`, `StagePill` (tooltip =
+  the stage's hint), `Segmented`, `EmptyState`, `StatTile`.
+
+Two conventions make the tool teachable:
+
+- **Every mutation goes through `useSave()`** (`src/components/use-save.ts`),
+  which toasts success/error and announces automatic stage moves. Nothing
+  saves silently. Destructive actions use `ConfirmButton` (two-step, inline).
+- **The app explains itself from its own tables.** Stage labels, hints,
+  groups and exit reasons live in `src/lib/stages.ts`; the auto-stage rules
+  in `src/lib/auto-stage.ts`; `/help` and the record page's "Next:" line
+  (`src/lib/next-step.ts`) are generated from them, so the explanation cannot
+  drift from the behaviour. `npm run verify:design` and
+  `npm run verify:next-step` keep both honest.
 
 The build process itself is a graph of loops (fast → feature → watcher →
 audit → reference) with frozen nodes and anchors — `AGENTS.md` is the

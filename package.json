@@ -28,6 +28,8 @@
     "verify:email-ingest": "tsx --env-file=.env.local scripts/verify-email-ingest.ts",
     "verify:gmail-sync": "tsx --env-file=.env.local scripts/verify-gmail-sync.ts",
     "verify:email-body": "tsx scripts/verify-email-body.ts",
+    "verify:next-step": "tsx scripts/verify-next-step.ts",
+    "verify:design": "tsx scripts/verify-design.ts",
     "gmail:diagnose": "tsx --env-file=.env.local scripts/gmail-diagnose.ts",
     "gmail:resync": "tsx --env-file=.env.local scripts/gmail-resync.ts",
     "verify:invariants": "tsx --env-file=.env.local scripts/verify-invariants.ts",

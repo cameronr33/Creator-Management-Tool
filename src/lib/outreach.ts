@@ -90,6 +90,23 @@ export function renderTemplate(
   });
 }
 
+/** Placeholders renderTemplate left unfilled — "[reason]" — so a half-done message can be caught before it's copied. */
+export function unfilledPlaceholders(text: string): string[] {
+  return [...new Set([...text.matchAll(/\[(\w+)\]/g)].map((m) => m[1]))];
+}
+
+/** Channel enum values as a teammate reads them. */
+export const CHANNEL_LABELS: Record<string, string> = {
+  ig_dm: "Instagram DM",
+  email: "Email",
+  phone: "Phone",
+  other: "Other",
+};
+
+export function channelLabel(channel: string): string {
+  return CHANNEL_LABELS[channel] ?? channel;
+}
+
 /**
  * Instagram DM deep link — Meta's official ig.me short link, which opens the
  * DM composer for a logged-in browser. The @username profile link stays the

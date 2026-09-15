@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { resolveClient, getCampaigns, getCreatorRows } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
-import { PageHeader, Card, EmptyState, StagePill } from "@/components/ui";
+import { PageHeader, Card, EmptyState, StagePill, Button } from "@/components/ui";
 import { money } from "@/lib/format";
 import { ACTIVE_STAGES, isTerminal } from "@/lib/stages";
 import type { CmStage } from "@/lib/db/schema";
@@ -13,7 +13,7 @@ export default async function CampaignsPage() {
       <>
         <PageHeader title="Campaigns" />
         <div className="p-6">
-          <EmptyState title="No client selected" />
+          <EmptyState title="No client selected" hint="Pick a client in the sidebar first." />
         </div>
       </>
     );
@@ -33,10 +33,21 @@ export default async function CampaignsPage() {
 
   return (
     <>
-      <PageHeader title="Campaigns" subtitle={`${campaigns.length} · ${client.name}`} />
+      <PageHeader
+        title="Campaigns"
+        client={client.name}
+        subtitle={`${campaigns.length} campaign${campaigns.length === 1 ? "" : "s"}`}
+        help="A rollup per campaign: how many creators, how many are live, and what's been agreed. Click a stage to see those creators."
+        helpAnchor="words"
+        actions={<Button href="/settings#campaigns">Add a campaign</Button>}
+      />
       <div className="space-y-4 p-6">
         {campaigns.length === 0 ? (
-          <EmptyState title="No campaigns yet" hint="Campaigns are created when you import or run research." />
+          <EmptyState
+            title="No campaigns yet"
+            hint="Create one under Settings → Campaigns, or import a research run — its campaign is created automatically."
+            action={<Button href="/settings#campaigns" variant="primary">Create a campaign</Button>}
+          />
         ) : (
           campaigns.map((c) => {
             const members = byCampaign.get(c.id) ?? [];
@@ -58,19 +69,27 @@ export default async function CampaignsPage() {
                     {c.description && <p className="text-sm text-text-muted">{c.description}</p>}
                   </div>
                   <div className="flex gap-6 text-right">
-                    <Stat label="Creators" value={members.length} />
-                    <Stat label="Active" value={active.length} />
-                    <Stat label="Agreed+" value={agreed.length} />
-                    <Stat label="Committed" value={committed > 0 ? money(committed) : "—"} />
+                    <Stat label="Creators" value={members.length} title="Everyone on this campaign, including closed deals" />
+                    <Stat label="Active" value={active.length} title="Not closed" />
+                    <Stat label="Agreed or later" value={agreed.length} title="Agreed, shipping, waiting on video, posted or completed" />
+                    <Stat label="Fees agreed" value={committed > 0 ? money(committed) : "—"} title="Sum of recorded fees (payment itself is tracked in accounting)" />
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {topStages.map(({ stage, n }) => (
-                    <Link key={stage} href={`/creators?campaign=${c.id}&stage=${stage}`} className="flex items-center gap-1.5">
-                      <StagePill stage={stage} />
-                      <span className="text-xs tabular text-text-muted">{n}</span>
-                    </Link>
-                  ))}
+                  {topStages.length === 0 ? (
+                    <span className="text-xs text-text-muted">No active creators.</span>
+                  ) : (
+                    topStages.map(({ stage, n }) => (
+                      <Link
+                        key={stage}
+                        href={`/creators?campaign=${c.id}&stage=${stage}`}
+                        className="flex items-center gap-1.5 rounded-full transition hover:opacity-80"
+                      >
+                        <StagePill stage={stage} />
+                        <span className="text-xs tabular text-text-muted">{n}</span>
+                      </Link>
+                    ))
+                  )}
                 </div>
               </Card>
             );
@@ -81,10 +100,10 @@ export default async function CampaignsPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+function Stat({ label, value, title }: { label: string; value: React.ReactNode; title?: string }) {
   return (
-    <div>
-      <div className="text-xs uppercase tracking-wide text-text-faint">{label}</div>
+    <div title={title}>
+      <div className="text-xs text-text-muted">{label}</div>
       <div className="tabular text-lg font-semibold text-text">{value}</div>
     </div>
   );
