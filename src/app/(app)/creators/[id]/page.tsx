@@ -14,7 +14,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { getPartnershipDetail, getClients } from "@/lib/queries";
-import { getActiveGmailAccount } from "@/lib/gmail-sync";
+import { getActiveGmailAccount, scheduleEmailCheck } from "@/lib/gmail-sync";
 import { Card, CardHeader, StagePill, Avatar, Badge, Callout } from "@/components/ui";
 import {
   StageControl,
@@ -55,6 +55,7 @@ export default async function CreatorDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string | string[]; returnTo?: string | string[] }>;
 }) {
+  scheduleEmailCheck();
   const { id } = await params;
   const query = await searchParams;
   const section = creatorSection(query.tab);

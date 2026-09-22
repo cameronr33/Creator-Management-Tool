@@ -127,7 +127,7 @@ export function EmailsEditor({
   const add = async () => {
     if (!value.trim()) return;
     const r = await run(() => api(`/api/creators/${creatorId}/emails`, { email: value }), {
-      success: "Email linked — their threads will sync from now on",
+      success: "Email added — their last 6 months of email is being checked now",
     });
     if (r.ok) setValue("");
   };

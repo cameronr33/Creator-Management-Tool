@@ -6,11 +6,12 @@ import {
   CampaignAdder,
   GmailConnectCard,
   GmailSyncStatus,
+  TeamAddressesEditor,
   type GmailAccountView,
 } from "@/components/settings-forms";
 import { ClientVisibility, FollowUpCadence } from "@/components/client-settings";
 import { gmailConfigured } from "@/lib/gmail";
-import { getActiveGmailAccount } from "@/lib/gmail-sync";
+import { getActiveGmailAccount, getEmailCoverage } from "@/lib/gmail-sync";
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 import { summarizeGmailHealth } from "@/lib/gmail-health";
 
@@ -27,7 +28,7 @@ const GMAIL_ERRORS: Record<string, string> = {
 
 function describeGmailResult(param: string | null): { tone: "good" | "bad"; text: string } | null {
   if (!param) return null;
-  if (param === "connected") return { tone: "good", text: "Gmail connected. The first check backfills the last 90 days." };
+  if (param === "connected") return { tone: "good", text: "Gmail connected. The first check searches each creator's last 6 months of email." };
   if (param.startsWith("error:")) {
     const code = param.slice("error:".length);
     return { tone: "bad", text: GMAIL_ERRORS[code] ?? `Gmail connection failed: ${code}` };
@@ -54,10 +55,11 @@ export default async function SettingsPage({
     );
   }
 
-  const [clients, campaigns, gmailAccount] = await Promise.all([
+  const [clients, campaigns, gmailAccount, coverage] = await Promise.all([
     getClientsWithSettings(),
     getCampaigns(client.id),
     getActiveGmailAccount(),
+    getEmailCoverage(),
   ]);
   const currentSettings = clients.find((c) => c.id === client.id) ?? null;
 
@@ -90,7 +92,36 @@ export default async function SettingsPage({
           />
           <div className="mt-3 space-y-3">
             {accountView ? (
-              <GmailSyncStatus account={accountView} />
+              <>
+                <GmailSyncStatus account={accountView} />
+                <TeamAddressesEditor entries={gmailAccount?.teamAddresses ?? []} />
+                {coverage.searchedNoMail.length > 0 && (
+                  <Callout tone="info" title="No email found yet for these addresses">
+                    The mailbox was searched for them and nothing turned up. Check the spelling on the creator, or add the
+                    address they actually write from. Creators you only message on Instagram are fine to leave.
+                    <ul className="mt-1.5 list-disc pl-4">
+                      {coverage.searchedNoMail.map((c) => (
+                        <li key={c.address}>
+                          {c.creator} · <span className="break-all">{c.address}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Callout>
+                )}
+                {coverage.shared.length > 0 && (
+                  <Callout tone="warn" title="Addresses saved on more than one creator">
+                    Email from these addresses can only be filed on one of them. Remove the address from the creator it
+                    doesn&apos;t belong to.
+                    <ul className="mt-1.5 list-disc pl-4">
+                      {coverage.shared.map((c) => (
+                        <li key={c.address}>
+                          <span className="break-all">{c.address}</span> — {c.creators.join(", ")}
+                        </li>
+                      ))}
+                    </ul>
+                  </Callout>
+                )}
+              </>
             ) : (
               <Callout
                 tone="info"

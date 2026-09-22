@@ -1,0 +1,40 @@
+import { NextResponse, after, type NextRequest } from "next/server";
+import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { db } from "@/lib/db";
+import { cmGmailAccounts } from "@/lib/db/schema";
+import { getActiveGmailAccount } from "@/lib/gmail-sync";
+import { FREE_MAIL_DOMAINS, loadTeamIdentity, reclassifyStoredEmails } from "@/lib/email-ingest";
+
+const entry = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((e) => /^@[^\s@]+\.[^\s@]+$/.test(e) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e), { message: "Use an address or @domain.com" })
+  .refine((e) => !(e.startsWith("@") && FREE_MAIL_DOMAINS.has(e.slice(1))), { message: "A free-mail domain can't be a whole team — add the address instead" });
+
+const schema = z.object({ entries: z.array(entry).max(200) });
+
+/**
+ * PUT /api/gmail/team — the "Our side" list: teammates or client staff who
+ * email creators from other addresses. Saving it re-decides who wrote each
+ * stored email (from saved headers, nothing downloaded).
+ */
+export async function PUT(req: NextRequest) {
+  const { error } = await requireAuth();
+  if (error) return error;
+  const account = await getActiveGmailAccount();
+  if (!account) return badRequest("Connect Gmail first");
+
+  const body = await req.json().catch(() => null);
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) return badRequest(parsed.error.issues[0]?.message ?? "Invalid list", parsed.error.flatten());
+
+  const entries = [...new Set(parsed.data.entries)];
+  await db.update(cmGmailAccounts).set({ teamAddresses: entries }).where(eq(cmGmailAccounts.id, account.id));
+  after(async () => {
+    await reclassifyStoredEmails(await loadTeamIdentity(account.email, entries));
+  });
+  return NextResponse.json({ ok: true, entries });
+}

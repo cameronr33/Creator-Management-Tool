@@ -79,6 +79,57 @@ export function cleanEmailBody(raw: string | null | undefined): string | null {
   return text ? text.slice(0, 4000) : null;
 }
 
+const ENTITIES: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  "#39": "'",
+  rsquo: "’",
+  lsquo: "‘",
+  rdquo: "”",
+  ldquo: "“",
+  ndash: "–",
+  mdash: "—",
+  hellip: "…",
+};
+
+/**
+ * HTML-only emails (common from phones and newsletters) → plain text that
+ * cleanEmailBody can trim. Quoted history (Gmail's gmail_quote, <blockquote>)
+ * is turned into "> " lines so the same cut applies. Deliberately simple: no
+ * DOM, just the structure a message body needs to stay readable.
+ */
+export function htmlToText(html: string | null | undefined): string | null {
+  if (!html) return null;
+  let s = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(head|style|script|title)\b[\s\S]*?<\/\1>/gi, "")
+    // Everything from Gmail's quote wrapper or a blockquote down is history.
+    .replace(/<div[^>]*class="?[^">]*gmail_quote[\s\S]*$/i, "\n> quoted\n")
+    .replace(/<blockquote\b[\s\S]*$/i, "\n> quoted\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li\b[^>]*>/gi, "\n- ")
+    .replace(/<\/(p|div|tr|h[1-6]|table|ul|ol)>/gi, "\n")
+    .replace(/<(p|div|tr|h[1-6])\b[^>]*>/gi, "\n")
+    .replace(/<[^>]+>/g, "");
+  s = s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+\d*);/gi, (m, code: string) => {
+    const key = code.toLowerCase();
+    if (key.startsWith("#x")) return String.fromCodePoint(parseInt(key.slice(2), 16));
+    if (key.startsWith("#") && key !== "#39") return String.fromCodePoint(parseInt(key.slice(1), 10));
+    return ENTITIES[key] ?? m;
+  });
+  const text = s
+    .split("\n")
+    .map((l) => l.replace(/[ \t ]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text || null;
+}
+
 /** "Name <a@b.com>, c@d.com" → "Name, c@d.com" (display name, else the address). */
 export function displayNames(header: string | null | undefined): string {
   if (!header) return "";

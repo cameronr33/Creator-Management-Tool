@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ExternalLink, Mail, Plus, Upload } from "lucide-react";
 import { resolveClient, getCampaigns, getCreatorRows } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
+import { scheduleEmailCheck } from "@/lib/gmail-sync";
 import { PageHeader, EmptyState, StagePill, Avatar, Badge, Button } from "@/components/ui";
 import { CreatorsFilterBar } from "@/components/creators-filter-bar";
 import { compactNumber, relativeDays } from "@/lib/format";
@@ -13,6 +14,7 @@ export default async function CreatorsPage({
 }: {
   searchParams: Promise<{ q?: string; stage?: string; campaign?: string }>;
 }) {
+  scheduleEmailCheck();
   const sp = await searchParams;
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) {

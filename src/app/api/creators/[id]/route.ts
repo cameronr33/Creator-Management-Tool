@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
 import { updateCreatorProfile } from "@/lib/creators";
+import { checkEmailForNewAddress } from "@/lib/gmail-sync";
 
 const schema = z.object({
   name: z.string().min(1).optional(),
@@ -29,5 +30,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     ...d,
     businessEmail: d.businessEmail === "" ? null : d.businessEmail?.toLowerCase(),
   });
+  // A new address starts being tracked now: its last 180 days are searched.
+  if (d.businessEmail) after(() => checkEmailForNewAddress());
   return NextResponse.json({ ok: true });
 }

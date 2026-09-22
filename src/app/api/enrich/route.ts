@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { requireAuth, badRequest } from "@/lib/api-helpers";
@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { cmCreators } from "@/lib/db/schema";
 import { fetchProfiles } from "@/lib/apify";
 import { parseSocialUrl, ENRICHABLE_PLATFORMS, PLATFORM_LABELS } from "@/lib/social-links";
+import { addCreatorEmail } from "@/lib/creator-emails";
+import { checkEmailForNewAddress } from "@/lib/gmail-sync";
 
 const schema = z
   .object({
@@ -72,15 +74,23 @@ export async function POST(req: NextRequest) {
     }
 
     if (d.save && d.creatorId) {
+      // The tracked address is never silently replaced: Instagram's public
+      // email only fills an empty one, and a different one is added alongside.
+      const [cur] = await db.select({ businessEmail: cmCreators.businessEmail }).from(cmCreators).where(eq(cmCreators.id, d.creatorId)).limit(1);
+      const found = profile.businessEmail?.trim().toLowerCase() || null;
       await db
         .update(cmCreators)
         .set({
           followers: profile.followersCount ?? undefined,
-          businessEmail: profile.businessEmail ?? undefined,
+          businessEmail: !cur?.businessEmail && found ? found : undefined,
           lastRefreshedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(eq(cmCreators.id, d.creatorId));
+      if (found && cur?.businessEmail && cur.businessEmail.toLowerCase() !== found) {
+        await addCreatorEmail(d.creatorId, found, "apify").catch(() => undefined);
+      }
+      if (found) after(() => checkEmailForNewAddress());
     }
 
     return NextResponse.json({

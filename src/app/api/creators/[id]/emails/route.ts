@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth, badRequest } from "@/lib/api-helpers";
 import { addCreatorEmail, removeCreatorEmail } from "@/lib/creator-emails";
+import { checkEmailForNewAddress } from "@/lib/gmail-sync";
 
 const schema = z.object({ email: z.string().min(3) });
 
@@ -17,6 +18,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
   try {
     const email = await addCreatorEmail(id, parsed.data.email);
+    // Search this address's last 180 days now rather than at the next visit.
+    after(() => checkEmailForNewAddress());
     return NextResponse.json({ ok: true, email });
   } catch (e) {
     return badRequest((e as Error).message);

@@ -4,10 +4,11 @@ import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { getWorkspaceItems } from "@/lib/workspace-data";
 import { PageHeader, EmptyState, Button, Callout } from "@/components/ui";
 import { CreatorWorkspace } from "@/components/creator-workspace";
-import { getActiveGmailAccount } from "@/lib/gmail-sync";
+import { getActiveGmailAccount, scheduleEmailCheck } from "@/lib/gmail-sync";
 import { summarizeGmailHealth } from "@/lib/gmail-health";
 
 export default async function TodayPage() {
+  scheduleEmailCheck();
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) return <><PageHeader title="Today" /><div className="p-6"><EmptyState title="No clients to show" hint="Choose which clients to show in Settings." action={<Button href="/settings">Open settings</Button>} /></div></>;
   const [items, account] = await Promise.all([getWorkspaceItems(client.id), getActiveGmailAccount()]);

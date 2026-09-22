@@ -64,6 +64,20 @@
       "when": 1790111446142,
       "tag": "0008_modern_omega_red",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790112187124,
+      "tag": "0009_watery_revanche",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790112925553,
+      "tag": "0010_superb_roulette",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@
  *
  * Env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, APP_URL (for the redirect URI).
  */
+import { htmlToText } from "@/lib/email-body";
 
 export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 
@@ -100,21 +101,29 @@ export async function getProfile(accessToken: string): Promise<{ emailAddress: s
   return api(accessToken, "/profile");
 }
 
-export async function listMessageIds(accessToken: string, query: string, max = 200): Promise<string[]> {
+export async function listMessageIds(
+  accessToken: string,
+  query: string,
+  max = 500,
+): Promise<{ ids: string[]; truncated: boolean }> {
   const ids: string[] = [];
   let pageToken: string | undefined;
+  let more = false;
   while (ids.length < max) {
-    const params = new URLSearchParams({ q: query, maxResults: "100" });
+    // Spam/Trash included: a creator's reply that landed in Spam is still their reply.
+    const params = new URLSearchParams({ q: query, maxResults: "100", includeSpamTrash: "true" });
     if (pageToken) params.set("pageToken", pageToken);
     const data = await api<{ messages?: { id: string }[]; nextPageToken?: string }>(
       accessToken,
       `/messages?${params}`,
     );
     ids.push(...(data.messages ?? []).map((m) => m.id));
+    more = !!data.nextPageToken;
     if (!data.nextPageToken) break;
     pageToken = data.nextPageToken;
   }
-  return ids.slice(0, max);
+  // Hitting the cap is reported, never silent: the caller marks the run partial.
+  return { ids: ids.slice(0, max), truncated: more || ids.length > max };
 }
 
 export interface GmailPayload {
@@ -129,6 +138,7 @@ export interface GmailMessage {
   threadId: string;
   internalDate: string;
   snippet?: string;
+  labelIds?: string[];
   payload?: GmailPayload;
 }
 
@@ -155,16 +165,22 @@ export function emailDomain(email: string): string {
 
 /* ── Pure normalization helpers (unit-tested offline) ─────────── */
 
+/** Which mail a search covers: everything since an instant, or the last N days. */
+export type SearchWindow = { afterEpochSeconds: number } | { newerThanDays: number };
+
 /**
  * Batch roster addresses into Gmail search queries. Gmail caps query length,
- * so we group a handful of addresses per query.
+ * so a handful of addresses go in each. Addresses are quoted so plus-tags and
+ * other punctuation match literally.
  */
-export function buildSearchQueries(addresses: string[], windowDays = 14, batchSize = 8): string[] {
+export function buildSearchQueries(addresses: string[], window: SearchWindow, batchSize = 8): string[] {
+  const suffix =
+    "afterEpochSeconds" in window ? `after:${Math.floor(window.afterEpochSeconds)}` : `newer_than:${window.newerThanDays}d`;
   const queries: string[] = [];
   for (let i = 0; i < addresses.length; i += batchSize) {
     const batch = addresses.slice(i, i + batchSize);
-    const clause = batch.map((a) => `from:${a} OR to:${a} OR cc:${a}`).join(" OR ");
-    queries.push(`(${clause}) newer_than:${windowDays}d`);
+    const clause = batch.map((a) => `from:"${a}" OR to:"${a}" OR cc:"${a}"`).join(" OR ");
+    queries.push(`(${clause}) ${suffix}`);
   }
   return queries;
 }
@@ -174,11 +190,14 @@ export function header(payload: GmailPayload | undefined, name: string): string 
   return h?.value ?? null;
 }
 
-/** "A <a@x.com>, b@y.com" → ["A <a@x.com>", "b@y.com"] (comma-split, quote-aware enough). */
+/**
+ * Split an address header on commas that are outside quotes, so a display
+ * name like "Last, First" stays one person.
+ */
 export function splitAddresses(value: string | null): string[] {
   if (!value) return [];
   return value
-    .split(",")
+    .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
     .map((s) => s.trim())
     .filter(Boolean);
 }
@@ -187,22 +206,43 @@ function decodeBase64Url(data: string): string {
   return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
 }
 
+function findPart(payload: GmailPayload | undefined, mimeType: string): GmailPayload | null {
+  if (!payload) return null;
+  if (payload.mimeType === mimeType && payload.body?.data) return payload;
+  for (const part of payload.parts ?? []) {
+    const found = findPart(part, mimeType);
+    if (found) return found;
+  }
+  return null;
+}
+
 /** Depth-first search of the MIME tree for the first text/plain part. */
 export function extractPlainText(payload: GmailPayload | undefined): string | null {
   if (!payload) return null;
-  if (payload.mimeType === "text/plain" && payload.body?.data) {
-    return decodeBase64Url(payload.body.data);
-  }
-  for (const part of payload.parts ?? []) {
-    const found = extractPlainText(part);
-    if (found) return found;
-  }
-  // Single-part non-multipart messages sometimes carry text at the root
-  // without an explicit text/plain mimeType.
-  if (!payload.parts && payload.body?.data) {
+  const plain = findPart(payload, "text/plain");
+  if (plain?.body?.data) return decodeBase64Url(plain.body.data);
+  // Single-part messages sometimes carry text at the root without an explicit
+  // text/plain type — but HTML is never passed off as text.
+  if (!payload.parts && payload.body?.data && payload.mimeType !== "text/html") {
     return decodeBase64Url(payload.body.data);
   }
   return null;
+}
+
+/** The message's own words: text/plain when there is one, else its HTML turned into text. */
+export function extractBodyText(payload: GmailPayload | undefined): string | null {
+  const plain = extractPlainText(payload);
+  if (plain) return plain;
+  const html = findPart(payload, "text/html");
+  return html?.body?.data ? htmlToText(decodeBase64Url(html.body.data)) : null;
+}
+
+/** True when the message carries a calendar invitation (text/calendar or an .ics part). */
+export function hasCalendarPart(payload: GmailPayload | undefined): boolean {
+  if (!payload) return false;
+  const type = (payload.mimeType ?? "").toLowerCase();
+  if (type === "text/calendar" || type === "application/ics") return true;
+  return (payload.parts ?? []).some(hasCalendarPart);
 }
 
 export interface NormalizedGmailMessage {
@@ -214,15 +254,24 @@ export interface NormalizedGmailMessage {
   cc: string[];
   subject: string | null;
   bodyText: string | null;
+  /** Gmail labels — "SENT" marks mail the connected mailbox itself sent. */
+  labelIds: string[];
+  /** RFC 822 Message-ID, for "Open in Gmail". */
+  messageId: string | null;
+  /** Auto-Submitted / X-Autoreply / Precedence — how auto-replies announce themselves. */
+  autoSubmitted: string | null;
+  autoReplyHeader: boolean;
+  precedence: string | null;
+  hasCalendar: boolean;
 }
 
-/** GmailMessage → the shape /api/emails/ingest (ingestEmails) consumes. */
+/** GmailMessage → the shape ingestEmails consumes. */
 export function normalizeMessage(msg: GmailMessage): NormalizedGmailMessage | null {
   const from = header(msg.payload, "From");
   if (!from) return null;
   const ts = Number(msg.internalDate);
   if (!Number.isFinite(ts) || ts <= 0) return null;
-  const bodyText = extractPlainText(msg.payload) ?? msg.snippet ?? null;
+  const bodyText = extractBodyText(msg.payload) ?? msg.snippet ?? null;
   return {
     externalId: msg.id,
     threadId: msg.threadId ?? null,
@@ -232,5 +281,11 @@ export function normalizeMessage(msg: GmailMessage): NormalizedGmailMessage | nu
     cc: splitAddresses(header(msg.payload, "Cc")),
     subject: header(msg.payload, "Subject"),
     bodyText: bodyText ? bodyText.slice(0, 10_000) : null,
+    labelIds: msg.labelIds ?? [],
+    messageId: header(msg.payload, "Message-ID"),
+    autoSubmitted: header(msg.payload, "Auto-Submitted"),
+    autoReplyHeader: !!(header(msg.payload, "X-Autoreply") || header(msg.payload, "X-Autorespond")),
+    precedence: header(msg.payload, "Precedence"),
+    hasCalendar: hasCalendarPart(msg.payload),
   };
 }

@@ -23,6 +23,7 @@ import {
   normalizeMessage,
   type GmailMessage,
 } from "../src/lib/gmail";
+import { planSearches } from "../src/lib/gmail-sync";
 import { encrypt, decrypt } from "../src/lib/encryption";
 
 let failures = 0;
@@ -36,13 +37,26 @@ function b64url(s: string): string {
 }
 
 async function main() {
-  console.log("\n── buildSearchQueries ──");
-  const qs = buildSearchQueries(["a@x.com", "b@y.com"], 14);
+  console.log("\n── buildSearchQueries / planSearches ──");
+  const qs = buildSearchQueries(["a@x.com", "b@y.com"], { newerThanDays: 14 });
   check("one query for two addresses", qs.length === 1);
-  check("query includes from/to/cc per address", qs[0].includes("from:a@x.com OR to:a@x.com OR cc:a@x.com"), qs[0]);
-  check("window applied", qs[0].endsWith("newer_than:14d"));
-  const many = buildSearchQueries(Array.from({ length: 20 }, (_, i) => `u${i}@x.com`), 14, 8);
+  check("query includes quoted from/to/cc per address", qs[0].includes('from:"a@x.com" OR to:"a@x.com" OR cc:"a@x.com"'), qs[0]);
+  check("day window applied", qs[0].endsWith("newer_than:14d"));
+  check("instant window applied", buildSearchQueries(["a@x.com"], { afterEpochSeconds: 1790000000.7 })[0].endsWith("after:1790000000"));
+  const many = buildSearchQueries(Array.from({ length: 20 }, (_, i) => `u${i}@x.com`), { newerThanDays: 14 }, 8);
   check("20 addresses batch into 3 queries at size 8", many.length === 3, `got ${many.length}`);
+  const through = new Date("2026-09-20T12:00:00Z");
+  const plan = planSearches({ addresses: ["old@x.com", "new@y.com"], backfilled: ["old@x.com"], syncedThrough: through });
+  check("a never-searched address gets the 180-day backfill", plan.fresh.join() === "new@y.com" && plan.queries.some((q) => q.includes('"new@y.com"') && q.endsWith("newer_than:180d")), JSON.stringify(plan));
+  check(
+    "a searched address only needs mail since the last complete check, less an hour",
+    plan.queries.some((q) => q.includes('"old@x.com"') && q.endsWith(`after:${(through.getTime() - 3600_000) / 1000}`)),
+    JSON.stringify(plan.queries),
+  );
+  const first = planSearches({ addresses: ["old@x.com"], backfilled: ["old@x.com"], syncedThrough: null });
+  check("without a completed check nothing counts as covered", first.fresh.join() === "old@x.com" && first.queries[0].endsWith("newer_than:180d"));
+  const resync = planSearches({ addresses: ["a@x.com"], backfilled: ["a@x.com"], syncedThrough: through, windowDays: 365 });
+  check("an explicit window searches everything over it", resync.queries[0].endsWith("newer_than:365d"));
 
   console.log("\n── header / splitAddresses / extractPlainText ──");
   const msg: GmailMessage = {
@@ -79,6 +93,42 @@ async function main() {
   check("message without From is dropped, not crashed", noFrom === null);
   const badDate = normalizeMessage({ ...msg, internalDate: "not-a-number" });
   check("message with invalid internalDate is dropped, not a RangeError", badDate === null);
+  check("a display name with a comma stays one address", splitAddresses('"Rahmati, Cameron" <c@x.com>, b@y.com').length === 2);
+
+  console.log("\n── what a message is: sent by us, an invite, an auto-reply, HTML only ──");
+  const sent = normalizeMessage({
+    ...msg,
+    labelIds: ["SENT", "INBOX"],
+    payload: {
+      ...msg.payload,
+      headers: [...(msg.payload?.headers ?? []), { name: "Message-ID", value: "<abc@mail.gmail.com>" }, { name: "Auto-Submitted", value: "auto-replied" }],
+    },
+  });
+  check("labels carried (SENT = our mailbox sent it)", sent?.labelIds.includes("SENT") === true);
+  check("Message-ID carried", sent?.messageId === "<abc@mail.gmail.com>");
+  check("Auto-Submitted carried", sent?.autoSubmitted === "auto-replied");
+  const invite = normalizeMessage({
+    ...msg,
+    payload: {
+      mimeType: "multipart/mixed",
+      headers: msg.payload?.headers,
+      parts: [
+        { mimeType: "text/plain", body: { data: b64url("You have been invited") } },
+        { mimeType: "text/calendar", body: { data: b64url("BEGIN:VCALENDAR") } },
+      ],
+    },
+  });
+  check("a calendar part is detected", invite?.hasCalendar === true && sent?.hasCalendar === false);
+  const htmlOnly = normalizeMessage({
+    ...msg,
+    payload: {
+      mimeType: "text/html",
+      headers: msg.payload?.headers,
+      body: { data: b64url("<div>Sounds <b>great</b>&nbsp;&amp; thanks!</div><div class=\"gmail_quote\">On Mon wrote: old</div>") },
+    },
+  });
+  check("an HTML-only email becomes text without the quoted history", htmlOnly?.bodyText === "Sounds great & thanks!\n\n> quoted", JSON.stringify(htmlOnly?.bodyText));
+  check("HTML is never stored raw", !(htmlOnly?.bodyText ?? "").includes("<div"));
 
   console.log("\n── address helpers ──");
   check("parseEmailAddress: display-name form", JSON.stringify(parseEmailAddress("Robin Shute <Robin@Example.com>")) === JSON.stringify({ name: "Robin Shute", email: "robin@example.com" }));

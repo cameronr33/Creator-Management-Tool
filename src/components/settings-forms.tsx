@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Plus, RefreshCw, Unplug } from "lucide-react";
-import { Button, Field, Input, Callout } from "@/components/ui";
+import { Button, Field, Input, Textarea, Callout } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
@@ -49,8 +49,10 @@ export interface GmailAccountView {
     unmatched?: number;
     stageChanges?: number;
     messagesFetched?: number;
-    windowDays?: number;
     fetchErrors?: number;
+    truncated?: boolean;
+    rosterSize?: number;
+    backfilled?: number;
   } | null;
 }
 
@@ -63,22 +65,23 @@ export function GmailSyncStatus({ account }: { account: GmailAccountView }) {
     const r = await run(
       () =>
         api<{
-          windowDays?: number;
-          messagesFetched?: number;
+          rosterSize?: number;
+          backfilled?: number;
           inserted?: number;
           stageChanges?: unknown[];
           fetchErrors?: number;
+          truncated?: boolean;
         }>("/api/gmail/sync"),
       {},
     );
     if (r.ok) {
       const d = r.data;
-      const partial = (d.fetchErrors ?? 0) > 0;
-      toast(partial ? "Email check incomplete" : `Checked the last ${d.windowDays ?? "?"} days`, {
+      const partial = (d.fetchErrors ?? 0) > 0 || !!d.truncated;
+      toast(partial ? "Email check incomplete — the next check continues" : "Email checked", {
         tone: partial ? "info" : "good",
-        detail: `${partial ? `${d.fetchErrors} fetch(es) skipped; some messages may be missing. ` : ""}${d.messagesFetched ?? 0} matched message(s) · ${d.inserted ?? 0} new on timelines · ${
-          d.stageChanges?.length ?? 0
-        } stage change(s)`,
+        detail: `${d.rosterSize ?? 0} creator address(es) · ${d.inserted ?? 0} new message(s) · ${d.stageChanges?.length ?? 0} stage change(s)${
+          d.backfilled ? ` · searched the last 6 months for ${d.backfilled} new address(es)` : ""
+        }`,
       });
     }
   };
@@ -92,7 +95,7 @@ export function GmailSyncStatus({ account }: { account: GmailAccountView }) {
         <div className="min-w-0 text-text-muted">
           <div className="break-all font-medium text-text">{account.email}</div>
           <div className="mt-0.5 text-xs">{account.lastSyncAt ? `Last checked ${account.lastSyncAt}` : "No check recorded yet"}</div>
-          {s && <div className="mt-0.5 text-xs">{s.messagesFetched ?? 0} matched · {s.inserted ?? 0} new on timelines{s.windowDays != null ? ` · ${s.windowDays}-day search window` : ""}</div>}
+          {s && <div className="mt-0.5 text-xs">{s.rosterSize ?? 0} creator address(es) searched · {s.inserted ?? 0} new message(s) last time</div>}
           {account.health.state === "error" && account.lastSyncStatus && <p className="mt-1 break-words text-xs text-bad">{account.lastSyncStatus}</p>}
         </div>
         <Button size="sm" icon={<RefreshCw size={13} />} onClick={syncNow} pending={pending}>
@@ -150,6 +153,40 @@ export function GmailConnectCard({
         pending={pending}
         onConfirm={() => run(() => api("/api/gmail/disconnect"), { success: "Gmail disconnected" })}
       />
+    </div>
+  );
+}
+
+/**
+ * "Our side": people who email creators for us from addresses the app can't
+ * guess — client staff, a partner agency, a teammate's own domain. Their
+ * messages count as ours, never as the creator replying.
+ */
+export function TeamAddressesEditor({ entries }: { entries: string[] }) {
+  const { pending, run } = useSave();
+  const [text, setText] = useState(entries.join("\n"));
+  const list = text
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const dirty = list.join("\n") !== entries.join("\n");
+  return (
+    <div className="space-y-2">
+      <Field
+        label="Our side — other addresses that email creators for us"
+        hint="One per line. An address (rob@partner.com) or a whole domain (@hella.com). Your mailbox's own domain and everyone who signs in here already count."
+      >
+        <Textarea compact rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder={"@hella.com\nrob@partner.com"} />
+      </Field>
+      <Button
+        size="sm"
+        variant="primary"
+        pending={pending}
+        disabled={!dirty}
+        onClick={() => run(() => api("/api/gmail/team", { entries: list }, "PUT"), { success: "Saved — stored emails are being re-checked" })}
+      >
+        Save
+      </Button>
     </div>
   );
 }

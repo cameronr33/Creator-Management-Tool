@@ -404,8 +404,18 @@ export const cmOutreachEvents = pgTable(
     subject: text("subject"),
     /** Synced email only: the From header ("Name <address>"). */
     fromAddress: text("from_address"),
-    /** Synced email only: the To header, comma-separated. Cc is not kept. */
+    /** Synced email only: the To header, comma-separated. */
     toAddress: text("to_address"),
+    /** Synced email only: the Cc header, comma-separated. */
+    ccAddress: text("cc_address"),
+    /** Synced email only: the RFC 822 Message-ID — "Open in Gmail" searches by it. */
+    messageId: text("message_id"),
+    /**
+     * Synced email only: who wrote it — "team" (us), "creator", or "other"
+     * (someone else on the creator's thread: a manager, a parent). Only the
+     * creator's own messages count as "they replied".
+     */
+    senderRole: text("sender_role"),
     /**
      * External message id for synced events (Gmail message id). Unique so
      * re-running the email sync is idempotent — Postgres unique constraints
@@ -689,6 +699,26 @@ export const cmGmailAccounts = pgTable(
     /** Result of the last sync: {inserted, skipped, unmatched, stageChanges}. */
     lastSyncSummary: jsonb("last_sync_summary"),
     isActive: boolean("is_active").default(true).notNull(),
+    /**
+     * Mail up to here has been fully checked for every searched address. Only
+     * advances after a COMPLETE run — a partial or failed check leaves it, so
+     * the next check re-covers the gap (message ids make that harmless).
+     */
+    syncedThrough: timestamp("synced_through"),
+    /** Held while a check runs; every trigger (cron, visit, button, new address) shares it. */
+    syncLeaseUntil: timestamp("sync_lease_until"),
+    /**
+     * Creator addresses whose 180-day history has been searched. An address
+     * not in this list — newly added anywhere — gets that search on the next
+     * check; the rest only need mail since `syncedThrough`.
+     */
+    backfilledAddresses: jsonb("backfilled_addresses").$type<string[]>().default([]).notNull(),
+    /**
+     * "Our side" beyond the mailbox and the logins: teammates or client staff
+     * who email creators from other addresses. Entries are addresses or
+     * "@domain.com".
+     */
+    teamAddresses: jsonb("team_addresses").$type<string[]>().default([]).notNull(),
   },
   (t) => [unique("cm_gmail_accounts_email_uq").on(t.email)],
 );

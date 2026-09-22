@@ -23,7 +23,8 @@ function count(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-// The email worker is scheduled twice daily; match the 1.5× heartbeat threshold.
+// Visits check every 15 minutes and the worker twice a day; a check older than
+// this means nobody has had the app open and the worker isn't running.
 export const GMAIL_STALE_AFTER_HOURS = 18;
 
 export function summarizeGmailHealth(

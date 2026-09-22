@@ -61,10 +61,17 @@ here — it looks like health. So:
   `ok` (did work), `idle` (nothing to do — still healthy), or `error`. The
   email card shows when the mailbox was last checked and flags a failed or
   overdue check. "Hasn't run" and "ran with nothing to do" are different states.
-- The email sync searches **only** for addresses saved on creators (owner
+- The email check searches **only** for addresses saved on creators (owner
   decision, 2026-09-22 — the mailbox is a broad work inbox; nothing else is
-  read or stored). Use `npm run gmail:diagnose` to see whether those
-  addresses appear in the mailbox at all.
+  read or stored). Its anchors, all computed from stored rows:
+  - every check (schedule, page visit, button, new address) leaves a
+    heartbeat, and coverage (`synced_through`) only advances on a
+    **complete** check — a partial or capped one is reported as partial
+    and the next check re-covers the gap;
+  - Settings lists creator addresses that were searched but have **no mail**
+    (a typo or the wrong address looks exactly like a quiet creator
+    otherwise) and addresses saved on **more than one creator**;
+  - `npm run gmail:diagnose` shows per-address match counts in the mailbox.
 - Counter-metrics: outreach volume is paired with reply rate (worklist +
   timeline), follow-ups sent with `no_response` closes and reopens.
 - Measurement decay: imported sheet rows have unknown dates and are flagged

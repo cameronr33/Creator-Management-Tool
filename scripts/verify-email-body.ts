@@ -8,7 +8,7 @@
  * a Gmail reply whose attribution line wraps onto two lines above ">" quotes.
  * Pure — no database.
  */
-import { cleanEmailBody, displayNames } from "../src/lib/email-body";
+import { cleanEmailBody, displayNames, htmlToText } from "../src/lib/email-body";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail?: string) {
@@ -118,6 +118,17 @@ function main() {
   check("multiple recipients", displayNames("Tatum Maciejack <tatum@nosincustoms.com>, b@x.com") === "Tatum Maciejack, b@x.com");
   check("quoted display name", displayNames('"Rahmati, Cameron" <cameron@sentic.io>') === "Rahmati, Cameron");
   check("empty → empty", displayNames(null) === "");
+
+  console.log("\n── htmlToText (HTML-only emails) ──");
+  check("paragraphs and line breaks become lines", htmlToText("<p>Hi Rob,</p><p>Sounds great!<br>Tatum</p>") === "Hi Rob,\n\nSounds great!\nTatum", JSON.stringify(htmlToText("<p>Hi Rob,</p><p>Sounds great!<br>Tatum</p>")));
+  check("entities decoded", htmlToText("Fish &amp; chips&nbsp;&#39;n&#x27; more &lt;3") === "Fish & chips 'n' more <3");
+  check("styles and scripts dropped", htmlToText("<style>p{color:red}</style><script>x()</script><p>Body</p>") === "Body");
+  check("list items read as a list", htmlToText("<ul><li>Unboxing</li><li>Install</li></ul>") === "- Unboxing\n- Install");
+  const quoted = htmlToText('<div>Yes please!</div><div class="gmail_quote"><div>On Mon, Rob wrote:</div><blockquote>old text</blockquote></div>');
+  check("Gmail's quoted history becomes a quote marker…", quoted === "Yes please!\n\n> quoted", JSON.stringify(quoted));
+  check("…which the cleaner then cuts", cleanEmailBody(quoted) === "Yes please!");
+  check("a blockquote is history too", cleanEmailBody(htmlToText("<p>Agreed.</p><blockquote>earlier</blockquote>")) === "Agreed.");
+  check("empty HTML → null", htmlToText("<div> </div>") === null);
 }
 
 main();

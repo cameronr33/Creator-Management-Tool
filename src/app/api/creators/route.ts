@@ -1,8 +1,9 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth, badRequest } from "@/lib/api-helpers";
 import { createCreatorWithPartnership, ensureCampaignByName } from "@/lib/creators";
 import { STARTING_STAGES } from "@/lib/stages";
+import { checkEmailForNewAddress } from "@/lib/gmail-sync";
 
 const schema = z
   .object({
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
       userId: session.user.id,
     });
 
+    if (d.businessEmail) after(() => checkEmailForNewAddress());
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     return badRequest((e as Error).message);

@@ -1,5 +1,6 @@
 import { resolveClient, getCreatorRows } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
+import { scheduleEmailCheck } from "@/lib/gmail-sync";
 import { PageHeader, EmptyState, Button } from "@/components/ui";
 import { PipelineBoard, type BoardCard } from "@/components/pipeline-board";
 
@@ -8,6 +9,7 @@ export default async function PipelinePage({
 }: {
   searchParams: Promise<{ campaign?: string }>;
 }) {
+  scheduleEmailCheck();
   const sp = await searchParams;
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) {
