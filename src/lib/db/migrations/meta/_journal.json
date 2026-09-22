@@ -57,6 +57,13 @@
       "when": 1789450652329,
       "tag": "0007_chemical_the_fallen",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790111446142,
+      "tag": "0008_modern_omega_red",
+      "breakpoints": true
     }
   ]
 }

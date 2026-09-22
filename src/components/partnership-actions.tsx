@@ -15,6 +15,43 @@ import { api, useSave } from "@/components/use-save";
 
 /* ── Stage ────────────────────────────────────────────────────── */
 
+/** True when the stage API refused a Posted move because no video is recorded yet. */
+export function needsVideo(data: unknown): boolean {
+  const d = data as { details?: { needsVideo?: boolean } } | null;
+  return !!d?.details?.needsVideo;
+}
+
+/**
+ * Posted always has a video behind it. When someone moves a creator to
+ * Posted and none is recorded, this asks for the link right there.
+ */
+export function VideoLinkPrompt({
+  pending,
+  onSubmit,
+  onCancel,
+}: {
+  pending: boolean;
+  onSubmit: (url: string) => void;
+  onCancel: () => void;
+}) {
+  const [url, setUrl] = useState("");
+  return (
+    <div className="space-y-2 rounded-lg border border-accent-ring bg-surface p-2.5 text-xs shadow-pop">
+      <Field label="Link to the posted video" hint="Posted needs the video itself. Paste its link.">
+        <Input compact autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.instagram.com/reel/…" />
+      </Field>
+      <div className="flex gap-2">
+        <Button size="sm" variant="primary" pending={pending} disabled={!url.trim()} onClick={() => onSubmit(url.trim())}>
+          Save and mark Posted
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The stage control. Grouped by phase, explains the current stage under it,
  * says what will move it automatically, and — when a closed stage is picked —
@@ -34,11 +71,16 @@ export function StageControl({
 }) {
   const { pending, run } = useSave();
   const [closingAs, setClosingAs] = useState<CmStage | null>(null);
+  const [askVideo, setAskVideo] = useState(false);
 
-  const setStage = (to: CmStage, reason?: string | null) =>
-    run(() => api(`/api/partnerships/${partnershipId}/stage`, { stage: to, exitReason: reason }), {
-      success: `Stage set to ${stageLabel(to)}`,
-    });
+  const setStage = async (to: CmStage, reason?: string | null, videoUrl?: string) => {
+    const r = await run(
+      () => api(`/api/partnerships/${partnershipId}/stage`, { stage: to, exitReason: reason, videoUrl }),
+      { success: `Stage set to ${stageLabel(to)}` },
+    );
+    setAskVideo(!r.ok && needsVideo(r.data));
+    return r;
+  };
 
   return (
     <div className="w-full max-w-xs space-y-1.5">
@@ -67,7 +109,13 @@ export function StageControl({
         </Select>
       </Field>
 
-      {closingAs ? (
+      {askVideo ? (
+        <VideoLinkPrompt
+          pending={pending}
+          onSubmit={(url) => setStage("posted", undefined, url)}
+          onCancel={() => setAskVideo(false)}
+        />
+      ) : closingAs ? (
         <div className="rounded-lg border border-accent-ring bg-surface p-2.5 text-xs shadow-pop">
           <div className="mb-1.5 font-medium text-text">
             Closing as {stageLabel(closingAs)} — why?

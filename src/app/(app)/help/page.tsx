@@ -122,10 +122,9 @@ export default function HelpPage() {
             })}
           </ul>
           <p className="mt-4 text-xs leading-relaxed text-text-faint">
-            Nothing ever moves a creator into {stageLabel("negotiating")}, {stageLabel("agreed")},{" "}
-            {stageLabel("awaiting_address")} or {stageLabel("completed")} automatically — those are judgement calls
-            you make on the record or the board. A creator closed as {stageLabel("no_response")} is the one
-            exception: their own late reply reopens them.
+            These rules never decide {stageLabel("awaiting_address")} and never close a deal — agreeing and closing
+            are judgement calls you make on the creator page or the board. A creator closed as{" "}
+            {stageLabel("no_response")} is the one exception: their own reply reopens them.
           </p>
         </Card>
 
@@ -195,7 +194,7 @@ export default function HelpPage() {
             <Term word="Creator">A person or channel — their profile links, follower count and research. One record, reused across clients and campaigns.</Term>
             <Term word="Partnership">One creator working one campaign. That&apos;s what moves through the stages; a creator can have several.</Term>
             <Term word="Campaign">A client&apos;s effort that creators are recruited for, e.g. &ldquo;Evergreen creators&rdquo; or &ldquo;Suspension&rdquo;.</Term>
-            <Term word="Content type (pillar)">What the creator mostly posts — overlanding, DIY, shop builds. Fills the message template.</Term>
+            <Term word="Content type (pillar)">What the creator mostly posts — overlanding, DIY, shop builds.</Term>
             <Term word="Posts / week">How often they post, from the research sample.</Term>
             <Term word="Brief">The document telling the creator what to make. &ldquo;Mark brief sent&rdquo; records the date.</Term>
             <Term word="Posted video">A live post we tracked — its link, date and views.</Term>

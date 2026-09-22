@@ -153,7 +153,7 @@ export async function createCreatorWithPartnership(
     };
   }
 
-  const stage = input.stage ?? "researched";
+  const stage = input.stage ?? "shortlisted";
   const [partnership] = await db
     .insert(cmPartnerships)
     .values({ creatorId, campaignId: input.campaignId, stage, notes: input.notes ?? null })
@@ -164,6 +164,8 @@ export async function createCreatorWithPartnership(
     fromStage: null,
     toStage: stage,
     changedBy: input.userId ?? null,
+    source: "manual",
+    reason: "added",
   });
 
   return {

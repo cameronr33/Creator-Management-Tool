@@ -17,9 +17,7 @@
     "db:deploy": "tsx scripts/apply-schema.ts",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --env-file=.env.local scripts/seed-admin.ts",
-    "import:hella": "tsx --env-file=.env.local scripts/import-hella.ts",
     "backfill:socials": "tsx --env-file=.env.local scripts/backfill-socials.ts",
-    "verify:import": "tsx scripts/verify-import.ts",
     "verify:add-creator": "tsx --env-file=.env.local scripts/verify-add-creator.ts",
     "verify:auto-stage": "tsx --env-file=.env.local scripts/verify-auto-stage.ts",
     "verify:editors": "tsx --env-file=.env.local scripts/verify-editors.ts",
@@ -44,7 +42,8 @@
     "seed:clients": "tsx --env-file=.env.local scripts/seed-clients.ts",
     "fix:duplicate-shipments": "tsx --env-file=.env.local scripts/fix-duplicate-shipments.ts",
     "cron": "tsx scripts/cron-worker.ts",
-    "db:backup": "tsx --env-file=.env.local scripts/backup-tables.ts"
+    "db:backup": "tsx --env-file=.env.local scripts/backup-tables.ts",
+    "stages:migrate": "tsx --env-file=.env.local scripts/stages-migrate.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

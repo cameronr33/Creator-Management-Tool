@@ -1,50 +1,32 @@
-import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { cmPartnerships, cmStageTransitions, type CmStage, type cmExitReasonEnum } from "@/lib/db/schema";
-import { isTerminal } from "@/lib/stages";
+import type { CmStage } from "@/lib/db/schema";
+import { moveStage, type ExitReason, type StageMoveResult } from "@/lib/stage-moves";
 
-export type ExitReason = (typeof cmExitReasonEnum.enumValues)[number];
+export type { ExitReason };
 
 /**
- * Change a partnership's stage and record the transition atomically-ish.
- *
- * Closing a deal can carry the exit reason in the same call, so the board's
- * close prompt records "who ended it and why" in one step. Moving back to an
- * active stage clears any stale reason.
+ * A person moving a stage (board, stage control, bulk). Goes through the one
+ * stage-move core so the shipment/video guards and the transition record are
+ * identical to automatic moves. A move that lost a race re-reads once and
+ * applies to the fresh stage — a person's intent is "put it in X", whatever
+ * it was a moment ago.
  */
 export async function changeStage(
   partnershipId: string,
   toStage: CmStage,
   userId?: string,
-  opts: { exitReason?: ExitReason | null } = {},
-): Promise<void> {
-  const [current] = await db
-    .select({ stage: cmPartnerships.stage })
-    .from(cmPartnerships)
-    .where(eq(cmPartnerships.id, partnershipId))
-    .limit(1);
-  if (!current) throw new Error("Partnership not found");
-
-  const set: Partial<typeof cmPartnerships.$inferInsert> = { updatedAt: new Date() };
-  if (opts.exitReason !== undefined) set.exitReason = opts.exitReason;
-  else if (!isTerminal(toStage)) set.exitReason = null;
-
-  if (current.stage === toStage) {
-    if (opts.exitReason !== undefined) {
-      await db.update(cmPartnerships).set(set).where(eq(cmPartnerships.id, partnershipId));
-    }
-    return;
+  opts: { exitReason?: ExitReason | null; videoUrl?: string | null } = {},
+): Promise<StageMoveResult> {
+  let result: StageMoveResult = { status: "not_found" };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    result = await moveStage({
+      partnershipId,
+      to: toStage,
+      source: "manual",
+      userId: userId ?? null,
+      exitReason: opts.exitReason,
+      videoUrl: opts.videoUrl ?? null,
+    });
+    if (result.status !== "stale") return result;
   }
-
-  await db
-    .update(cmPartnerships)
-    .set({ ...set, stage: toStage })
-    .where(eq(cmPartnerships.id, partnershipId));
-
-  await db.insert(cmStageTransitions).values({
-    partnershipId,
-    fromStage: current.stage,
-    toStage,
-    changedBy: userId ?? null,
-  });
+  return result;
 }

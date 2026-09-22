@@ -8,7 +8,7 @@ import {
   parseDateRange,
 } from "@/lib/csv";
 import { ingestResearch, type IngestCreator, type IngestPayload } from "@/lib/ingest";
-import { viewsSourceOf } from "@/lib/hella-import";
+import { viewsSourceOf } from "@/lib/csv";
 
 /**
  * Manual CSV upload path — accepts a creator-research skill CSV (same columns

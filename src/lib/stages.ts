@@ -6,85 +6,76 @@ import type { AutoStageTrigger } from "@/lib/auto-stage";
  * The stage answers one question — what is this partnership waiting on right
  * now — so shipping/post/contract facts are deliberately absent from it.
  *
- * Labels are written for a teammate on day one ("We passed" / "They
- * declined" says who ended it; "Waiting on video" says what's next). The
- * enum values underneath never change.
+ * Seven active stages and three closed ones (owner decision, 2026-09-22 —
+ * "simplify the pipeline"). The Postgres enum still carries four retired
+ * values (researched, negotiating, agreed, completed); nothing writes them,
+ * `canonicalStage()` maps any straggler on read, and verify:invariants
+ * asserts none remain. Labels are written for a teammate on day one, and
+ * every `action` line is what Today, the board, Next: and /help tell people
+ * to do — one table, so the explanation can't drift from the behaviour.
  */
 
-export type StageGroup = "research" | "outreach" | "deal" | "fulfilment" | "closed";
+export type StageGroup = "outreach" | "deal" | "fulfilment" | "closed";
 
 export interface StageMeta {
   value: CmStage;
   label: string;
   group: StageGroup;
-  /** One-line explanation, shown as a tooltip on pills and under the stage control. */
+  /** What the stage means. Shown as a tooltip on pills and in /help. */
   hint: string;
+  /** What you do while a creator is here. Board column hints, Today, /help. */
+  action: string;
   /** Terminal stages leave the working board and collapse into "Closed". */
   terminal: boolean;
 }
 
 export const STAGES: StageMeta[] = [
   {
-    value: "researched",
-    label: "Researched",
-    group: "research",
-    hint: "Found by a research run. Nobody has decided whether to reach out yet.",
-    terminal: false,
-  },
-  {
     value: "shortlisted",
-    label: "Shortlisted",
-    group: "research",
-    hint: "Approved for outreach. Nothing sent yet — they appear on Today under To contact.",
+    label: "To contact",
+    group: "outreach",
+    hint: "On the list. No message sent yet.",
+    action: "Message them on Instagram or by email. After a DM, click I messaged them.",
     terminal: false,
   },
   {
     value: "contacted",
     label: "Contacted",
     group: "outreach",
-    hint: "First message sent. Waiting on a reply; follow-ups come due automatically.",
+    hint: "First message sent. Waiting on their reply.",
+    action: "Wait for a reply. Today tells you when a follow-up is due.",
     terminal: false,
   },
   {
     value: "in_conversation",
-    label: "In conversation",
+    label: "Talking",
     group: "outreach",
-    hint: "They replied and are interested. No terms discussed yet.",
-    terminal: false,
-  },
-  {
-    value: "negotiating",
-    label: "Negotiating",
-    group: "outreach",
-    hint: "Terms are on the table — fee, product scope, how many videos.",
-    terminal: false,
-  },
-  {
-    value: "agreed",
-    label: "Agreed",
-    group: "deal",
-    hint: "They're in. Whether it's verbal or signed is recorded on the agreement, not the stage.",
+    hint: "They replied. Working out whether they're in, and on what terms.",
+    action: "Agree the product, fee and videos, and write them down under Deal.",
     terminal: false,
   },
   {
     value: "awaiting_address",
-    label: "Awaiting address",
+    label: "Agreed",
     group: "deal",
-    hint: "Agreed, but we still need a shipping address before anything can move.",
+    hint: "They're in. Verbal or signed is recorded under Deal. Waiting on their shipping address.",
+    action: "Get their shipping address. Saving it moves them to Shipping.",
     terminal: false,
   },
   {
     value: "fulfilling",
     label: "Shipping",
     group: "fulfilment",
-    hint: "Address in hand. Ready / shipped / delivered is tracked on the shipment.",
+    hint: "Address in hand. The product is being packed, shipped or delivered.",
+    action: "Ship the product and add the tracking number, then mark it delivered.",
     terminal: false,
   },
   {
     value: "content_pending",
     label: "Waiting on video",
     group: "fulfilment",
-    hint: "Product delivered and brief sent. Waiting on the creator to post.",
+    hint: "The product arrived. Waiting on them to post.",
+    action: "Send the brief if they need one, then paste the video link when it's live.",
     terminal: false,
   },
   {
@@ -92,13 +83,7 @@ export const STAGES: StageMeta[] = [
     label: "Posted",
     group: "fulfilment",
     hint: "At least one video is live.",
-    terminal: false,
-  },
-  {
-    value: "completed",
-    label: "Completed",
-    group: "fulfilment",
-    hint: "Everything agreed has been delivered. Nothing left to do.",
+    action: "Check the video matches what was agreed. Nothing else to do.",
     terminal: false,
   },
   {
@@ -106,6 +91,7 @@ export const STAGES: StageMeta[] = [
     label: "We passed",
     group: "closed",
     hint: "We ended it — wrong fit, too expensive, out of budget.",
+    action: "Nothing to do. Reopen it by moving the stage if plans change.",
     terminal: true,
   },
   {
@@ -113,31 +99,57 @@ export const STAGES: StageMeta[] = [
     label: "They declined",
     group: "closed",
     hint: "They ended it — not interested, a competitor conflict, wanted more money.",
+    action: "Nothing to do. Reopen it by moving the stage if they come back.",
     terminal: true,
   },
   {
     value: "no_response",
     label: "No response",
     group: "closed",
-    hint: "Went quiet after the follow-ups ran out. A late reply reopens them automatically.",
+    hint: "Went quiet after the follow-ups ran out. A reply from them reopens it.",
+    action: "Nothing to do. If they write back, they move to Talking by themselves.",
     terminal: true,
   },
 ];
+
+/**
+ * Enum values that still exist in Postgres but are no longer used, and the
+ * stage each one now means. Only ever read defensively — nothing writes them.
+ */
+export const RETIRED_STAGES: Partial<Record<CmStage, CmStage>> = {
+  researched: "shortlisted",
+  negotiating: "in_conversation",
+  agreed: "awaiting_address",
+  completed: "posted",
+};
+
+/** Map a stored stage to the one the app shows (identity for current stages). */
+export function canonicalStage(stage: CmStage): CmStage {
+  return RETIRED_STAGES[stage] ?? stage;
+}
+
+/** Stages a creator can be added at (later ones need shipment / video records first). */
+export const STARTING_STAGES = ["shortlisted", "contacted", "in_conversation", "awaiting_address"] as const satisfies readonly CmStage[];
+
+/** Every stage a person or an engine may set — for zod enums. */
+export const STAGE_VALUES = STAGES.map((s) => s.value) as [CmStage, ...CmStage[]];
 
 export const STAGE_BY_VALUE = new Map(STAGES.map((s) => [s.value, s]));
 
 export const ACTIVE_STAGES = STAGES.filter((s) => !s.terminal);
 export const TERMINAL_STAGES = STAGES.filter((s) => s.terminal);
 
+/** stage → what you do there. Derived from STAGES so there is one table. */
+export const STAGE_ACTIONS: Record<string, string> = Object.fromEntries(STAGES.map((s) => [s.value, s.action]));
+
 export const STAGE_GROUP_LABELS: Record<StageGroup, string> = {
-  research: "Research",
-  outreach: "Outreach",
-  deal: "Deal",
-  fulfilment: "Fulfilment",
+  outreach: "Reach out",
+  deal: "Agree",
+  fulfilment: "Ship & post",
   closed: "Closed",
 };
 
-export const STAGE_GROUP_ORDER: StageGroup[] = ["research", "outreach", "deal", "fulfilment", "closed"];
+export const STAGE_GROUP_ORDER: StageGroup[] = ["outreach", "deal", "fulfilment", "closed"];
 
 /** Stages in display order, bucketed by phase — for grouped selects and the Help page. */
 export function stagesByGroup(): { group: StageGroup; label: string; stages: StageMeta[] }[] {
@@ -149,36 +161,39 @@ export function stagesByGroup(): { group: StageGroup; label: string; stages: Sta
 }
 
 export function stageLabel(stage: CmStage): string {
-  return STAGE_BY_VALUE.get(stage)?.label ?? stage;
+  return STAGE_BY_VALUE.get(canonicalStage(stage))?.label ?? stage;
 }
 
 export function stageHint(stage: CmStage): string {
-  return STAGE_BY_VALUE.get(stage)?.hint ?? "";
+  return STAGE_BY_VALUE.get(canonicalStage(stage))?.hint ?? "";
+}
+
+export function stageAction(stage: CmStage): string {
+  return STAGE_BY_VALUE.get(canonicalStage(stage))?.action ?? "";
 }
 
 export function stageGroup(stage: CmStage): StageGroup {
-  return STAGE_BY_VALUE.get(stage)?.group ?? "research";
+  return STAGE_BY_VALUE.get(canonicalStage(stage))?.group ?? "outreach";
 }
 
 export function isTerminal(stage: CmStage): boolean {
-  return STAGE_BY_VALUE.get(stage)?.terminal ?? false;
+  return STAGE_BY_VALUE.get(canonicalStage(stage))?.terminal ?? false;
 }
 
 /** Position on the active ladder; terminal stages return -1. */
 export function stageIndex(stage: CmStage): number {
-  return ACTIVE_STAGES.findIndex((s) => s.value === stage);
+  const c = canonicalStage(stage);
+  return ACTIVE_STAGES.findIndex((s) => s.value === c);
 }
 
 /** True once a partnership has reached the point where a shipment must exist. */
 export function requiresShipment(stage: CmStage): boolean {
-  const i = stageIndex(stage);
-  return i >= stageIndex("fulfilling");
+  return stageIndex(stage) >= stageIndex("fulfilling");
 }
 
 /** True once a partnership must have at least one live deliverable. */
 export function requiresDeliverable(stage: CmStage): boolean {
-  const i = stageIndex(stage);
-  return i >= stageIndex("posted");
+  return stageIndex(stage) >= stageIndex("posted");
 }
 
 /** Exit reasons split by who actually ended it. */
@@ -218,8 +233,8 @@ export function exitReasonLabel(value: string | null | undefined): string {
  * what the engine does.
  */
 export const AUTO_TRIGGER_LABELS: Record<AutoStageTrigger, string> = {
-  outbound_message: "a first message is logged (I messaged them, or an email found in the mailbox)",
-  inbound_message: "the creator replies (logged by you, or found by the email sync)",
+  outbound_message: "a first message goes out (I messaged them, or an email in the mailbox)",
+  inbound_message: "they reply (They replied, or an email from them in the mailbox)",
   address_complete: "a complete shipping address is saved",
   shipment_shipped: "the shipment is marked shipped",
   shipment_delivered: "the shipment is marked delivered",
@@ -228,7 +243,6 @@ export const AUTO_TRIGGER_LABELS: Record<AutoStageTrigger, string> = {
 
 /** Tailwind classes per group — semantic tokens only, never raw palette colours. */
 export const STAGE_GROUP_STYLES: Record<StageGroup, string> = {
-  research: "bg-surface-2 text-text-muted ring-border-strong",
   outreach: "bg-info-soft text-info ring-info-line",
   deal: "bg-warn-soft text-warn ring-warn-line",
   fulfilment: "bg-good-soft text-good ring-good-line",

@@ -9,9 +9,9 @@
  * complete and consistent with the auto-stage engine.
  */
 import { nextStep, type NextStepInput } from "../src/lib/next-step";
-import { STAGES, STAGE_GROUP_LABELS, stagesByGroup, AUTO_TRIGGER_LABELS, EXIT_REASONS_BY_STAGE, stageLabel } from "../src/lib/stages";
+import { STAGES, STAGE_ACTIONS, STAGE_GROUP_LABELS, stagesByGroup, AUTO_TRIGGER_LABELS, EXIT_REASONS_BY_STAGE, stageLabel } from "../src/lib/stages";
 import { AUTO_STAGE_RULES, type AutoStageTrigger } from "../src/lib/auto-stage";
-import { unfilledPlaceholders, renderTemplate, channelLabel } from "../src/lib/outreach";
+import { channelLabel } from "../src/lib/outreach";
 import type { CmStage } from "../src/lib/db/schema";
 
 let failures = 0;
@@ -21,7 +21,7 @@ function check(label: string, cond: boolean, detail?: string) {
 }
 
 const base: NextStepInput = {
-  stage: "researched",
+  stage: "shortlisted",
   hasAddress: false,
   shipmentStatus: null,
   hasBrief: false,
@@ -69,8 +69,16 @@ function main() {
     /imported/i.test(nextStep({ ...base, stage: "contacted", totalOutbound: 1, datesAreMigrated: true, daysSinceLastOutbound: 400 }).text),
   );
   check(
-    "agreed with an address points to the shipment, not the address",
-    /shipment/i.test(nextStep({ ...base, stage: "agreed", hasAddress: true }).text),
+    "Agreed with an address points to Shipping, not the address",
+    /shipping/i.test(nextStep({ ...base, stage: "awaiting_address", hasAddress: true }).text),
+  );
+  check(
+    "Agreed without an address asks for it",
+    /address/i.test(nextStep({ ...base, stage: "awaiting_address" }).text),
+  );
+  check(
+    "a retired stage is answered as the stage it now means",
+    nextStep({ ...base, stage: "negotiating" }).text === nextStep({ ...base, stage: "in_conversation" }).text,
   );
   check(
     "posted with no recorded video flags the gap",
@@ -78,11 +86,13 @@ function main() {
   );
   const closed = nextStep({ ...base, stage: "declined", exitReason: "not_interested" });
   check("closed stages say who ended it and why", /they declined/i.test(closed.text) && /not interested/i.test(closed.text), closed.text);
+  // Regression: this used to point at the Agreement card, but the reason is
+  // chosen in the stage control.
   check(
-    "closed without a reason asks for one (anchors to the agreement card)",
-    nextStep({ ...base, stage: "passed" }).anchor === "agreement",
+    "closed without a reason asks for one (anchors to the stage control)",
+    nextStep({ ...base, stage: "passed" }).anchor === "stage",
   );
-  check("no_response mentions the automatic reopen", /reopens/i.test(nextStep({ ...base, stage: "no_response" }).text));
+  check("no_response mentions the reopen", /reopens/i.test(nextStep({ ...base, stage: "no_response" }).text));
 
   console.log("\n── stage vocabulary the UI and Help page are built from ──");
   const grouped = stagesByGroup();
@@ -93,6 +103,7 @@ function main() {
   );
   check("every group has a label", grouped.every((g) => STAGE_GROUP_LABELS[g.group].length > 0));
   check("every stage has a hint a newcomer can read", STAGES.every((s) => s.hint.length >= 20));
+  check("every stage says what to do there", STAGES.every((s) => s.action.length >= 20 && STAGE_ACTIONS[s.value] === s.action));
   check(
     "closed stage labels say who ended it",
     stageLabel("passed").startsWith("We") && stageLabel("declined").startsWith("They"),
@@ -101,20 +112,16 @@ function main() {
     "every closed stage has exit reasons",
     (["passed", "declined", "no_response"] as CmStage[]).every((s) => (EXIT_REASONS_BY_STAGE[s]?.length ?? 0) > 0),
   );
+  check(
+    "retired stages read as the stage they became",
+    stageLabel("negotiating") === "Talking" && stageLabel("researched") === "To contact" && stageLabel("completed") === "Posted",
+  );
   const triggers = Object.keys(AUTO_STAGE_RULES) as AutoStageTrigger[];
   check("every auto-stage trigger has a plain-language label", triggers.every((t) => AUTO_TRIGGER_LABELS[t]?.length > 10));
   check(
     "every auto-stage target stage exists in the vocabulary",
     triggers.every((t) => STAGES.some((s) => s.value === AUTO_STAGE_RULES[t].to)),
   );
-
-  console.log("\n── composer guards ──");
-  check(
-    "unfilled placeholders are detected after rendering",
-    unfilledPlaceholders(renderTemplate("Hi {{name}}, loved your {{reason}}", { name: "Joe" })).join() === "reason",
-  );
-  check("a fully rendered message has none", unfilledPlaceholders(renderTemplate("Hi {{name}}", { name: "Joe" })).length === 0);
-  check("choice phrases in a template are unfinished too", unfilledPlaceholders("I've been [watching / following / enjoying] your work").length === 1);
   check("channel labels are plain", channelLabel("ig_dm") === "Instagram DM" && channelLabel("phone") === "Phone");
 }
 

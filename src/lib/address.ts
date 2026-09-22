@@ -168,3 +168,13 @@ export function formatAddress(a: {
     .filter((p) => p && p.trim() !== "")
     .join("\n");
 }
+
+/** Enough to ship to: street, city, state and postal code all present. */
+export function hasCompleteAddress(a: {
+  addressLine1?: string | null;
+  city?: string | null;
+  region?: string | null;
+  postalCode?: string | null;
+}): boolean {
+  return !!(a.addressLine1?.trim() && a.city?.trim() && a.region?.trim() && a.postalCode?.trim());
+}

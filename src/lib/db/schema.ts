@@ -60,41 +60,30 @@ export const clients = pgTable("sa_clients", {
  * waiting on right now. Shipping status lives in cm_shipments, post
  * status in cm_deliverables, contract status in agreementType — none
  * of it is duplicated here.
+ *
+ * The app uses seven active stages and three closed ones (src/lib/stages.ts
+ * is the source of truth for labels and order). Four values below are
+ * RETIRED — kept only because Postgres can't cheaply drop enum values:
+ * researched → shortlisted, negotiating → in_conversation,
+ * agreed → awaiting_address, completed → posted. Nothing writes them.
  */
 export const cmStageEnum = pgEnum("cm_stage", [
-  "researched",
-  "shortlisted",
+  "researched", // retired
+  "shortlisted", // "To contact"
   "contacted",
-  "in_conversation",
-  "negotiating",
-  "agreed",
-  "awaiting_address",
-  "fulfilling",
-  "content_pending",
+  "in_conversation", // "Talking"
+  "negotiating", // retired
+  "agreed", // retired
+  "awaiting_address", // "Agreed"
+  "fulfilling", // "Shipping"
+  "content_pending", // "Waiting on video"
   "posted",
-  "completed",
+  "completed", // retired
   // Terminal — collapse into one "Closed" column on the board.
   "passed", // we ended it
   "declined", // they ended it
-  "no_response", // went dark; set by the follow-up loop
+  "no_response", // went quiet; always closed by a person
 ]);
-
-/** Stages past which a shipment record must exist. Order matters. */
-export const CM_STAGE_ORDER = [
-  "researched",
-  "shortlisted",
-  "contacted",
-  "in_conversation",
-  "negotiating",
-  "agreed",
-  "awaiting_address",
-  "fulfilling",
-  "content_pending",
-  "posted",
-  "completed",
-] as const;
-
-export const CM_TERMINAL_STAGES = ["passed", "declined", "no_response"] as const;
 
 export const cmAgreementTypeEnum = pgEnum("cm_agreement_type", [
   "verbal",
@@ -344,7 +333,7 @@ export const cmPartnerships = pgTable(
       .notNull()
       .references(() => cmCampaigns.id, { onDelete: "cascade" }),
 
-    stage: cmStageEnum("stage").default("researched").notNull(),
+    stage: cmStageEnum("stage").default("shortlisted").notNull(),
 
     // Agreement. verbal vs signed is an attribute, not a stage — a creator
     // who is signed AND shipped must not lose the fact that they signed.
@@ -425,7 +414,7 @@ export const cmOutreachEvents = pgTable(
     externalId: text("external_id"),
     /** External thread id (Gmail thread id) for grouping synced messages. */
     threadId: text("thread_id"),
-    /** True for rows synthesized by import-hella.ts, whose real dates are unknown. */
+    /** True for rows synthesized by the one-time HELLA sheet import, whose real dates are unknown. */
     isMigrated: boolean("is_migrated").default(false).notNull(),
     createdBy: uuid("created_by").references(() => users.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -833,6 +822,21 @@ export const cmStageTransitions = pgTable(
     toStage: cmStageEnum("to_stage").notNull(),
     changedBy: uuid("changed_by").references(() => users.id),
     changedAt: timestamp("changed_at").defaultNow().notNull(),
+    /**
+     * Who moved it: "manual" (a person), "rule" (the auto-stage table),
+     * "email" (read from the creator's latest email), or "migration".
+     * Rows written before this column existed are null and read as manual —
+     * the conservative reading for "a manual change wins".
+     */
+    source: text("source"),
+    /** Plain-words why: the rule that fired, or the quote from the email. */
+    reason: text("reason"),
+    /** The message that justified an email-read move. */
+    evidenceEventId: uuid("evidence_event_id").references(() => cmOutreachEvents.id, { onDelete: "set null" }),
+    /** What the move created (shipment, video record), so Undo can take it back. */
+    meta: jsonb("meta"),
+    /** Set when someone pressed Undo on this move. */
+    undoneAt: timestamp("undone_at"),
   },
   (t) => [index("cm_transitions_partnership_idx").on(t.partnershipId)],
 );

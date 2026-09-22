@@ -217,7 +217,7 @@ export async function ingestResearch(
         await db.insert(cmPartnerships).values({
           creatorId: creator.id,
           campaignId,
-          stage: "researched",
+          stage: "shortlisted",
         });
       }
     } catch (err) {

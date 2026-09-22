@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth, badRequest } from "@/lib/api-helpers";
 import { createCreatorWithPartnership, ensureCampaignByName } from "@/lib/creators";
-import { cmStageEnum } from "@/lib/db/schema";
+import { STARTING_STAGES } from "@/lib/stages";
 
 const schema = z
   .object({
@@ -11,7 +11,8 @@ const schema = z
     links: z.array(z.string()).default([]),
     campaignId: z.string().uuid().optional(),
     campaignName: z.string().optional(),
-    stage: z.enum(cmStageEnum.enumValues).optional(),
+    // Before Shipping only: later stages need their shipment / video records, so move them after adding.
+    stage: z.enum(STARTING_STAGES).optional(),
     businessEmail: z.string().nullable().optional(),
     contentPillar: z.string().nullable().optional(),
     followers: z.number().nullable().optional(),

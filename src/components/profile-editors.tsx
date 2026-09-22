@@ -79,7 +79,7 @@ export function EditableProfile({ creator }: { creator: CmCreator }) {
         <Field label="Contact email" hint="The public one. Other addresses they write from are linked separately.">
           <Input compact value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
         </Field>
-        <Field label="Content type" hint="Overlanding, DIY, shop builds… fills the message template.">
+        <Field label="Content type" hint="What they post — overlanding, DIY, shop builds.">
           <Input compact value={pillar} onChange={(e) => setPillar(e.target.value)} />
         </Field>
         <Field label="Followers" hint="Manual edits stay until the next refresh.">

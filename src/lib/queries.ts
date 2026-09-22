@@ -15,6 +15,7 @@ import {
   cmClientSettings,
   type CmStage,
 } from "@/lib/db/schema";
+import { canonicalStage } from "@/lib/stages";
 import {
   deriveOutreachState,
   daysBetween,
@@ -179,6 +180,9 @@ export async function getCreatorRows(
     .orderBy(desc(cmCreators.followers));
 
   if (rows.length === 0) return [];
+  // A retired stage value can only appear in the window before stages:migrate
+  // runs; show it as the stage it now means rather than dropping the row.
+  for (const r of rows) r.stage = canonicalStage(r.stage);
   if (opts?.withOutreach === false) {
     return rows.map((r) => ({ ...r, lastOutboundAt: null, repliedAt: null, followUpCount: 0 }));
   }
@@ -267,6 +271,7 @@ export async function getPartnershipDetail(partnershipId: string) {
     .where(eq(cmPartnerships.id, partnershipId))
     .limit(1);
   if (!row) return null;
+  row.partnership.stage = canonicalStage(row.partnership.stage);
 
   const [socials, events, products, shipments, deliverables, otherPartnerships] =
     await Promise.all([

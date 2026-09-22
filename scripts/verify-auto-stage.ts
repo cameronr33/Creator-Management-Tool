@@ -1,18 +1,23 @@
 /**
- * Verifies the auto-stage engine.
+ * Verifies the stage rules and the one stage-move core.
  *
- *   npm run verify:auto-stage
+ *   npm run preview:verify -- scripts/verify-auto-stage.ts
  *
- * Part 1 asserts the FULL pure rule matrix — every trigger × every stage —
- * so any change to the rule table must be made deliberately here too.
- * Part 2 walks a live partnership through the trigger chain against the
- * database using throwaway __verify_ rows, asserting cm_stage_transitions
- * audit rows, then cleans up everything it created.
+ * Part 1 asserts the FULL pure rule matrix — every trigger × every stage,
+ * retired values included — so any change to the rule table must be made
+ * deliberately here too (frozen node 2).
+ * Part 2 walks a live partnership through the trigger chain and the manual
+ * guards against the database using throwaway __verify_ rows, asserting the
+ * cm_stage_transitions audit rows and the shipment / video records each move
+ * must leave behind, then cleans up everything it created.
  */
 import { eq, asc } from "drizzle-orm";
 import { db, schema } from "./db";
-import { nextStageFor, applyAutoStage, type AutoStageTrigger } from "../src/lib/auto-stage";
+import { nextStageFor, applyAutoStage, AUTO_STAGE_RULES, type AutoStageTrigger } from "../src/lib/auto-stage";
+import { moveStage, resolveTarget, describeVideo } from "../src/lib/stage-moves";
+import { changeStage } from "../src/lib/mutations";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
+import { RETIRED_STAGES, STAGE_VALUES, canonicalStage, isTerminal, stageIndex } from "../src/lib/stages";
 import type { CmStage } from "../src/lib/db/schema";
 
 let failures = 0;
@@ -22,63 +27,68 @@ function check(label: string, cond: boolean, detail?: string) {
 }
 
 const ALL_STAGES = schema.cmStageEnum.enumValues;
+const TRIGGERS = Object.keys(AUTO_STAGE_RULES) as AutoStageTrigger[];
 
 /** The expected rule table, restated independently of the implementation. */
 const EXPECTED: Record<AutoStageTrigger, { from: CmStage[]; to: CmStage }> = {
-  outbound_message: { from: ["researched", "shortlisted"], to: "contacted" },
-  // no_response is the one terminal a creator's OWN late reply reopens.
+  outbound_message: { from: ["shortlisted"], to: "contacted" },
+  // no_response is the one closed stage a creator's OWN reply reopens.
   inbound_message: { from: ["contacted", "no_response"], to: "in_conversation" },
   address_complete: { from: ["awaiting_address"], to: "fulfilling" },
-  shipment_shipped: { from: ["agreed", "awaiting_address"], to: "fulfilling" },
-  shipment_delivered: {
-    from: ["agreed", "awaiting_address", "fulfilling"],
-    to: "content_pending",
-  },
+  shipment_shipped: { from: ["awaiting_address"], to: "fulfilling" },
+  shipment_delivered: { from: ["awaiting_address", "fulfilling"], to: "content_pending" },
   deliverable_added: { from: ["fulfilling", "content_pending"], to: "posted" },
 };
 
 async function main() {
-  console.log("\n── Pure rule matrix (every trigger × every stage) ──");
+  console.log("\n── Pure rule matrix (every trigger × every stored stage) ──");
+  const before = failures;
+  check("the engine has exactly the expected triggers", TRIGGERS.sort().join() === Object.keys(EXPECTED).sort().join());
   for (const trigger of Object.keys(EXPECTED) as AutoStageTrigger[]) {
     const rule = EXPECTED[trigger];
     for (const stage of ALL_STAGES) {
       const expected = rule.from.includes(stage) ? rule.to : null;
       const actual = nextStageFor(stage, trigger);
-      if (actual !== expected) {
-        check(`${trigger} @ ${stage}`, false, `expected ${expected}, got ${actual}`);
-      }
+      if (actual !== expected) check(`${trigger} @ ${stage}`, false, `expected ${expected}, got ${actual}`);
     }
   }
   const matrixSize = Object.keys(EXPECTED).length * ALL_STAGES.length;
-  check(`full ${matrixSize}-cell matrix matches the expected rule table`, failures === 0);
+  check(`full ${matrixSize}-cell matrix matches the expected rule table`, failures === before);
+  check(
+    "retired stage values are never a from- or to-stage",
+    Object.keys(RETIRED_STAGES).every((r) => TRIGGERS.every((t) => !AUTO_STAGE_RULES[t].from.includes(r as CmStage) && AUTO_STAGE_RULES[t].to !== r)),
+  );
+  check("no rule ever closes a deal", TRIGGERS.every((t) => !isTerminal(AUTO_STAGE_RULES[t].to)));
+  check("no rule decides Agreed — that is a person's (or the creator's email's) call", TRIGGERS.every((t) => AUTO_STAGE_RULES[t].to !== "awaiting_address"));
   check(
     "passed/declined are never advanced by any trigger",
-    (["passed", "declined"] as CmStage[]).every((s) =>
-      (Object.keys(EXPECTED) as AutoStageTrigger[]).every((t) => nextStageFor(s, t) === null),
-    ),
+    (["passed", "declined"] as CmStage[]).every((s) => TRIGGERS.every((t) => nextStageFor(s, t) === null)),
   );
   check(
     "no_response reopens ONLY on the creator's own reply",
     nextStageFor("no_response", "inbound_message") === "in_conversation" &&
-      (["outbound_message", "address_complete", "shipment_shipped", "shipment_delivered", "deliverable_added"] as AutoStageTrigger[]).every(
-        (t) => nextStageFor("no_response", t) === null,
-      ),
+      TRIGGERS.filter((t) => t !== "inbound_message").every((t) => nextStageFor("no_response", t) === null),
   );
   check(
     "no rule moves an ACTIVE stage backward",
-    (Object.keys(EXPECTED) as AutoStageTrigger[]).every((t) =>
-      EXPECTED[t].from
-        .filter((f) => f !== "no_response")
-        .every((f) => ALL_STAGES.indexOf(EXPECTED[t].to) > ALL_STAGES.indexOf(f)),
-    ),
+    TRIGGERS.every((t) => AUTO_STAGE_RULES[t].from.filter((f) => !isTerminal(f)).every((f) => stageIndex(AUTO_STAGE_RULES[t].to) > stageIndex(f))),
+  );
+  check("canonical stages are exactly 7 active + 3 closed", STAGE_VALUES.length === 10 && STAGE_VALUES.filter((s) => !isTerminal(s)).length === 7);
+  check(
+    "every retired value maps to a current stage",
+    Object.entries(RETIRED_STAGES).every(([, to]) => STAGE_VALUES.includes(to as CmStage)) && canonicalStage("negotiating") === "in_conversation",
   );
 
+  console.log("\n── Pure: where a move lands ──");
+  check("Agreed with a complete address continues to Shipping", JSON.stringify(resolveTarget("awaiting_address", { addressComplete: true })) === JSON.stringify({ to: "fulfilling", continued: true }));
+  check("Agreed without an address stays Agreed", resolveTarget("awaiting_address", { addressComplete: false }).to === "awaiting_address");
+  check("a retired target is canonicalised", resolveTarget("negotiating", { addressComplete: false }).to === "in_conversation");
+  check("video platform from the link", describeVideo("https://www.instagram.com/reel/ABC123/").platform === "instagram" && describeVideo("https://www.tiktok.com/@a/video/1").platform === "tiktok" && describeVideo("https://youtu.be/x").platform === "youtube");
+  check("the pasted link is stored as pasted", describeVideo("https://www.instagram.com/reel/ABC123/?igsh=x").url === "https://www.instagram.com/reel/ABC123/?igsh=x");
+  check("instagram shortcode captured", describeVideo("https://www.instagram.com/reel/ABC123/").shortcode === "ABC123");
+
   console.log("\n── Live lifecycle (throwaway rows, cleaned up after) ──");
-  const [client] = await db
-    .select({ id: schema.clients.id })
-    .from(schema.clients)
-    .where(eq(schema.clients.slug, "hella"))
-    .limit(1);
+  const [client] = await db.select({ id: schema.clients.id }).from(schema.clients).where(eq(schema.clients.slug, "hella")).limit(1);
   if (!client) {
     console.log("  [FAIL] HELLA client not found — cannot run DB checks");
     failures++;
@@ -87,85 +97,93 @@ async function main() {
 
   const TEST_CAMPAIGN = "__verify_auto_stage__";
   const campaignId = await ensureCampaignByName(client.id, TEST_CAMPAIGN);
-  const { creatorId, partnershipId } = await createCreatorWithPartnership({
-    clientId: client.id,
-    name: "Verify Auto Stage Creator",
-    links: ["https://www.instagram.com/__verify_as_test__"],
-    campaignId,
-    stage: "shortlisted",
-  });
+  const made: string[] = [];
+  const add = async (handle: string) => {
+    const r = await createCreatorWithPartnership({ clientId: client.id, name: `Verify ${handle}`, links: [`https://www.instagram.com/${handle}`], campaignId, stage: "shortlisted" });
+    made.push(r.creatorId);
+    return r.partnershipId;
+  };
+  const shipments = async (pid: string) => db.select().from(schema.cmShipments).where(eq(schema.cmShipments.partnershipId, pid));
+  const stageOf = async (pid: string) => (await db.select({ s: schema.cmPartnerships.stage }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, pid)))[0]?.s;
 
   try {
-    // shortlisted --outbound--> contacted
-    const r1 = await applyAutoStage(partnershipId, "outbound_message");
-    check("outbound: shortlisted → contacted", r1?.from === "shortlisted" && r1?.to === "contacted");
+    const pid = await add("__verify_as_chain__");
+    const r1 = await applyAutoStage(pid, "outbound_message");
+    check("outbound: To contact → Contacted", r1?.from === "shortlisted" && r1?.to === "contacted");
+    check("second outbound is a no-op at Contacted", (await applyAutoStage(pid, "outbound_message")) === null);
+    const r3 = await applyAutoStage(pid, "inbound_message");
+    check("inbound: Contacted → Talking", r3?.to === "in_conversation");
+    check("deliverable_added is a no-op at Talking", (await applyAutoStage(pid, "deliverable_added")) === null);
 
-    // contacted --outbound again--> no-op (guard holds)
-    const r2 = await applyAutoStage(partnershipId, "outbound_message");
-    check("second outbound is a no-op at contacted", r2 === null);
+    const agreed = await changeStage(pid, "awaiting_address");
+    check("a person moves Talking → Agreed", agreed.status === "moved" && agreed.to === "awaiting_address");
+    check("no shipment is created before Shipping", (await shipments(pid)).length === 0);
 
-    // contacted --inbound--> in_conversation
-    const r3 = await applyAutoStage(partnershipId, "inbound_message");
-    check("inbound: contacted → in_conversation", r3?.to === "in_conversation");
+    const r5 = await applyAutoStage(pid, "address_complete");
+    check("address_complete: Agreed → Shipping", r5?.to === "fulfilling");
+    const created = await shipments(pid);
+    check("entering Shipping created exactly one ready shipment", created.length === 1 && created[0].status === "ready");
 
-    // in_conversation --deliverable--> no-op (not in allowlist)
-    const r4 = await applyAutoStage(partnershipId, "deliverable_added");
-    check("deliverable_added is a no-op at in_conversation", r4 === null);
+    const r6 = await applyAutoStage(pid, "shipment_delivered");
+    check("shipment_delivered: Shipping → Waiting on video", r6?.to === "content_pending");
+    check("the existing shipment is reused, not duplicated", (await shipments(pid)).length === 1);
 
-    // Manually place at awaiting_address (a human judgment move), then address.
-    await db
-      .update(schema.cmPartnerships)
-      .set({ stage: "awaiting_address" })
-      .where(eq(schema.cmPartnerships.id, partnershipId));
-    const r5 = await applyAutoStage(partnershipId, "address_complete");
-    check("address_complete: awaiting_address → fulfilling", r5?.to === "fulfilling");
+    const noVideo = await changeStage(pid, "posted");
+    check("a manual move to Posted without a video is refused", noVideo.status === "needs_video" && (await stageOf(pid)) === "content_pending");
+    const withVideo = await changeStage(pid, "posted", undefined, { videoUrl: "https://www.instagram.com/reel/VERIFY1/" });
+    check("…and applied once the link is given", withVideo.status === "moved" && withVideo.to === "posted" && !!withVideo.createdDeliverableId);
+    const vids = await db.select().from(schema.cmDeliverables).where(eq(schema.cmDeliverables.partnershipId, pid));
+    check("the video record holds the pasted link", vids.length === 1 && vids[0].url === "https://www.instagram.com/reel/VERIFY1/" && vids[0].shortcode === "VERIFY1");
 
-    const r6 = await applyAutoStage(partnershipId, "shipment_delivered");
-    check("shipment_delivered: fulfilling → content_pending", r6?.to === "content_pending");
-
-    const r7 = await applyAutoStage(partnershipId, "deliverable_added");
-    check("deliverable_added: content_pending → posted", r7?.to === "posted");
-
-    // Audit trail: every applied transition wrote a cm_stage_transitions row.
     const transitions = await db
-      .select({
-        fromStage: schema.cmStageTransitions.fromStage,
-        toStage: schema.cmStageTransitions.toStage,
-      })
+      .select()
       .from(schema.cmStageTransitions)
-      .where(eq(schema.cmStageTransitions.partnershipId, partnershipId))
+      .where(eq(schema.cmStageTransitions.partnershipId, pid))
       .orderBy(asc(schema.cmStageTransitions.changedAt));
-    const autoOnes = transitions.filter((t) => t.fromStage !== null);
-    check(
-      "5 audit rows for the 5 applied transitions",
-      autoOnes.filter((t) =>
-        ["contacted", "in_conversation", "fulfilling", "content_pending", "posted"].includes(
-          t.toStage,
-        ),
-      ).length >= 5,
-      JSON.stringify(transitions),
-    );
+    const bySource = (s: string) => transitions.filter((t) => t.source === s).map((t) => t.toStage);
+    check("rule moves are recorded as source=rule with the trigger", JSON.stringify(bySource("rule")) === JSON.stringify(["contacted", "in_conversation", "fulfilling", "content_pending"]), JSON.stringify(transitions.map((t) => [t.source, t.toStage])));
+    check("person moves are recorded as source=manual", JSON.stringify(bySource("manual")) === JSON.stringify(["shortlisted", "awaiting_address", "posted"]));
+    const shipMove = transitions.find((t) => t.toStage === "fulfilling");
+    check("the move that created a shipment remembers it (for Undo)", (shipMove?.meta as { createdShipmentId?: string } | null)?.createdShipmentId === created[0].id);
+    check("rule transitions keep which trigger fired", (shipMove?.meta as { trigger?: string } | null)?.trigger === "address_complete");
 
-    const missing = await applyAutoStage("00000000-0000-0000-0000-000000000000", "outbound_message");
-    check("unknown partnership returns null, not a throw", missing === null);
+    // Existing shipment records — duplicates included — are never touched.
+    const pid2 = await add("__verify_as_dupes__");
+    await db.insert(schema.cmShipments).values([{ partnershipId: pid2, status: "ready" }, { partnershipId: pid2, status: "shipped" }]);
+    const toShip = await changeStage(pid2, "fulfilling");
+    check("moving to Shipping with shipments already there adds none", toShip.status === "moved" && !toShip.createdShipmentId && (await shipments(pid2)).length === 2);
 
-    // The reopen path: auto-closed creator replies late.
-    await db
-      .update(schema.cmPartnerships)
-      .set({ stage: "no_response" })
-      .where(eq(schema.cmPartnerships.id, partnershipId));
-    const reopened = await applyAutoStage(partnershipId, "inbound_message");
-    check("late reply reopens no_response → in_conversation", reopened?.from === "no_response" && reopened?.to === "in_conversation");
-    const notReopened = await applyAutoStage(partnershipId, "outbound_message");
-    check("our own outbound never advances in_conversation", notReopened === null);
+    // Agreed with the address already on file continues to Shipping.
+    const pid3 = await add("__verify_as_address__");
+    await db.update(schema.cmPartnerships).set({ addressLine1: "1 Test St", city: "Testville", region: "CA", postalCode: "90000" }).where(eq(schema.cmPartnerships.id, pid3));
+    const cont = await changeStage(pid3, "awaiting_address");
+    check("Agreed with an address on file lands on Shipping", cont.status === "moved" && cont.to === "fulfilling" && cont.continued);
+    check("…and has its shipment", (await shipments(pid3)).length === 1);
+
+    // Compare-and-set: an engine that evaluated a stale stage does nothing.
+    const stale = await moveStage({ partnershipId: pid3, to: "content_pending", source: "rule", expectFrom: "contacted" });
+    check("a stale engine move is refused", stale.status === "stale" && (await stageOf(pid3)) === "fulfilling");
+
+    // Closing records why; reopening to an active stage clears it.
+    await changeStage(pid3, "declined", undefined, { exitReason: "not_interested" });
+    const [closed] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, pid3));
+    check("closing records the reason", closed.stage === "declined" && closed.exitReason === "not_interested");
+    await changeStage(pid3, "in_conversation");
+    const [reopened] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, pid3));
+    check("reopening clears the stale reason", reopened.stage === "in_conversation" && reopened.exitReason === null);
+
+    // The reopen path.
+    await changeStage(pid3, "no_response");
+    const late = await applyAutoStage(pid3, "inbound_message");
+    check("a reply reopens No response → Talking", late?.from === "no_response" && late?.to === "in_conversation");
+    check("our own message never advances Talking", (await applyAutoStage(pid3, "outbound_message")) === null);
+
+    check("unknown partnership returns null, not a throw", (await applyAutoStage("00000000-0000-0000-0000-000000000000", "outbound_message")) === null);
   } finally {
-    await db.delete(schema.cmCreators).where(eq(schema.cmCreators.id, creatorId));
+    for (const id of made) await db.delete(schema.cmCreators).where(eq(schema.cmCreators.id, id));
     await db.delete(schema.cmCampaigns).where(eq(schema.cmCampaigns.id, campaignId));
   }
-  const leftover = await db
-    .select({ id: schema.cmPartnerships.id })
-    .from(schema.cmPartnerships)
-    .where(eq(schema.cmPartnerships.id, partnershipId));
+  const leftover = await db.select({ id: schema.cmCampaigns.id }).from(schema.cmCampaigns).where(eq(schema.cmCampaigns.id, campaignId));
   check("test rows cascade-deleted", leftover.length === 0);
 }
 

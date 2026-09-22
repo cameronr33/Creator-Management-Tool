@@ -57,6 +57,16 @@ async function main() {
   );
   check("no partnership at posted/completed without a deliverable", postedNoVideo === 0, `${postedNoVideo} violations`);
 
+  // Owner decision 2026-09-22: seven stages. The four retired enum values
+  // stay in Postgres but nothing may hold them (stages:migrate moved them).
+  const retired = await count(
+    db
+      .select({ n: N })
+      .from(schema.cmPartnerships)
+      .where(inArray(schema.cmPartnerships.stage, ["researched", "negotiating", "agreed", "completed"])),
+  );
+  check("no partnership uses a retired stage", retired === 0, `${retired} rows — run npm run stages:migrate`);
+
   console.log("\n── Metric provenance: estimates are never dressed as authoritative ──");
   const viewsNoSource = await count(
     db

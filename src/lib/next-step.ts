@@ -1,5 +1,5 @@
 import type { CmStage } from "@/lib/db/schema";
-import { exitReasonLabel, stageLabel } from "@/lib/stages";
+import { canonicalStage, exitReasonLabel, stageAction, stageLabel } from "@/lib/stages";
 
 /**
  * The one line at the top of a creator's record that says what to do next.
@@ -24,24 +24,23 @@ export interface NextStepInput {
 export interface NextStep {
   text: string;
   /** Card on the record page that holds the action. */
-  anchor: "conversation" | "agreement" | "shipping" | "content" | null;
+  anchor: "conversation" | "agreement" | "shipping" | "content" | "stage" | null;
 }
 
 export function nextStep(i: NextStepInput): NextStep {
+  const stage = canonicalStage(i.stage);
   // Corrections and replacements can require shipping work after the stage advanced.
-  if (["content_pending", "posted"].includes(i.stage)) {
+  if (stage === "content_pending" || stage === "posted") {
     if (i.shipmentStatus === "returned") return { text: "The shipment came back. Review the address and arrange a replacement.", anchor: "shipping" };
     if (i.shipmentStatus === "ready") return { text: "A shipment is ready. Confirm the address, send the package and record its tracking.", anchor: "shipping" };
   }
-  switch (i.stage) {
-    case "researched":
-      return { text: "Decide: shortlist them for outreach, or pass.", anchor: null };
+  switch (stage) {
     case "shortlisted":
       return {
         text:
           i.totalOutbound > 0
-            ? "A message was logged but the stage didn't move — check the timeline, then set the stage."
-            : "Prepare the first message in Conversation, personalize it, then log it after sending.",
+            ? "A message was logged but the stage didn't move — check the conversation, then set the stage."
+            : "Send the first message. After an Instagram DM, click I messaged them; emails are picked up by themselves.",
         anchor: "conversation",
       };
     case "contacted": {
@@ -56,24 +55,20 @@ export function nextStep(i: NextStepInput): NextStep {
       return {
         text:
           days == null
-            ? "Waiting on a reply. Follow-ups come due automatically."
-            : `Waiting on a reply — ${sent} sent ${days === 0 ? "today" : `${days}d ago`}. Follow-ups come due automatically; log the reply when it lands.`,
+            ? "Waiting on a reply. Today shows when a follow-up is due."
+            : `Waiting on a reply — ${sent} sent ${days === 0 ? "today" : `${days}d ago`}. Today shows when a follow-up is due.`,
         anchor: "conversation",
       };
     }
     case "in_conversation":
       return {
-        text: "Review the conversation and confirm their interest before agreeing the product, fee and deliverables.",
-        anchor: "conversation",
+        text: "Work out whether they're in: agree the product, fee and videos, write them down under Deal, then move them to Agreed.",
+        anchor: "agreement",
       };
-    case "negotiating":
-      return { text: "Settle the terms, record them under Agreement, then mark Agreed.", anchor: "agreement" };
-    case "agreed":
-      return i.hasAddress
-        ? { text: "Address on file — set up the shipment.", anchor: "shipping" }
-        : { text: "Ask for their shipping address, or move to Awaiting address so it shows on the dashboard.", anchor: "shipping" };
     case "awaiting_address":
-      return { text: "Paste their address under Shipping — the stage moves on its own.", anchor: "shipping" };
+      return i.hasAddress
+        ? { text: "Their address is on file — move them to Shipping and set up the shipment.", anchor: "shipping" }
+        : { text: "Get their shipping address and paste it under Shipping — the stage moves on its own.", anchor: "shipping" };
     case "fulfilling":
       switch (i.shipmentStatus) {
         case null:
@@ -93,28 +88,28 @@ export function nextStep(i: NextStepInput): NextStep {
       }
     case "content_pending":
       return i.briefSent || i.hasBrief
-        ? { text: "Waiting on their video. Add the link under Content as soon as it's live.", anchor: "content" }
+        ? { text: "Waiting on their video. Paste the link under Content as soon as it's live.", anchor: "content" }
         : { text: "Send the brief and mark it sent, then wait for the video.", anchor: "content" };
     case "posted":
       return {
         text:
           i.deliverables > 0
-            ? "Video is live. Check it meets the brief; mark Completed once everything agreed is delivered."
-            : "Marked Posted but no video recorded — add the link under Content.",
+            ? "The video is live. Check it matches what was agreed — nothing else to do."
+            : "Marked Posted but no video recorded — paste the link under Content.",
         anchor: "content",
       };
-    case "completed":
-      return { text: "Nothing left to do. Everything agreed has been delivered.", anchor: null };
     case "passed":
     case "declined":
     case "no_response": {
       const why = exitReasonLabel(i.exitReason);
       return {
-        text: `Closed — ${stageLabel(i.stage).toLowerCase()}${why ? ` (${why.toLowerCase()})` : " — no reason recorded"}.${
-          i.stage === "no_response" ? " A late reply reopens them automatically." : ""
+        text: `Closed — ${stageLabel(stage).toLowerCase()}${why ? ` (${why.toLowerCase()})` : " — no reason recorded"}.${
+          stage === "no_response" ? " A reply from them reopens it." : ""
         }`,
-        anchor: why ? null : "agreement",
+        anchor: why ? null : "stage",
       };
     }
+    default:
+      return { text: stageAction(stage) || "Open the creator and set the stage.", anchor: null };
   }
 }

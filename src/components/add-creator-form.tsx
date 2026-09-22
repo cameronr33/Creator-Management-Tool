@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X, Sparkles, Link2 } from "lucide-react";
-import { stagesByGroup } from "@/lib/stages";
+import { STARTING_STAGES, stageHint, stageLabel } from "@/lib/stages";
 import { parseSocialUrl, PLATFORM_LABELS, ENRICHABLE_PLATFORMS } from "@/lib/social-links";
 import { Button, IconButton, Field, Input, Select, Callout, Card, CardHeader } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
@@ -30,7 +30,7 @@ export function AddCreatorForm({
   const [name, setName] = useState("");
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
   const [newCampaign, setNewCampaign] = useState("");
-  const [stage, setStage] = useState("researched");
+  const [stage, setStage] = useState("shortlisted");
   const [email, setEmail] = useState("");
   const [pillar, setPillar] = useState("");
   const [followers, setFollowers] = useState("");
@@ -158,7 +158,7 @@ export function AddCreatorForm({
           <Field label="Contact email">
             <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="hello@example.com" type="email" />
           </Field>
-          <Field label="Content type" hint="Fills the message template, e.g. Overlanding, DIY, Shop builds.">
+          <Field label="Content type" hint="What they post, e.g. Overlanding, DIY, Shop builds.">
             <Input value={pillar} onChange={(e) => setPillar(e.target.value)} />
           </Field>
           <Field label="Followers">
@@ -194,16 +194,12 @@ export function AddCreatorForm({
               <Input value={newCampaign} onChange={(e) => setNewCampaign(e.target.value)} autoFocus />
             </Field>
           )}
-          <Field label="Starting stage" hint="Researched = found, no decision yet. Shortlisted = approved for outreach.">
+          <Field label="Starting stage" hint="Most new creators start at To contact. Move them further along after adding.">
             <Select value={stage} onChange={(e) => setStage(e.target.value)}>
-              {stagesByGroup().map((g) => (
-                <optgroup key={g.group} label={g.label}>
-                  {g.stages.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </optgroup>
+              {STARTING_STAGES.map((s) => (
+                <option key={s} value={s} title={stageHint(s)}>
+                  {stageLabel(s)}
+                </option>
               ))}
             </Select>
           </Field>

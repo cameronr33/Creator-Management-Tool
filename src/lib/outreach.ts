@@ -75,26 +75,6 @@ export const DEFAULT_THRESHOLDS: FollowUpThresholds = {
   markNoResponseAfterDays: 10,
 };
 
-/**
- * Render a message template. Placeholders are {{name}}-style; any token with
- * no supplied value is left visible as [name] so a half-filled message is
- * obvious before it gets pasted into a DM.
- */
-export function renderTemplate(
-  body: string,
-  vars: Record<string, string | null | undefined>,
-): string {
-  return body.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key: string) => {
-    const value = vars[key];
-    return value != null && value !== "" ? value : `[${key}]`;
-  });
-}
-
-/** Placeholders renderTemplate left unfilled — "[reason]" — so a half-done message can be caught before it's copied. */
-export function unfilledPlaceholders(text: string): string[] {
-  return [...new Set([...text.matchAll(/\[([^\[\]\n]+)\]/g)].map((m) => m[1]))];
-}
-
 /** Channel enum values as a teammate reads them. */
 export const CHANNEL_LABELS: Record<string, string> = {
   ig_dm: "Instagram DM",
@@ -107,40 +87,3 @@ export function channelLabel(channel: string): string {
   return CHANNEL_LABELS[channel] ?? channel;
 }
 
-/**
- * Instagram DM deep link — Meta's official ig.me short link, which opens the
- * DM composer for a logged-in browser. The @username profile link stays the
- * fallback when IG shows a "message request" interstitial instead.
- */
-export function igDmUrl(username: string): string {
-  return `https://ig.me/m/${encodeURIComponent(username)}`;
-}
-
-export function igProfileUrl(username: string): string {
-  return `https://www.instagram.com/${encodeURIComponent(username)}/`;
-}
-
-/**
- * mailto: link with the subject and body pre-filled. `cc` is the connected
- * sync mailbox — the email loop can only see threads that mailbox is on, so
- * the cc is pre-filled rather than left to memory.
- */
-export function mailtoUrl(email: string, subject: string | null, body: string, cc?: string | null): string {
-  const params = new URLSearchParams();
-  if (cc) params.set("cc", cc);
-  if (subject) params.set("subject", subject);
-  if (body) params.set("body", body);
-  const qs = params.toString().replace(/\+/g, "%20");
-  return `mailto:${email}${qs ? `?${qs}` : ""}`;
-}
-
-/** First name only — "Abel & Victoria" -> "Abel", "AUTUMN SCHWALBE" -> "Autumn". */
-export function firstName(fullName: string): string {
-  const first = fullName.trim().split(/[\s&/,]+/)[0] ?? fullName;
-  if (!first) return fullName;
-  // Sheet has SHOUTED names; normalise those but leave deliberate casing alone.
-  if (first === first.toUpperCase() && first.length > 1) {
-    return first[0] + first.slice(1).toLowerCase();
-  }
-  return first;
-}

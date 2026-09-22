@@ -4,6 +4,7 @@ import { cmCreators, cmCampaigns, cmPartnerships, cmShipments, cmDeliverables } 
 import { getOutreachStates, getFollowUpThresholds } from "@/lib/queries";
 import { deriveOutreachState } from "@/lib/outreach";
 import { deriveWorkspaceItem } from "@/lib/workspace";
+import { canonicalStage } from "@/lib/stages";
 
 /** One row per partnership; package records never multiply the daily worklist. */
 export async function getWorkspaceItems(clientId: string) {
@@ -28,7 +29,7 @@ export async function getWorkspaceItems(clientId: string) {
     db.select({ partnershipId: cmDeliverables.partnershipId }).from(cmDeliverables).where(inArray(cmDeliverables.partnershipId, ids)),
   ]);
   return rows.map(r => deriveWorkspaceItem({
-    ...r, hasAddress: !!(r.addressLine1?.trim() && r.city?.trim() && r.region?.trim() && r.postalCode?.trim()),
+    ...r, stage: canonicalStage(r.stage), hasAddress: !!(r.addressLine1?.trim() && r.city?.trim() && r.region?.trim() && r.postalCode?.trim()),
     hasBrief: !!r.briefUrl, briefSent: !!r.briefSentAt,
     shipments: shipments.filter(s => s.partnershipId === r.partnershipId),
     deliverables: posts.filter(p => p.partnershipId === r.partnershipId).length,

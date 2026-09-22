@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
 import { httpUrl, isoDate, money } from "@/lib/validation";
 import { applyAutoStage } from "@/lib/auto-stage";
+import { hasCompleteAddress } from "@/lib/address";
 import { db } from "@/lib/db";
 import {
   cmPartnerships,
@@ -81,7 +82,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       .from(cmPartnerships)
       .where(eq(cmPartnerships.id, id))
       .limit(1);
-    if (row?.addressLine1 && row.city && row.region && row.postalCode) {
+    if (row && hasCompleteAddress(row)) {
       stageChanged = await applyAutoStage(id, "address_complete", session.user.id);
     }
   }

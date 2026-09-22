@@ -16,6 +16,7 @@ import type { CmStage } from "@/lib/db/schema";
 import { compactNumber } from "@/lib/format";
 import { StagePill, Select, Button, IconButton, cn } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
+import { VideoLinkPrompt, needsVideo } from "@/components/partnership-actions";
 
 export interface BoardCard {
   partnershipId: string;
@@ -56,12 +57,14 @@ interface Closing {
 }
 
 export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
-  const { run } = useSave();
+  const { run, pending } = useSave();
   const [items, setItems] = useState(cards);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
   const [closing, setClosing] = useState<Closing | null>(null);
   const [moveMenu, setMoveMenu] = useState<string | null>(null);
+  // A card moved to Posted with no video recorded: ask for the link on the card.
+  const [posting, setPosting] = useState<string | null>(null);
 
   // After a refresh the server hands down new cards; adopt them.
   const [seenCards, setSeenCards] = useState(cards);
@@ -70,20 +73,31 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
     setItems(cards);
   }
 
-  const move = async (partnershipId: string, toStage: CmStage, exitReason?: string | null) => {
+  const move = async (partnershipId: string, toStage: CmStage, exitReason?: string | null, videoUrl?: string) => {
     const card = items.find((c) => c.partnershipId === partnershipId);
     if (!card || card.stage === toStage) return;
     const before = items;
     setItems((prev) => prev.map((c) => (c.partnershipId === partnershipId ? { ...c, stage: toStage } : c)));
     const r = await run(
       () =>
-        api(`/api/partnerships/${partnershipId}/stage`, {
+        api<{ stage?: CmStage }>(`/api/partnerships/${partnershipId}/stage`, {
           stage: toStage,
           exitReason: exitReason === undefined ? undefined : exitReason,
+          videoUrl,
         }),
       { success: `${card.name} → ${stageLabel(toStage)}` },
     );
-    if (!r.ok) setItems(before);
+    if (!r.ok) {
+      setItems(before);
+      if (needsVideo(r.data)) setPosting(partnershipId);
+      return;
+    }
+    setPosting(null);
+    // The server can land somewhere else (Agreed continues to Shipping when the address is on file).
+    const landed = r.data.stage;
+    if (landed && landed !== toStage) {
+      setItems((prev) => prev.map((c) => (c.partnershipId === partnershipId ? { ...c, stage: landed } : c)));
+    }
   };
 
   const closePrompt = (c: Closing) => {
@@ -238,6 +252,15 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                   </div>
                   {closing?.via === "menu" && closing.id === c.partnershipId && (
                     <div className="mt-2">{closePrompt(closing)}</div>
+                  )}
+                  {posting === c.partnershipId && (
+                    <div className="mt-2">
+                      <VideoLinkPrompt
+                        pending={pending}
+                        onSubmit={(url) => move(c.partnershipId, "posted", undefined, url)}
+                        onCancel={() => setPosting(null)}
+                      />
+                    </div>
                   )}
                 </div>
               ))}

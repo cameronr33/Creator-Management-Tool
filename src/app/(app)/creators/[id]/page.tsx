@@ -165,8 +165,8 @@ export default async function CreatorDetailPage({
                   {step.anchor && (
                     <>
                       {" "}
-                      <Link href={sectionHref(step.anchor)} className="font-medium underline">
-                        Open {step.anchor}
+                      <Link href={sectionHref(step.anchor === "stage" ? "overview" : step.anchor)} className="font-medium underline">
+                        Open {step.anchor === "stage" ? "stage" : step.anchor}
                       </Link>
                     </>
                   )}

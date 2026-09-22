@@ -204,3 +204,15 @@ export function toCsv(rows: CsvRow[], header?: string[]): string {
   }
   return lines.join("\n");
 }
+
+/**
+ * The research CSV's "Views Source" column → the stored label. Chrome-grid
+ * numbers are authoritative; Apify numbers are estimates (frozen node 1).
+ */
+export function viewsSourceOf(raw: string): "ig_public_chrome" | "apify" | null {
+  const s = raw.toLowerCase();
+  if (!s) return null;
+  if (s.includes("chrome") || s.includes("ig public")) return "ig_public_chrome";
+  if (s.includes("apify")) return "apify";
+  return null;
+}
