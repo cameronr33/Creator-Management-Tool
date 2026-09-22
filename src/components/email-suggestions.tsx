@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Link2, EyeOff } from "lucide-react";
-import { Button, Select } from "@/components/ui";
+import { Button, Field, Select } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
@@ -39,7 +39,7 @@ export function EmailSuggestions({
   if (suggestions.length === 0) {
     return (
       <p className="text-sm text-text-muted">
-        Nobody to link — every address on cc&apos;d threads is linked to a creator or marked as not one.
+        No unmatched senders are currently queued. This does not confirm that every conversation has been captured.
       </p>
     );
   }
@@ -84,24 +84,23 @@ function SuggestionItem({ s, byClient }: { s: SuggestionRow; byClient: Map<strin
     });
 
   return (
-    <li className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm text-text">
+    <li className="flex flex-wrap items-end gap-3 px-3 py-4">
+      <div className="min-w-0 basis-full xl:basis-auto xl:flex-1">
+        <div className="break-words text-sm text-text">
           {s.displayName ? <span className="font-medium">{s.displayName} </span> : null}
           <span className="text-text-muted">{s.email}</span>
         </div>
-        <div className="truncate text-xs text-text-muted">
+        <div className="mt-1 break-words text-xs text-text-muted">
           {s.messageCount} message{s.messageCount === 1 ? "" : "s"}
           {s.lastSeenAt ? ` · last ${s.lastSeenAt}` : ""}
           {s.sampleSubject ? ` · “${s.sampleSubject}”` : ""}
         </div>
       </div>
-      <Select
+      <Field label="Link to creator" className="w-full sm:w-64" hint={s.suggestedCreatorName ? `Suggested: ${s.suggestedCreatorName}. Confirm before linking.` : undefined}>
+        <Select
         compact
         value={creatorId}
         onChange={(e) => setCreatorId(e.target.value)}
-        aria-label="Creator to link"
-        className="w-56"
       >
         <option value="">{s.suggestedCreatorName ? `Suggested: ${s.suggestedCreatorName}` : "Choose the creator…"}</option>
         {[...byClient.entries()].map(([client, list]) => (
@@ -113,7 +112,8 @@ function SuggestionItem({ s, byClient }: { s: SuggestionRow; byClient: Map<strin
             ))}
           </optgroup>
         ))}
-      </Select>
+        </Select>
+      </Field>
       <Button size="sm" variant="primary" icon={<Link2 size={13} />} onClick={link} pending={pending} disabled={!creatorId}>
         Link
       </Button>

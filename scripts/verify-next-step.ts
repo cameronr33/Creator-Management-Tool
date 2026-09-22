@@ -44,6 +44,11 @@ function main() {
 
   console.log("\n── nextStep: the facts the stage summarises change the answer ──");
   check(
+    "a reply alone never implies positive interest",
+    !/they're interested/i.test(nextStep({ ...base, stage: "in_conversation", hasReplied: true }).text),
+  );
+  check("a returned shipment overrides a later content stage", nextStep({ ...base, stage: "content_pending", briefSent: true, shipmentStatus: "returned" }).anchor === "shipping");
+  check(
     "fulfilling with no shipment says to create one",
     /create the shipment/i.test(nextStep({ ...base, stage: "fulfilling" }).text),
   );
@@ -109,6 +114,7 @@ function main() {
     unfilledPlaceholders(renderTemplate("Hi {{name}}, loved your {{reason}}", { name: "Joe" })).join() === "reason",
   );
   check("a fully rendered message has none", unfilledPlaceholders(renderTemplate("Hi {{name}}", { name: "Joe" })).length === 0);
+  check("choice phrases in a template are unfinished too", unfilledPlaceholders("I've been [watching / following / enjoying] your work").length === 1);
   check("channel labels are plain", channelLabel("ig_dm") === "Instagram DM" && channelLabel("phone") === "Phone");
 }
 

@@ -92,7 +92,7 @@ export function renderTemplate(
 
 /** Placeholders renderTemplate left unfilled — "[reason]" — so a half-done message can be caught before it's copied. */
 export function unfilledPlaceholders(text: string): string[] {
-  return [...new Set([...text.matchAll(/\[(\w+)\]/g)].map((m) => m[1]))];
+  return [...new Set([...text.matchAll(/\[([^\[\]\n]+)\]/g)].map((m) => m[1]))];
 }
 
 /** Channel enum values as a teammate reads them. */

@@ -142,7 +142,7 @@ export interface OpenSuggestion extends CmEmailSuggestion {
   suggestedCreatorName: string | null;
 }
 
-export async function listOpenSuggestions(limit = 50): Promise<OpenSuggestion[]> {
+export async function listOpenSuggestions(limit = 50, offset = 0): Promise<OpenSuggestion[]> {
   const rows = await db
     .select({
       suggestion: cmEmailSuggestions,
@@ -161,8 +161,10 @@ export async function listOpenSuggestions(limit = 50): Promise<OpenSuggestion[]>
                else 2 end`,
       desc(cmEmailSuggestions.messageCount),
       desc(cmEmailSuggestions.lastSeenAt),
+      cmEmailSuggestions.id,
     )
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
   return rows.map((r) => ({ ...r.suggestion, suggestedCreatorName: r.suggestedCreatorName ?? null }));
 }
 

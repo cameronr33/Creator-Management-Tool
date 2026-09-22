@@ -7,11 +7,14 @@ import { CreatorsFilterBar } from "@/components/creators-filter-bar";
 import { compactNumber, relativeDays } from "@/lib/format";
 import type { CmStage } from "@/lib/db/schema";
 import { EST_VIEWS_NOTE } from "@/lib/copy";
+import { getWorkspaceItems } from "@/lib/workspace-data";
+import { CreatorWorkspace } from "@/components/creator-workspace";
+import { STAGES } from "@/lib/stages";
 
 export default async function CreatorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; stage?: string; campaign?: string }>;
+  searchParams: Promise<{ q?: string; stage?: string; campaign?: string; view?: string }>;
 }) {
   const sp = await searchParams;
   const client = await resolveClient(await getSelectedClientSlug());
@@ -26,10 +29,19 @@ export default async function CreatorsPage({
     );
   }
 
+  if (sp.view !== "research") {
+    const items = await getWorkspaceItems(client.id);
+    return <>
+      <PageHeader title="Creators" client={client.name} subtitle={`${items.length} partnerships across your campaigns`}
+        help="Open the next task, preview a partnership, or go deeper into the creator's profile and research."
+        actions={<><Button href="/creators?view=research">Research table</Button><Button href="/pipeline">Pipeline board</Button><Button href="/creators/new" variant="primary" icon={<Plus size={15} />}>Add creator</Button></>} />
+      <div className="p-4 sm:p-6"><CreatorWorkspace items={items} mode="directory" /></div>
+    </>;
+  }
   const campaigns = await getCampaigns(client.id);
   let rows = await getCreatorRows(client.id, {
     campaignId: sp.campaign || undefined,
-    stage: (sp.stage as CmStage) || undefined,
+    stage: STAGES.some(s => s.value === sp.stage) ? sp.stage as CmStage : undefined,
   });
 
   const q = (sp.q ?? "").trim().toLowerCase();
@@ -55,7 +67,7 @@ export default async function CreatorsPage({
         client={client.name}
         subtitle={`${rows.length} shown`}
         help="Everyone tracked for this client. Search by name, handle or content type, filter by campaign or stage, and open a row for the full record."
-        actions={addButton}
+        actions={<><Button href="/creators">Workspace view</Button>{addButton}</>}
       >
         <CreatorsFilterBar campaigns={campaigns} />
       </PageHeader>

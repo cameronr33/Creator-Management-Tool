@@ -7,7 +7,6 @@ import {
   type CmAlertType,
 } from "@/lib/db/schema";
 import { getOutreachStates, getFollowUpThresholdsByClient } from "@/lib/queries";
-import { changeStage } from "@/lib/mutations";
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 
 export interface SweepResult {
@@ -15,13 +14,14 @@ export interface SweepResult {
   alertsOpened: number;
   alertsResolved: number;
   movedToNoResponse: number;
+  closuresNeedingReview: number;
 }
 
 /**
  * The follow-up loop. Idempotent: run it as often as you like. It opens at most
  * one alert of each type per partnership, resolves alerts that no longer apply
- * (they replied, or moved stage), and auto-retires creators who went dark after
- * the second follow-up.
+ * (they replied, or moved stage). Silence after the second follow-up is counted
+ * for manual review in Today; incomplete mailbox coverage cannot prove no reply.
  */
 export async function runFollowUpSweep(clientId?: string): Promise<SweepResult> {
   const conds = [inArray(cmPartnerships.stage, ["shortlisted", "contacted"] as const)];
@@ -57,7 +57,7 @@ export async function runFollowUpSweep(clientId?: string): Promise<SweepResult> 
 
   let alertsOpened = 0;
   let alertsResolved = 0;
-  let movedToNoResponse = 0;
+  let closuresNeedingReview = 0;
 
   for (const p of partnerships) {
     const st = states.get(p.id);
@@ -72,25 +72,17 @@ export async function runFollowUpSweep(clientId?: string): Promise<SweepResult> 
       }
       const days = st.daysSinceLastOutbound;
       if (days == null) return null;
-      if (st.followUpCount >= 2 && days >= t.markNoResponseAfterDays) return null; // handled below
+      if (st.followUpCount >= 2 && days >= t.markNoResponseAfterDays) return null; // review in Today
       if (st.followUpCount === 0 && days >= t.followUp1AfterDays) return { type: "follow_up_1_due" };
       if (st.followUpCount === 1 && days >= t.followUp2AfterDays) return { type: "follow_up_2_due" };
       return null;
     })();
 
-    // Auto-retire: two follow-ups, still silent past the threshold.
+    // A recent Gmail check still cannot see replies that omit the shared mailbox,
+    // or replies on another channel. No durable completeness guarantee exists,
+    // so preserve the stage and let a teammate review before closing the deal.
     if (st && !st.hasReplied && !st.datesAreMigrated && st.followUpCount >= 2 && (st.daysSinceLastOutbound ?? 0) >= t.markNoResponseAfterDays) {
-      await changeStage(p.id, "no_response");
-      movedToNoResponse++;
-      // Resolve any lingering alerts for this partnership.
-      const existing = openByPartnership.get(p.id);
-      if (existing) {
-        for (const id of existing.values()) {
-          await db.update(cmAlerts).set({ status: "done", updatedAt: new Date() }).where(eq(cmAlerts.id, id));
-          alertsResolved++;
-        }
-      }
-      continue;
+      closuresNeedingReview++;
     }
 
     const existing = openByPartnership.get(p.id) ?? new Map();
@@ -120,6 +112,7 @@ export async function runFollowUpSweep(clientId?: string): Promise<SweepResult> 
     scanned: partnerships.length,
     alertsOpened,
     alertsResolved,
-    movedToNoResponse,
+    movedToNoResponse: 0,
+    closuresNeedingReview,
   };
 }

@@ -1,0 +1,87 @@
+/** Presentation only: a recent heartbeat is not proof of complete mailbox coverage. */
+export interface GmailHealthInput {
+  lastSyncAt: Date | string | null;
+  lastSyncStatus: string | null;
+  lastSyncSummary?: unknown;
+}
+
+export interface GmailHealthSummary {
+  state: "disconnected" | "never" | "error" | "partial" | "stale" | "idle" | "review" | "checked" | "unknown";
+  tone: "info" | "good" | "warn" | "bad";
+  label: string;
+  detail: string;
+  stale: boolean;
+  fetchErrors: number;
+  lastCheckedAt: string | null;
+}
+
+function asSummary(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function count(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+// The email worker is scheduled twice daily; match the 1.5× heartbeat threshold.
+export const GMAIL_STALE_AFTER_HOURS = 18;
+
+export function summarizeGmailHealth(
+  account: GmailHealthInput | null,
+  openSuggestions = 0,
+  now = new Date(),
+): GmailHealthSummary {
+  const base = { stale: false, fetchErrors: 0, lastCheckedAt: null };
+  if (!account) {
+    return { ...base, state: "disconnected", tone: "warn", label: "Gmail not connected", detail: "Connect the shared mailbox to start tracking creator email." };
+  }
+  const status = account.lastSyncStatus?.toLowerCase() ?? "";
+  const summary = asSummary(account.lastSyncSummary);
+  const legacySkipped = Number(status.match(/(\d+) message fetch\(es\) skipped/)?.[1] ?? 0);
+  const fetchErrors = Math.max(count(summary.fetchErrors), legacySkipped);
+  const at = account.lastSyncAt == null ? null : new Date(account.lastSyncAt);
+  const validAt = at != null && Number.isFinite(at.getTime()) && at.getTime() <= now.getTime() + 60_000;
+  const stale = validAt && (now.getTime() - at.getTime()) / 3_600_000 > GMAIL_STALE_AFTER_HOURS;
+  const facts = { stale, fetchErrors, lastCheckedAt: validAt ? at.toISOString() : null };
+  const late = stale ? " The last check is also overdue." : "";
+
+  if (status.startsWith("error")) {
+    return { ...facts, state: "error", tone: "bad", label: "Email check failed", detail: `The latest check failed. Review the Gmail connection and retry before relying on email status.${late}` };
+  }
+  if (account.lastSyncAt == null) {
+    return { ...facts, state: "never", tone: "warn", label: "Email not checked yet", detail: "The mailbox is connected, but no check has been recorded." };
+  }
+  if (!validAt) {
+    return { ...facts, state: "unknown", tone: "warn", label: "Email timing unknown", detail: "The last check has an invalid timestamp. Its freshness cannot be confirmed." };
+  }
+  if (fetchErrors > 0 || status.startsWith("partial")) {
+    return { ...facts, state: "partial", tone: "warn", label: "Email check incomplete", detail: `${fetchErrors > 0 ? `${fetchErrors} message or search fetch${fetchErrors === 1 ? " was" : "es were"} skipped.` : "Part of the latest check did not finish."} Some messages may be missing; retry the check.${late}` };
+  }
+  if (stale) {
+    return { ...facts, state: "stale", tone: "warn", label: "Email check overdue", detail: "No check has been recorded in over 18 hours. Recent replies may be missing." };
+  }
+  if (status.startsWith("idle")) {
+    return { ...facts, state: "idle", tone: "warn", label: "No creator addresses to match", detail: "The last check had no creator email addresses to search. Add known addresses or review unmatched senders." };
+  }
+  if (status !== "ok") {
+    return { ...facts, state: "unknown", tone: "warn", label: "Email result unknown", detail: "The last check has no recognized completion status. Run another check before relying on it." };
+  }
+  if (summary.messagesFetched === 0 && openSuggestions > 0) {
+    return { ...facts, state: "review", tone: "warn", label: "Sender review needed", detail: "The last check matched no messages, and unmatched senders need review. Confirm which addresses belong to creators." };
+  }
+  return { ...facts, state: "checked", tone: "info", label: "Email checked recently", detail: "The last recorded check reported no fetch errors. Only messages visible to the connected mailbox can be tracked." };
+}
+
+/** Existing jobs can record "ok" even when their summary contains skipped fetches. */
+export function summarizeJobHealth(job: {
+  overdue: boolean;
+  failing: boolean;
+  lastRun: { status: string; summary?: unknown } | null;
+}): { label: string; tone: "info" | "good" | "warn" | "bad" } {
+  if (!job.lastRun) return { label: "never ran", tone: "warn" };
+  if (job.failing || job.lastRun.status === "error") return { label: "failing", tone: "bad" };
+  if (job.overdue) return { label: "overdue", tone: "warn" };
+  if (job.lastRun.status === "running") return { label: "running", tone: "info" };
+  if (count(asSummary(job.lastRun.summary).fetchErrors) > 0) return { label: "partial", tone: "warn" };
+  return { label: job.lastRun.status, tone: job.lastRun.status === "ok" || job.lastRun.status === "idle" ? "good" : "warn" };
+}

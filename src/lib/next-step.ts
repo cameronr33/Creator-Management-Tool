@@ -28,6 +28,11 @@ export interface NextStep {
 }
 
 export function nextStep(i: NextStepInput): NextStep {
+  // Corrections and replacements can require shipping work after the stage advanced.
+  if (["content_pending", "posted"].includes(i.stage)) {
+    if (i.shipmentStatus === "returned") return { text: "The shipment came back. Review the address and arrange a replacement.", anchor: "shipping" };
+    if (i.shipmentStatus === "ready") return { text: "A shipment is ready. Confirm the address, send the package and record its tracking.", anchor: "shipping" };
+  }
   switch (i.stage) {
     case "researched":
       return { text: "Decide: shortlist them for outreach, or pass.", anchor: null };
@@ -36,7 +41,7 @@ export function nextStep(i: NextStepInput): NextStep {
         text:
           i.totalOutbound > 0
             ? "A message was logged but the stage didn't move — check the timeline, then set the stage."
-            : "Send the first message — it's pre-written below.",
+            : "Prepare the first message in Conversation, personalize it, then log it after sending.",
         anchor: "conversation",
       };
     case "contacted": {
@@ -58,8 +63,8 @@ export function nextStep(i: NextStepInput): NextStep {
     }
     case "in_conversation":
       return {
-        text: "They're interested. Agree the product, fee and number of videos, then move to Negotiating or Agreed.",
-        anchor: "agreement",
+        text: "Review the conversation and confirm their interest before agreeing the product, fee and deliverables.",
+        anchor: "conversation",
       };
     case "negotiating":
       return { text: "Settle the terms, record them under Agreement, then mark Agreed.", anchor: "agreement" };

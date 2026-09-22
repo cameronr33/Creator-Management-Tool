@@ -6,6 +6,7 @@ import { Button, Field, Input, Textarea, Callout } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
+import type { GmailHealthSummary } from "@/lib/gmail-health";
 
 export function CampaignAdder({ clientId }: { clientId: string }) {
   const { pending, run } = useSave();
@@ -102,6 +103,7 @@ export interface GmailAccountView {
   connectedAt: string;
   lastSyncAt: string | null;
   lastSyncStatus: string | null;
+  health: GmailHealthSummary;
   lastSyncSummary: {
     inserted?: number;
     skipped?: number;
@@ -110,6 +112,7 @@ export interface GmailAccountView {
     messagesFetched?: number;
     suggestionsOpen?: number;
     windowDays?: number;
+    fetchErrors?: number;
   } | null;
 }
 
@@ -127,14 +130,16 @@ export function GmailSyncStatus({ account }: { account: GmailAccountView }) {
           inserted?: number;
           stageChanges?: unknown[];
           suggestionsOpen?: number;
+          fetchErrors?: number;
         }>("/api/gmail/sync"),
       {},
     );
     if (r.ok) {
       const d = r.data;
-      toast(`Synced the last ${d.windowDays ?? "?"} days`, {
-        tone: "good",
-        detail: `${d.messagesFetched ?? 0} matched message(s) · ${d.inserted ?? 0} new on timelines · ${
+      const partial = (d.fetchErrors ?? 0) > 0;
+      toast(partial ? "Email check incomplete" : `Checked the last ${d.windowDays ?? "?"} days`, {
+        tone: partial ? "info" : "good",
+        detail: `${partial ? `${d.fetchErrors} fetch(es) skipped; some messages may be missing. ` : ""}${d.messagesFetched ?? 0} matched message(s) · ${d.inserted ?? 0} new on timelines · ${
           d.stageChanges?.length ?? 0
         } stage change(s) · ${d.suggestionsOpen ?? 0} sender(s) to link`,
       });
@@ -142,26 +147,21 @@ export function GmailSyncStatus({ account }: { account: GmailAccountView }) {
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-      <div className="text-text-muted">
-        <span className="font-medium text-text">{account.email}</span>
-        {account.lastSyncAt ? (
-          <>
-            {" "}
-            · last checked {account.lastSyncAt}
-            {account.lastSyncStatus === "ok" && s
-              ? ` — ${s.messagesFetched ?? 0} matched, ${s.inserted ?? 0} new`
-              : account.lastSyncStatus && account.lastSyncStatus !== "ok"
-                ? ` — ${account.lastSyncStatus}`
-                : null}
-          </>
-        ) : (
-          " · never checked yet — runs twice a day"
-        )}
+    <div className="space-y-3">
+      <Callout tone={account.health.tone} title={account.health.label}>
+        {account.health.detail}
+      </Callout>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div className="min-w-0 text-text-muted">
+          <div className="break-all font-medium text-text">{account.email}</div>
+          <div className="mt-0.5 text-xs">{account.lastSyncAt ? `Last checked ${account.lastSyncAt}` : "Scheduled twice daily; no check recorded"}</div>
+          {s && <div className="mt-0.5 text-xs">{s.messagesFetched ?? 0} matched · {s.inserted ?? 0} new on timelines{s.windowDays != null ? ` · ${s.windowDays}-day search window` : ""}</div>}
+          {account.health.state === "error" && account.lastSyncStatus && <p className="mt-1 break-words text-xs text-bad">{account.lastSyncStatus}</p>}
+        </div>
+        <Button size="sm" icon={<RefreshCw size={13} />} onClick={syncNow} pending={pending}>
+          {pending ? "Checking…" : "Check email now"}
+        </Button>
       </div>
-      <Button size="sm" icon={<RefreshCw size={13} />} onClick={syncNow} pending={pending}>
-        {pending ? "Checking…" : "Check email now"}
-      </Button>
     </div>
   );
 }
@@ -190,8 +190,8 @@ export function GmailConnectCard({
       <div className="space-y-3">
         <p className="text-sm text-text-muted">
           Connect the mailbox that gets cc&apos;d on creator outreach. The app gets <strong>read-only</strong> access,
-          files every creator email onto the right record, and moves stages when creators reply — twice a day and on
-          demand. It never sends mail.
+          matches visible messages to known creator addresses, and moves eligible stages when creators reply — twice a day and on
+          demand. Keep this mailbox included on replies too. It never sends mail.
         </p>
         <Button variant="primary" href="/api/gmail/connect">
           Connect Gmail

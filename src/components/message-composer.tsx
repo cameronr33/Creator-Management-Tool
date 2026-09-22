@@ -6,6 +6,7 @@ import { Button, Field, Input, Textarea, Segmented, Callout } from "@/components
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
 import { renderTemplate, firstName, igDmUrl, igProfileUrl, mailtoUrl, unfilledPlaceholders } from "@/lib/outreach";
+import { selectMessageTemplate, validateMessageDraft } from "@/lib/message-draft";
 
 /**
  * The one message composer, used on the Outreach list and on a creator's
@@ -58,12 +59,13 @@ export function MessageComposer({
   onLogged?: () => void;
 }) {
   const { pending, run } = useSave();
-  const emailAvailable = !!target.businessEmail && !!templates.email;
+  const emailAvailable = !!target.businessEmail;
   const [channel, setChannel] = useState<Channel>(templates.ig_dm || !emailAvailable ? "ig_dm" : "email");
   const [reason, setReason] = useState(target.outreachReason ?? "");
   const [savedReason, setSavedReason] = useState(target.outreachReason ?? "");
   // null = follow the template; a string = the operator hand-edited the message.
   const [override, setOverride] = useState<string | null>(null);
+  const [subjectOverride, setSubjectOverride] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [opened, setOpened] = useState(false);
   // The reason field only turns red after a copy was attempted without it —
@@ -71,7 +73,7 @@ export function MessageComposer({
   const [attempted, setAttempted] = useState(false);
   const reasonRef = useRef<HTMLInputElement>(null);
 
-  const template = templates[channel];
+  const template = selectMessageTemplate(templates, channel, kind);
   const vars = useMemo(
     () => ({
       name: firstName(target.name),
@@ -82,7 +84,7 @@ export function MessageComposer({
   );
   const rendered = template ? renderTemplate(template.body, vars) : "";
   const message = override ?? rendered;
-  const subject = template?.subject ? renderTemplate(template.subject, vars) : null;
+  const subject = channel === "email" ? subjectOverride ?? (template?.subject ? renderTemplate(template.subject, vars) : "") : null;
   const usesReason = REASON_RE.test(template?.body ?? "") || REASON_RE.test(template?.subject ?? "");
   const missing = unfilledPlaceholders(`${subject ?? ""}\n${message}`);
 
@@ -97,14 +99,19 @@ export function MessageComposer({
   };
 
   const copyAndOpen = async () => {
-    if (!message) return;
-    if (missing.length) {
+    const problem = validateMessageDraft(subject, message);
+    if (problem) {
       setAttempted(true);
       if (missing.includes("reason")) reasonRef.current?.focus();
-      toast(`Fill in ${missing.map((m) => `[${m}]`).join(", ")} before copying`, { tone: "bad" });
+      toast(problem, { tone: "bad" });
       return;
     }
-    await navigator.clipboard.writeText(message);
+    try {
+      await navigator.clipboard.writeText(message);
+    } catch {
+      toast("Copy failed. Select and copy the message manually, then open the conversation.", { tone: "bad" });
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
     setOpened(true);
@@ -116,6 +123,12 @@ export function MessageComposer({
   };
 
   const markSent = async () => {
+    const problem = validateMessageDraft(subject, message);
+    if (problem) {
+      setAttempted(true);
+      toast(problem, { tone: "bad" });
+      return;
+    }
     const r = await run(
       () =>
         api("/api/outreach", {
@@ -123,7 +136,7 @@ export function MessageComposer({
           direction: "outbound",
           channel,
           kind,
-          body: message || undefined,
+          body: message,
           subject: channel === "email" && subject ? subject : undefined,
         }),
       { success: `Logged ${kind === "initial" ? "first message" : "follow-up"} to ${target.name}` },
@@ -140,12 +153,14 @@ export function MessageComposer({
     <div className="space-y-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {emailAvailable ? (
+          <Field label="Channel">
           <Segmented<Channel>
             aria-label="Channel"
             value={channel}
             onChange={(c) => {
               setChannel(c);
               setOverride(null);
+              setSubjectOverride(null);
               setOpened(false);
             }}
             options={[
@@ -153,6 +168,7 @@ export function MessageComposer({
               { value: "email", label: (<><Mail size={12} /> Email</>), title: target.businessEmail ?? undefined },
             ]}
           />
+          </Field>
         ) : (
           <span className="text-xs text-text-faint">
             Instagram DM{target.businessEmail ? "" : " · no email on file"}
@@ -168,8 +184,9 @@ export function MessageComposer({
         </a>
       </div>
 
-      {template ? (
-        <>
+      <p className="text-xs text-text-muted">{kind === "follow_up" ? "Follow-up draft — check the previous conversation and tailor this continuation." : "First-message draft — personalize it before sending."} The app opens your messaging app; it does not send the message.</p>
+      {!template && <Callout tone="info">No default {channel === "email" ? "email" : "DM"} template is configured. Write your message below or <a href="/settings#templates" className="font-medium underline">add a template in Settings</a>.</Callout>}
+      <>
           {usesReason && (
             <Field
               label="Why them? One line about their content — it goes into the message"
@@ -191,21 +208,18 @@ export function MessageComposer({
               />
             </Field>
           )}
-          {channel === "email" && subject && (
-            <div className="text-xs text-text-muted">
-              <span className="font-medium text-text">Subject:</span> {subject}
-              {templates.ccEmail && (
-                <span className="text-text-faint"> · cc {templates.ccEmail} (so replies get tracked)</span>
-              )}
-            </div>
+          {channel === "email" && (
+            <Field label="Subject" hint={templates.ccEmail ? `Cc ${templates.ccEmail} is included. Only replies received by that mailbox can sync.` : "No sync mailbox is connected."}>
+              <Input compact value={subject ?? ""} onChange={(e) => { setSubjectOverride(e.target.value); setOpened(false); }} placeholder="Subject" />
+            </Field>
           )}
           <Field
             label="Message"
             hint={
-              override !== null ? (
-                <button type="button" onClick={() => setOverride(null)} className="text-accent hover:underline">
+              override !== null && template ? (
+                <Button size="sm" variant="link" onClick={() => { setOverride(null); setOpened(false); }}>
                   Reset to the template
-                </button>
+                </Button>
               ) : (
                 "Edit freely — this exact text is what gets logged."
               )
@@ -213,7 +227,7 @@ export function MessageComposer({
           >
             <Textarea
               value={message}
-              onChange={(e) => setOverride(e.target.value)}
+              onChange={(e) => { setOverride(e.target.value); setOpened(false); }}
               rows={Math.min(10, Math.max(4, message.split("\n").length + 1))}
               className="bg-surface-2/60"
             />
@@ -228,33 +242,23 @@ export function MessageComposer({
               . Edit it before copying.
             </Callout>
           )}
-        </>
-      ) : (
-        <Callout tone="info">
-          No default {channel === "email" ? "email" : "DM"} template for this client yet —{" "}
-          <a href="/settings#templates" className="font-medium underline">
-            add one in Settings
-          </a>
-          . You can still log a message you wrote yourself.
-        </Callout>
-      )}
+      </>
 
       <div className="flex flex-wrap items-center gap-2">
-        {template && (
           <Button
             variant={opened ? "secondary" : "primary"}
             onClick={copyAndOpen}
-            disabled={!message}
+            disabled={!message.trim()}
             icon={copied ? <Check size={14} /> : <Copy size={14} />}
             title="Copies the message and opens the app"
           >
             {copied ? "Copied" : openLabel}
           </Button>
-        )}
         <Button
-          variant={opened || !template ? "primary" : "secondary"}
+          variant={opened ? "primary" : "secondary"}
           onClick={markSent}
           pending={pending}
+          disabled={!message.trim()}
           icon={<Send size={14} />}
           title="Records this message on the timeline. Do this after you've actually sent it."
         >

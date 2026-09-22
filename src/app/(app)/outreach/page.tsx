@@ -71,7 +71,7 @@ export default async function OutreachPage() {
         title="Outreach"
         client={client.name}
         subtitle={`${entries.length} to send · ${awaitingReply.length} waiting on a reply`}
-        help="Today's messages, pre-written from the client's template. Copy & open puts the message in Instagram or your email app; press I sent it afterwards and the stage moves by itself."
+        help="Choose a creator to write the next message. First messages use the client's template; follow-ups start with an editable continuation. Copy & open opens your messaging app. Log it only after sending."
         helpAnchor="daily-loop"
       />
       <div className="mx-auto max-w-3xl space-y-4 p-6">
@@ -84,7 +84,7 @@ export default async function OutreachPage() {
               </Button>
             }
           >
-            No default DM template for {client.name} yet. Messages here will be blank until one exists.
+            No default DM template for {client.name} yet. Write the first message yourself, or add a template. Follow-up drafts are still available.
           </Callout>
         )}
         <OutreachWorklist entries={entries} templates={worklistTemplates} />

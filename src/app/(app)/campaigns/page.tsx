@@ -5,6 +5,7 @@ import { PageHeader, Card, EmptyState, StagePill, Button } from "@/components/ui
 import { money } from "@/lib/format";
 import { ACTIVE_STAGES, isTerminal } from "@/lib/stages";
 import type { CmStage } from "@/lib/db/schema";
+import { CampaignAdder } from "@/components/settings-forms";
 
 export default async function CampaignsPage() {
   const client = await resolveClient(await getSelectedClientSlug());
@@ -39,14 +40,15 @@ export default async function CampaignsPage() {
         subtitle={`${campaigns.length} campaign${campaigns.length === 1 ? "" : "s"}`}
         help="A rollup per campaign: how many creators, how many are live, and what's been agreed. Click a stage to see those creators."
         helpAnchor="words"
-        actions={<Button href="/settings#campaigns">Add a campaign</Button>}
+        actions={<Button href="#new-campaign">Add a campaign</Button>}
       />
       <div className="space-y-4 p-6">
+        <Card className="p-4" id="new-campaign"><CampaignAdder clientId={client.id} /></Card>
         {campaigns.length === 0 ? (
           <EmptyState
             title="No campaigns yet"
-            hint="Create one under Settings → Campaigns, or import a research run — its campaign is created automatically."
-            action={<Button href="/settings#campaigns" variant="primary">Create a campaign</Button>}
+            hint="Create a campaign above, then add creators to it. Research imports can also create a campaign."
+            action={<Button href="#new-campaign" variant="primary">Create a campaign</Button>}
           />
         ) : (
           campaigns.map((c) => {
@@ -72,7 +74,7 @@ export default async function CampaignsPage() {
                     <Stat label="Creators" value={members.length} title="Everyone on this campaign, including closed deals" />
                     <Stat label="Active" value={active.length} title="Not closed" />
                     <Stat label="Agreed or later" value={agreed.length} title="Agreed, shipping, waiting on video, posted or completed" />
-                    <Stat label="Fees agreed" value={committed > 0 ? money(committed) : "—"} title="Sum of recorded fees (payment itself is tracked in accounting)" />
+                    <Stat label="Recorded fees" value={committed > 0 ? money(committed) : "—"} title="All recorded fees, including proposals and closed deals. Payment itself is tracked in accounting." />
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">

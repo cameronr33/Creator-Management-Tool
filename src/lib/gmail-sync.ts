@@ -2,6 +2,7 @@ import { eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cmGmailAccounts, cmOutreachEvents, type CmGmailAccount } from "@/lib/db/schema";
 import { decrypt } from "@/lib/encryption";
+import { describeSyncOutcome } from "@/lib/gmail-sync-outcome";
 import {
   refreshAccessToken,
   buildSearchQueries,
@@ -206,13 +207,7 @@ export async function runGmailSync(opts: { windowDays?: number } = {}): Promise<
     };
     // Status is specific, not a bare "ok": a run that could not have matched
     // anything must not look like a healthy quiet day.
-    const status =
-      roster.length === 0
-        ? "idle: no creator addresses to match"
-        : fetchErrors > 0
-          ? `ok (${fetchErrors} message fetch(es) skipped)`
-          : "ok";
-    await recordSync(account.id, status, summary);
+    await recordSync(account.id, describeSyncOutcome(summary), summary);
     return summary;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

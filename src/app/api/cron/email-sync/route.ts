@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireCronSecret } from "@/lib/api-helpers";
 import { getActiveGmailAccount, runGmailSync } from "@/lib/gmail-sync";
 import { runJob } from "@/lib/job-runs";
+import { requireCompleteSync } from "@/lib/gmail-sync-outcome";
 
 /**
  * POST /api/cron/email-sync — the twice-daily automatic sync, driven by
@@ -19,6 +20,8 @@ export async function POST(req: NextRequest) {
       const account = await getActiveGmailAccount();
       if (!account) return { status: "idle", summary: { skipped: "no Gmail account connected" } };
       const result = await runGmailSync();
+      // The account retains its partial summary; the worker must see a failed run.
+      requireCompleteSync(result);
       return {
         status: result.rosterSize === 0 ? "idle" : "ok",
         summary: {

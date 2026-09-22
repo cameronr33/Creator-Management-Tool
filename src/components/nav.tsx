@@ -11,6 +11,7 @@ import {
   Upload,
   Settings,
   CircleHelp,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,16 +24,17 @@ const SECTIONS: { label: string; links: { href: string; label: string; icon: Luc
   {
     label: "Work",
     links: [
-      { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-      { href: "/outreach", label: "Outreach", icon: Send },
-      { href: "/pipeline", label: "Pipeline", icon: Kanban },
+      { href: "/", label: "Today", icon: LayoutDashboard, exact: true },
       { href: "/creators", label: "Creators", icon: Users },
+      { href: "/campaigns", label: "Campaigns", icon: Megaphone },
+      { href: "/review", label: "Needs review", icon: Inbox },
     ],
   },
   {
-    label: "Manage",
+    label: "Tools & settings",
     links: [
-      { href: "/campaigns", label: "Campaigns", icon: Megaphone },
+      { href: "/outreach", label: "Outreach", icon: Send },
+      { href: "/pipeline", label: "Pipeline board", icon: Kanban },
       { href: "/import", label: "Import research", icon: Upload },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
@@ -86,7 +88,7 @@ export function Nav({ settingsBadge }: { settingsBadge?: number }) {
           </div>
           <div className="flex flex-col gap-0.5">
             {section.links.map((l) => (
-              <NavLink key={l.href} {...l} badge={l.href === "/settings" ? settingsBadge : undefined} />
+              <NavLink key={l.href} {...l} badge={l.href === "/review" ? settingsBadge : undefined} />
             ))}
           </div>
         </div>

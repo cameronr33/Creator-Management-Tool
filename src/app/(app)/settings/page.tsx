@@ -16,13 +16,13 @@ import {
   GmailSyncStatus,
   type GmailAccountView,
 } from "@/components/settings-forms";
-import { EmailSuggestions } from "@/components/email-suggestions";
 import { ClientVisibility, FollowUpCadence } from "@/components/client-settings";
 import { gmailConfigured } from "@/lib/gmail";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
-import { listOpenSuggestions, countOpenSuggestions, getAllCreatorRefs } from "@/lib/email-suggestions";
+import { countOpenSuggestions } from "@/lib/email-suggestions";
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 import { getJobHealth } from "@/lib/job-runs";
+import { summarizeGmailHealth, summarizeJobHealth } from "@/lib/gmail-health";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -64,16 +64,14 @@ export default async function SettingsPage({
     );
   }
 
-  const [clients, campaigns, templates, apiKeys, gmailAccount, suggestions, openCount, creatorRefs, jobHealth] =
+  const [clients, campaigns, templates, apiKeys, gmailAccount, openCount, jobHealth] =
     await Promise.all([
       getClientsWithSettings(),
       getCampaigns(client.id),
       getTemplates(client.id),
       getApiKeys(),
       getActiveGmailAccount(),
-      listOpenSuggestions(),
       countOpenSuggestions(),
-      getAllCreatorRefs(),
       getJobHealth(),
     ]);
   const currentSettings = clients.find((c) => c.id === client.id) ?? null;
@@ -85,71 +83,32 @@ export default async function SettingsPage({
         email: gmailAccount.email,
         connectedAt: gmailAccount.connectedAt.toLocaleDateString(),
         lastSyncAt: gmailAccount.lastSyncAt ? gmailAccount.lastSyncAt.toLocaleString() : null,
+        health: summarizeGmailHealth(gmailAccount, openCount),
         lastSyncStatus: gmailAccount.lastSyncStatus,
         lastSyncSummary: (gmailAccount.lastSyncSummary as GmailAccountView["lastSyncSummary"]) ?? null,
       }
     : null;
-  const syncMatchingNothing =
-    accountView?.lastSyncStatus === "ok" &&
-    (accountView.lastSyncSummary?.messagesFetched ?? 0) === 0 &&
-    suggestions.length > 0;
 
   return (
     <>
       <PageHeader
         title="Settings"
         client={client.name}
-        help="The top half is everyday setup for the selected client — email senders to link, follow-up timing, campaigns, message templates. The bottom half is one-time admin that applies to every client."
+        help="Set follow-up timing and templates for this client. Shared Gmail, automation, and access settings apply to every client."
         helpAnchor="email"
       />
       <div className="mx-auto max-w-3xl space-y-6 p-6">
         {gmailResult && <Callout tone={gmailResult.tone}>{gmailResult.text}</Callout>}
 
-        <GroupHeading>Everyday setup · {client.name}</GroupHeading>
-
         <Card id="email-sync" className="scroll-mt-4 p-5">
           <CardHeader
-            title={
-              <>
-                Email senders to link{" "}
-                {openCount > 0 && (
-                  <Badge tone="warn" className="ml-1 normal-case tracking-normal">
-                    {openCount}
-                  </Badge>
-                )}
-              </>
-            }
-            description="People who emailed on cc'd threads from an address the app doesn't know. Link each to their creator so the conversation syncs onto their record — or mark it as not a creator (a client contact, a vendor, a tool)."
+            title="Shared email tracking"
+            description="One connected mailbox serves every client. Unmatched senders are reviewed in Needs review."
+            actions={<Button href="/review" size="sm">Needs review{openCount > 0 ? ` (${openCount})` : ""}</Button>}
           />
           <div className="mt-3 space-y-3">
             {accountView ? (
-              <>
-                <GmailSyncStatus account={accountView} />
-                {syncMatchingNothing && (
-                  <Callout tone="warn">
-                    Email is being checked, but nothing matches — the addresses on file aren&apos;t the ones creators
-                    write from. Link the senders below and their threads will appear.
-                  </Callout>
-                )}
-                <EmailSuggestions
-                  suggestions={suggestions.map((s) => ({
-                    id: s.id,
-                    email: s.email,
-                    displayName: s.displayName,
-                    messageCount: s.messageCount,
-                    lastSeenAt: s.lastSeenAt ? s.lastSeenAt.toLocaleDateString() : null,
-                    sampleSubject: s.sampleSubject,
-                    suggestedCreatorId: s.suggestedCreatorId,
-                    suggestedCreatorName: s.suggestedCreatorName,
-                  }))}
-                  creators={creatorRefs.map((c) => ({ id: c.id, name: c.name, clientName: c.clientName }))}
-                />
-                {openCount > suggestions.length && (
-                  <p className="text-xs text-text-muted">
-                    Showing the first {suggestions.length} of {openCount} — the rest appear as these are linked or hidden.
-                  </p>
-                )}
-              </>
+              <GmailSyncStatus account={accountView} />
             ) : (
               <Callout
                 tone="info"
@@ -165,10 +124,12 @@ export default async function SettingsPage({
           </div>
         </Card>
 
+        <GroupHeading>Client setup · {client.name}</GroupHeading>
+
         <Card id="cadence" className="scroll-mt-4 p-5">
           <CardHeader
             title="Follow-up timing"
-            description={`When creators show up on the Outreach page for ${client.name}. These numbers drive the "Messages to send" list and the automatic No-response close.`}
+            description={`When outreach and unanswered conversations need attention for ${client.name}. No-response closures require a teammate's review because email coverage may be incomplete.`}
           />
           <div className="mt-4">
             <FollowUpCadence
@@ -252,7 +213,7 @@ export default async function SettingsPage({
           />
           <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
             {jobHealth.map((j) => {
-              const tone = j.failing ? "bad" : j.overdue ? "warn" : "good";
+              const health = summarizeJobHealth(j);
               const label =
                 j.hoursSince == null
                   ? "never ran"
@@ -264,7 +225,7 @@ export default async function SettingsPage({
                 <li key={j.job} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <Badge tone={tone}>{j.failing ? "failing" : j.overdue ? "overdue" : (j.lastRun?.status ?? "—")}</Badge>
+                      <Badge tone={health.tone}>{health.label}</Badge>
                       <span className="font-medium text-text">{j.label}</span>
                       <span className="text-xs text-text-muted">
                         every {j.expectedEveryHours >= 24 ? `${j.expectedEveryHours / 24}d` : `${j.expectedEveryHours}h`}

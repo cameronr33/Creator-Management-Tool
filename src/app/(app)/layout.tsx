@@ -9,6 +9,8 @@ import { ClientSwitcher } from "@/components/client-switcher";
 import { BrandLockup } from "@/components/brand";
 import { Toaster } from "@/components/toast";
 import { signOutAction } from "@/app/actions";
+import { Button } from "@/components/ui";
+import { MobileNavigation } from "@/components/mobile-navigation";
 
 export default async function AppLayout({
   children,
@@ -25,8 +27,12 @@ export default async function AppLayout({
   ]);
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="sidebar-scroll sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-line bg-sidebar-bg">
+    <div className="flex min-h-screen flex-col md:flex-row">
+      <header className="border-b border-sidebar-line bg-sidebar-bg p-3 md:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3"><BrandLockup inverted /><div className="max-w-44"><ClientSwitcher clients={clients} activeSlug={active?.slug ?? ""} /></div></div>
+        <MobileNavigation><Nav settingsBadge={unmatchedSenders} /><div className="mt-3"><HelpNavLink /></div><form action={signOutAction} className="mt-3"><Button type="submit" size="sm" icon={<LogOut size={14} />}>Sign out</Button></form></MobileNavigation>
+      </header>
+      <aside className="sidebar-scroll sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-sidebar-line bg-sidebar-bg md:flex">
         <div className="px-4 pt-5 pb-4">
           <BrandLockup inverted />
         </div>
@@ -62,7 +68,10 @@ export default async function AppLayout({
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1">{children}</main>
+      <main className="min-w-0 flex-1">
+        {process.env.CREATOR_LOCAL_PREVIEW === "1" && <div className="border-b border-info-line bg-info-soft px-6 py-2 text-xs text-info">Preview workspace · fictional data · external integrations disabled</div>}
+        {children}
+      </main>
       <Toaster />
     </div>
   );

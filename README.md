@@ -22,6 +22,10 @@ npm run dev                        # http://localhost:3002
 
 ## New teammate setup
 
+For a self-contained UI and verification environment with fictional records,
+see [Isolated local preview](docs/isolated-preview.md). It needs no production
+credentials or Neon branch.
+
 This repo shares a Neon Postgres instance with `social-analytics-dashboard` —
 the same database that holds live HELLA creator data (names, addresses) and the
 analytics dashboard's data. **Don't develop against production.** Ask the
@@ -67,7 +71,9 @@ plus terminal `passed` / `declined` / `no_response` (split by who ended it).
 ## Loops
 
 - **Follow-up sweep** (`/api/cron/follow-ups`, daily) — opens alerts for overdue
-  outreach and retires creators who go dark after two follow-ups.
+  outreach. After two unanswered follow-ups, Today asks a teammate to review the
+  conversation before closing as no response. The sweep does not automatically
+  close partnerships: shared-mailbox and off-channel coverage cannot prove silence.
 - **Tier-1 metric refresh** (`/api/cron/refresh-metrics`, weekly) — refreshes
   followers via Apify REST. Deliberately does **not** touch view counts: accurate
   public Views require the Chrome-grid scrape in the `creator-research` skill

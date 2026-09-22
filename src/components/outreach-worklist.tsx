@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Reply, ChevronDown, ChevronUp, XCircle } from "lucide-react";
-import { Avatar, Button, Callout, EmptyState } from "@/components/ui";
+import { Avatar, Badge, Button, Callout, EmptyState } from "@/components/ui";
+import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
 import { MessageComposer, type ComposerTemplates } from "@/components/message-composer";
 import { relativeDays } from "@/lib/format";
@@ -37,6 +38,7 @@ export function OutreachWorklist({
   entries: WorklistEntry[];
   templates: WorklistTemplates;
 }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   if (entries.length === 0) {
     return (
       <EmptyState
@@ -49,13 +51,26 @@ export function OutreachWorklist({
   return (
     <ul className="space-y-3">
       {entries.map((e) => (
-        <WorklistItem key={e.partnershipId} entry={e} templates={templates} />
+        <WorklistItem
+          key={e.partnershipId}
+          entry={e}
+          templates={templates}
+          expanded={expandedId === e.partnershipId}
+          onToggle={() => setExpandedId((current) => current === e.partnershipId ? null : e.partnershipId)}
+          onLogged={() => setExpandedId(null)}
+        />
       ))}
     </ul>
   );
 }
 
-function WorklistItem({ entry, templates }: { entry: WorklistEntry; templates: WorklistTemplates }) {
+function WorklistItem({ entry, templates, expanded, onToggle, onLogged }: {
+  entry: WorklistEntry;
+  templates: WorklistTemplates;
+  expanded: boolean;
+  onToggle: () => void;
+  onLogged: () => void;
+}) {
   const { pending, run } = useSave();
 
   const markReplied = () =>
@@ -86,13 +101,16 @@ function WorklistItem({ entry, templates }: { entry: WorklistEntry; templates: W
         <div className="flex min-w-0 items-start gap-3">
           <Avatar name={entry.name} />
           <div className="min-w-0">
-            <Link href={`/creators/${entry.partnershipId}`} className="font-medium text-text hover:text-accent">
+            <Link href={`/creators/${entry.partnershipId}?tab=conversation#conversation`} className="font-medium text-text hover:text-accent">
               {entry.name}
             </Link>
-            <div className="text-xs text-text-muted">{entry.detail}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-2"><Badge tone={entry.kind === "initial" ? "accent" : "warn"}>{entry.kind === "initial" ? "First message" : "Follow-up"}</Badge><span className="text-xs text-text-muted">{entry.detail}</span></div>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant={expanded ? "secondary" : "primary"} onClick={onToggle} aria-expanded={expanded} aria-controls={`draft-${entry.partnershipId}`} icon={expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}>
+            {expanded ? "Close draft" : "Write message"}
+          </Button>
           <Button
             size="sm"
             onClick={markReplied}
@@ -102,20 +120,18 @@ function WorklistItem({ entry, templates }: { entry: WorklistEntry; templates: W
           >
             They replied
           </Button>
-          <Button size="sm" variant="ghost" href={`/creators/${entry.partnershipId}`} icon={<ChevronRight size={14} />}>
+          <Button size="sm" variant="ghost" href={`/creators/${entry.partnershipId}?tab=conversation#conversation`} icon={<ChevronRight size={14} />}>
             Open record
           </Button>
         </div>
       </div>
 
-      {entry.migrated && (
+      {expanded && entry.migrated && (
         <Callout
           tone="warn"
           className="mt-3"
           actions={
-            <Button size="sm" variant="ghost" icon={<XCircle size={13} />} onClick={closeNoResponse} pending={pending}>
-              Close as no response
-            </Button>
+            <ConfirmButton label="Close as no response" question="Close this partnership?" confirmLabel="Close" icon={<XCircle size={13} />} onConfirm={closeNoResponse} pending={pending} />
           }
         >
           Imported from the old spreadsheet — the last contact date isn&apos;t known. If you&apos;re still waiting, send a
@@ -123,8 +139,8 @@ function WorklistItem({ entry, templates }: { entry: WorklistEntry; templates: W
         </Callout>
       )}
 
-      <div className="mt-3">
-        <MessageComposer target={entry} templates={templates} kind={entry.kind} />
+      <div id={`draft-${entry.partnershipId}`} hidden={!expanded} className="mt-4 border-t border-border pt-4">
+        <MessageComposer target={entry} templates={templates} kind={entry.kind} onLogged={onLogged} />
       </div>
     </li>
   );
@@ -140,8 +156,8 @@ export function AwaitingReplyList({ entries }: { entries: AwaitingReplyEntry[] }
   if (entries.length === 0) return null;
   return (
     <div className="rounded-xl border border-border bg-surface shadow-card">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm"
         aria-expanded={open}
@@ -152,7 +168,7 @@ export function AwaitingReplyList({ entries }: { entries: AwaitingReplyEntry[] }
         <span className="flex items-center gap-1 text-xs text-text-muted">
           {open ? "Hide" : "Show"} {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </span>
-      </button>
+      </Button>
       {open && (
         <ul className="divide-y divide-border border-t border-border">
           {entries.map((e) => (

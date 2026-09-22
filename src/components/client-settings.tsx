@@ -64,7 +64,7 @@ const FIELDS: { key: keyof ThresholdDefaults; label: string; hint: string }[] = 
   { key: "initialOutreachAfterDays", label: "First message due", hint: "days after shortlisting with nothing sent" },
   { key: "followUp1AfterDays", label: "Follow-up 1 due", hint: "days of silence after the first message" },
   { key: "followUp2AfterDays", label: "Follow-up 2 due", hint: "days of silence after follow-up 1" },
-  { key: "markNoResponseAfterDays", label: "Close as no response", hint: "days of silence after follow-up 2" },
+  { key: "markNoResponseAfterDays", label: "Review unanswered outreach", hint: "days after follow-up 2 before a teammate reviews whether to close" },
 ];
 
 /**

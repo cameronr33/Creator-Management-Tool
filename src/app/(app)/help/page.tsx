@@ -145,8 +145,8 @@ export default function HelpPage() {
               Still nothing <strong>{DEFAULT_THRESHOLDS.followUp2AfterDays} days</strong> after that → follow-up 2 due.
             </li>
             <li>
-              <strong>{DEFAULT_THRESHOLDS.markNoResponseAfterDays} days</strong> after the second follow-up → closed as{" "}
-              {stageLabel("no_response")} automatically.
+              <strong>{DEFAULT_THRESHOLDS.markNoResponseAfterDays} days</strong> after the second follow-up → review unanswered outreach in Today.
+              Check the full conversation before manually closing as {stageLabel("no_response")}.
             </li>
           </ul>
           <p className="mt-3 text-xs text-text-faint">
@@ -179,20 +179,20 @@ export default function HelpPage() {
           <CardHeader title="Email tracking" />
           <div className="mt-3 space-y-2 text-sm text-text-muted">
             <p>
-              The app reads one shared mailbox (read-only) twice a day and files every creator email onto the right
-              record — and moves the stage when a creator replies. It never sends mail.
+              The app reads one shared mailbox (read-only) twice a day and matches visible messages to known creator
+              addresses. Confirmed inbound messages move eligible stages. It never sends mail.
             </p>
             <p>
               <strong>The one rule:</strong> keep that mailbox on cc for every creator email you send. The Outreach page
-              pre-fills it. If it isn&apos;t on the thread, the app can&apos;t see the reply.
+              pre-fills it. The mailbox must receive the reply too; a reply that leaves it off is invisible to the app.
             </p>
             <p>
               When someone writes from an address the app doesn&apos;t know yet, they show up under{" "}
-              <Link href="/settings#email-sync" className="text-accent hover:underline">
-                Settings → Email senders to link
+              <Link href="/review" className="text-accent hover:underline">
+                Needs review
               </Link>
               . Linking one takes a click and pulls their conversation in immediately. Please check that list when the
-              sidebar shows a number next to Settings.
+              sidebar shows a number next to Needs review. This shared mailbox queue includes all clients.
             </p>
           </div>
         </Card>

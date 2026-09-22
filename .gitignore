@@ -45,3 +45,6 @@ next-env.d.ts
 # python (creator-research skill scripts)
 __pycache__/
 *.pyc
+
+# Isolated, synthetic local preview database and runtime
+/.local-preview/

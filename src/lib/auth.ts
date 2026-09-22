@@ -4,9 +4,11 @@ import { compare } from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { getPreviewAuthCookies } from "@/lib/auth-cookies";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET,
+  cookies: getPreviewAuthCookies(process.env.CREATOR_LOCAL_PREVIEW),
   // Auth.js v5 disables host trust in production by default. We sit behind
   // Railway's edge proxy, so the request arrives with X-Forwarded-Host set
   // to the public domain — trust it explicitly or every /api/auth/* call
