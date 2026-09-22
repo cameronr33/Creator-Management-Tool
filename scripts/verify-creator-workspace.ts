@@ -12,7 +12,6 @@ assert.ok(!/shipments\[0\]/.test(detailPage), "Creator detail must not discard e
 // A bookmarked record for another client must not display the cookie's client
 // or load that client's outreach template into this creator's conversation.
 assert.ok(!detailPage.includes("getSelectedClientSlug"), "Creator detail must use the record's client, not the selected-client cookie");
-assert.ok(detailPage.includes("getDefaultTemplates(creator.clientId)"), "Outreach templates must belong to the creator's client");
 assert.ok(detailPage.includes("shipments.map((shipment"), "Shipping must expose controls for every returned shipment");
 
 const mixed = [{ status: "delivered" }, { status: "ready" }];

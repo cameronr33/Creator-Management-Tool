@@ -6,13 +6,14 @@
  *   npx tsx scripts/cron-worker.ts
  *
  * Schedule (UTC, pinned explicitly):
- *   - 12:30 & 21:30 daily → email sync (Gmail → outreach timelines)
- *   - 13:00 daily         → follow-up due sweep (after the morning sync)
- *   - 05:00 Sunday        → tier-1 metric refresh (followers only)
+ *   - 12:30 & 21:30 daily → email check (Gmail → creator timelines)
+ *
+ * The app also checks email on page visits (at most every 15 minutes), so
+ * this worker only covers the hours nobody has the app open.
  */
 import cron from "node-cron";
 
-// Fail at boot, not at the first 13:00 fire, when the worker is misconfigured.
+// Fail at boot, not at the first scheduled fire, when the worker is misconfigured.
 const cronSecret = process.env.CRON_SECRET;
 const appUrl = process.env.APP_URL ?? process.env.NEXTAUTH_URL;
 if (!appUrl || !cronSecret) {
@@ -39,28 +40,9 @@ async function trigger(path: string): Promise<void> {
   }
 }
 
-// Twice-daily email sync at 12:30 and 21:30 UTC (morning + late afternoon
-// US Central). The morning run lands BEFORE the 13:00 follow-up sweep so
-// overnight replies are counted before anyone is flagged as silent.
+// Twice-daily email check at 12:30 and 21:30 UTC (morning + late afternoon
+// US Central).
 cron.schedule("30 12,21 * * *", () => {
   console.log("Running email sync…");
   trigger("/api/cron/email-sync");
 }, TZ);
-
-// Daily follow-up sweep at 13:00 UTC.
-cron.schedule("0 13 * * *", () => {
-  console.log("Running follow-up sweep…");
-  trigger("/api/cron/follow-ups");
-}, TZ);
-
-// Weekly tier-1 metric refresh, Sundays 05:00 UTC.
-cron.schedule("0 5 * * 0", () => {
-  console.log("Running tier-1 metric refresh…");
-  trigger("/api/cron/refresh-metrics");
-}, TZ);
-
-console.log("Cron worker started (schedules pinned to UTC; container tz is",
-  Intl.DateTimeFormat().resolvedOptions().timeZone + "):");
-console.log("  - Email sync:      12:30 & 21:30 UTC daily");
-console.log("  - Follow-up sweep: 13:00 UTC daily");
-console.log("  - Metric refresh:  05:00 UTC Sundays");

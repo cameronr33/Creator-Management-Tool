@@ -30,7 +30,7 @@ them. Changing one requires a human decision and an explanation in the commit.
 1. **Estimates never masquerade as accurate.** `viewsSource`/`metricsSource`
    `apify` is provisional; `ig_public_chrome` is authoritative. Nothing
    automated may overwrite an `ig_public_chrome` value with an `apify` one
-   (see `quick-analysis.ts`, `ingest.ts`, `refresh.ts`).
+   (see `ingest.ts`, which the CSV import uses).
 2. **Auto-stage never moves an active stage backward** and never sets a
    judgment stage (`negotiating`, `agreed`, `awaiting_address`, `completed`)
    or `passed`/`declined`. The one reopen is `no_response → in_conversation`
@@ -58,13 +58,13 @@ A loop reporting "ok" while doing nothing is the most expensive failure mode
 here — it looks like health. So:
 
 - Every background job writes a `cm_job_runs` heartbeat with a status of
-  `ok` (did work), `idle` (nothing to do — still healthy), or `error`. Settings
-  → Automation health flags any loop that hasn't completed within 1.5× its
-  interval. "Hasn't run" and "ran with nothing to do" are different states.
-- The email sync's anchor is **address discovery**: a sync that matches zero
-  messages is healthy only if the unmatched-senders list is empty too. Use
-  `npm run gmail:diagnose` to see whether roster addresses appear in the
-  mailbox at all.
+  `ok` (did work), `idle` (nothing to do — still healthy), or `error`. The
+  email card shows when the mailbox was last checked and flags a failed or
+  overdue check. "Hasn't run" and "ran with nothing to do" are different states.
+- The email sync searches **only** for addresses saved on creators (owner
+  decision, 2026-09-22 — the mailbox is a broad work inbox; nothing else is
+  read or stored). Use `npm run gmail:diagnose` to see whether those
+  addresses appear in the mailbox at all.
 - Counter-metrics: outreach volume is paired with reply rate (worklist +
   timeline), follow-ups sent with `no_response` closes and reopens.
 - Measurement decay: imported sheet rows have unknown dates and are flagged

@@ -79,26 +79,6 @@ export default async function ImportPage() {
             </table>
           )}
         </Card>
-
-        <Card className="p-5">
-          <details>
-            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-text-faint hover:text-accent">
-              For whoever runs the research process: automatic push
-            </summary>
-            <div className="mt-3 space-y-3 text-sm text-text-muted">
-              <p>
-                The <code className="rounded bg-surface-2 px-1">creator-research</code> skill can POST results straight in.
-                Create an API key under Settings, then the skill&apos;s final step sends to:
-              </p>
-              <pre className="overflow-x-auto rounded-lg border border-border bg-surface-2 p-3 text-xs text-text">
-{`POST ${process.env.APP_URL ?? "http://localhost:3002"}/api/ingest/research
-Authorization: Bearer <your cm_ api key>
-
-{ "client": "${client.slug}", "campaign": "…", "creators": [ … ] }`}
-              </pre>
-            </div>
-          </details>
-        </Card>
       </div>
     </>
   );

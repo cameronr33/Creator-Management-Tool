@@ -3,7 +3,6 @@ import { LogOut } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { getClients, resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
-import { countOpenSuggestions } from "@/lib/email-suggestions";
 import { Nav, HelpNavLink } from "@/components/nav";
 import { ClientSwitcher } from "@/components/client-switcher";
 import { BrandLockup } from "@/components/brand";
@@ -20,17 +19,13 @@ export default async function AppLayout({
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const [clients, active, unmatchedSenders] = await Promise.all([
-    getClients(),
-    resolveClient(await getSelectedClientSlug()),
-    countOpenSuggestions(),
-  ]);
+  const [clients, active] = await Promise.all([getClients(), resolveClient(await getSelectedClientSlug())]);
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <header className="border-b border-sidebar-line bg-sidebar-bg p-3 md:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3"><BrandLockup inverted /><div className="max-w-44"><ClientSwitcher clients={clients} activeSlug={active?.slug ?? ""} /></div></div>
-        <MobileNavigation><Nav settingsBadge={unmatchedSenders} /><div className="mt-3"><HelpNavLink /></div><form action={signOutAction} className="mt-3"><Button type="submit" size="sm" icon={<LogOut size={14} />}>Sign out</Button></form></MobileNavigation>
+        <MobileNavigation><Nav /><div className="mt-3"><HelpNavLink /></div><form action={signOutAction} className="mt-3"><Button type="submit" size="sm" icon={<LogOut size={14} />}>Sign out</Button></form></MobileNavigation>
       </header>
       <aside className="sidebar-scroll sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-sidebar-line bg-sidebar-bg md:flex">
         <div className="px-4 pt-5 pb-4">
@@ -45,7 +40,7 @@ export default async function AppLayout({
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-5">
-          <Nav settingsBadge={unmatchedSenders} />
+          <Nav />
         </div>
 
         <div className="border-t border-sidebar-line px-3 py-3">

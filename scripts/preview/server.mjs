@@ -54,9 +54,6 @@ for (const [name,username,stage,pillar,followers] of fixtures) {
   if (stage === 'in_conversation') {
     await pg.query(`INSERT INTO cm_outreach_events(partnership_id,direction,channel,kind,body,subject,external_id,occurred_at) VALUES($1,'inbound','email','reply','Thanks for reaching out. Could you share the lighting kit details?','Re: HELLA collaboration','preview-theo-reply',now()-interval '1 day') ON CONFLICT DO NOTHING`,[partnership]);
   }
-  if (stage === 'shortlisted') {
-    await pg.query(`INSERT INTO cm_alerts(partnership_id,type,due_at) VALUES($1,'initial_outreach_due',now()-interval '1 day') ON CONFLICT(partnership_id,type) DO NOTHING`,[partnership]);
-  }
 }
 
 const {rows: typeRows} = await pg.query('SELECT oid FROM pg_type');

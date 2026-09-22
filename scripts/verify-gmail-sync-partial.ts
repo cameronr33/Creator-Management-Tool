@@ -46,7 +46,10 @@ async function main() {
     assert.equal(failedResponse.status, 500, "Cron workers must see partial fetch failures");
     const [partial] = await db.select().from(schema.cmGmailAccounts).where(eq(schema.cmGmailAccounts.id, account.id));
     assert.match(partial.lastSyncStatus ?? "", /^partial:/);
-    assert.equal((partial.lastSyncSummary as { fetchErrors: number }).fetchErrors, 2);
+    // One failed message fetch. (This read 2 while the unmatched-sender
+    // discovery pass existed: it fetched the same broken message a second
+    // time. Discovery was removed by owner decision, 2026-09-22.)
+    assert.equal((partial.lastSyncSummary as { fetchErrors: number }).fetchErrors, 1);
     assert.equal((partial.lastSyncSummary as { inserted: number }).inserted, 1, "Successful fetched work must survive the partial result");
     const messages = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.partnershipId, partnership.id));
     assert.equal(messages.length, 1);

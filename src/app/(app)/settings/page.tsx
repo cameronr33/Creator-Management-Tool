@@ -1,17 +1,9 @@
 import type { Metadata } from "next";
-import {
-  resolveClient,
-  getClientsWithSettings,
-  getCampaigns,
-  getTemplates,
-  getApiKeys,
-} from "@/lib/queries";
+import { resolveClient, getClientsWithSettings, getCampaigns } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { PageHeader, Card, CardHeader, EmptyState, Badge, Callout, Button } from "@/components/ui";
 import {
   CampaignAdder,
-  TemplateEditor,
-  ApiKeyManager,
   GmailConnectCard,
   GmailSyncStatus,
   type GmailAccountView,
@@ -19,10 +11,8 @@ import {
 import { ClientVisibility, FollowUpCadence } from "@/components/client-settings";
 import { gmailConfigured } from "@/lib/gmail";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
-import { countOpenSuggestions } from "@/lib/email-suggestions";
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
-import { getJobHealth } from "@/lib/job-runs";
-import { summarizeGmailHealth, summarizeJobHealth } from "@/lib/gmail-health";
+import { summarizeGmailHealth } from "@/lib/gmail-health";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -64,26 +54,19 @@ export default async function SettingsPage({
     );
   }
 
-  const [clients, campaigns, templates, apiKeys, gmailAccount, openCount, jobHealth] =
-    await Promise.all([
-      getClientsWithSettings(),
-      getCampaigns(client.id),
-      getTemplates(client.id),
-      getApiKeys(),
-      getActiveGmailAccount(),
-      countOpenSuggestions(),
-      getJobHealth(),
-    ]);
+  const [clients, campaigns, gmailAccount] = await Promise.all([
+    getClientsWithSettings(),
+    getCampaigns(client.id),
+    getActiveGmailAccount(),
+  ]);
   const currentSettings = clients.find((c) => c.id === client.id) ?? null;
-  const defaultDmTemplate = templates.find((t) => t.isDefault && t.channel === "ig_dm") ?? null;
-  const defaultEmailTemplate = templates.find((t) => t.isDefault && t.channel === "email") ?? null;
 
   const accountView: GmailAccountView | null = gmailAccount
     ? {
         email: gmailAccount.email,
         connectedAt: gmailAccount.connectedAt.toLocaleDateString(),
         lastSyncAt: gmailAccount.lastSyncAt ? gmailAccount.lastSyncAt.toLocaleString() : null,
-        health: summarizeGmailHealth(gmailAccount, openCount),
+        health: summarizeGmailHealth(gmailAccount),
         lastSyncStatus: gmailAccount.lastSyncStatus,
         lastSyncSummary: (gmailAccount.lastSyncSummary as GmailAccountView["lastSyncSummary"]) ?? null,
       }
@@ -94,7 +77,7 @@ export default async function SettingsPage({
       <PageHeader
         title="Settings"
         client={client.name}
-        help="Set follow-up timing and templates for this client. Shared Gmail, automation, and access settings apply to every client."
+        help="Follow-up timing and campaigns for this client. The Gmail connection and which clients show apply to every client."
         helpAnchor="email"
       />
       <div className="mx-auto max-w-3xl space-y-6 p-6">
@@ -102,9 +85,8 @@ export default async function SettingsPage({
 
         <Card id="email-sync" className="scroll-mt-4 p-5">
           <CardHeader
-            title="Shared email tracking"
-            description="One connected mailbox serves every client. Unmatched senders are reviewed in Needs review."
-            actions={<Button href="/review" size="sm">Needs review{openCount > 0 ? ` (${openCount})` : ""}</Button>}
+            title="Email tracking"
+            description="One connected mailbox serves every client. Only the email addresses saved on creators are searched — nothing else in the mailbox is read or stored."
           />
           <div className="mt-3 space-y-3">
             {accountView ? (
@@ -157,23 +139,6 @@ export default async function SettingsPage({
           <CampaignAdder clientId={client.id} />
         </Card>
 
-        <Card id="templates" className="scroll-mt-4 p-5">
-          <CardHeader
-            title="Message templates"
-            description="What the Outreach page pre-writes for each creator. One for Instagram DMs, one for email (used when a creator has an email address)."
-          />
-          <div className="mt-4 space-y-6">
-            <div>
-              <h3 className="mb-2 text-sm font-medium text-text">Instagram DM</h3>
-              <TemplateEditor clientId={client.id} channel="ig_dm" template={defaultDmTemplate} />
-            </div>
-            <div className="border-t border-border pt-5">
-              <h3 className="mb-2 text-sm font-medium text-text">Email</h3>
-              <TemplateEditor clientId={client.id} channel="email" template={defaultEmailTemplate} />
-            </div>
-          </div>
-        </Card>
-
         <GroupHeading>Admin · applies to every client</GroupHeading>
 
         <Card id="gmail" className="scroll-mt-4 p-5">
@@ -196,57 +161,6 @@ export default async function SettingsPage({
           </div>
         </Card>
 
-        <Card id="api-keys" className="scroll-mt-4 p-5">
-          <CardHeader
-            title="API keys"
-            description="Lets the creator-research process on a teammate's machine push results straight into this tool."
-          />
-          <div className="mt-3">
-            <ApiKeyManager keys={apiKeys} />
-          </div>
-        </Card>
-
-        <Card id="automation" className="scroll-mt-4 p-5">
-          <CardHeader
-            title="Automation health"
-            description="Every background job leaves a heartbeat. A job that hasn't completed within 1.5× its interval is flagged, so a dead worker is visible instead of silent."
-          />
-          <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
-            {jobHealth.map((j) => {
-              const health = summarizeJobHealth(j);
-              const label =
-                j.hoursSince == null
-                  ? "never ran"
-                  : j.hoursSince < 1
-                    ? "ran under an hour ago"
-                    : `ran ${Math.round(j.hoursSince)}h ago`;
-              const summary = j.lastRun?.summary as Record<string, unknown> | null;
-              return (
-                <li key={j.job} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Badge tone={health.tone}>{health.label}</Badge>
-                      <span className="font-medium text-text">{j.label}</span>
-                      <span className="text-xs text-text-muted">
-                        every {j.expectedEveryHours >= 24 ? `${j.expectedEveryHours / 24}d` : `${j.expectedEveryHours}h`}
-                      </span>
-                    </div>
-                    <div className="truncate text-xs text-text-muted">
-                      {label}
-                      {j.lastRun?.error
-                        ? ` — ${j.lastRun.error}`
-                        : summary
-                          ? ` — ${Object.entries(summary)
-                              .map(([k, v]) => `${k} ${String(v)}`)
-                              .join(", ")}`
-                          : ""}
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
       </div>
     </>
   );

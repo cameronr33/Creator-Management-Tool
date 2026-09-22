@@ -34,11 +34,10 @@ const env = {
 };
 const next = resolve(root, "node_modules/next/dist/bin/next");
 const suite = [
-  "verify-add-creator", "verify-quick-analysis", "verify-auto-stage", "verify-outreach-flow",
+  "verify-add-creator", "verify-auto-stage",
   "verify-editors", "verify-email-ingest", "verify-gmail-sync", "verify-email-body",
   "verify-next-step", "verify-design", "verify-workspace", "verify-workspace-db", "verify-creator-workspace",
-  "verify-message-draft", "verify-gmail-health", "verify-gmail-sync-outcome",
-  "verify-follow-up-coverage", "verify-gmail-sync-partial", "verify-preview-cookies", "verify-invariants",
+  "verify-gmail-health", "verify-gmail-sync-outcome", "verify-gmail-sync-partial", "verify-preview-cookies", "verify-invariants",
 ];
 const commands = mode === "db" ? [[resolve(root, "scripts/preview/server.mjs")]]
   : mode === "dev" ? [[next, "dev", "--hostname", "127.0.0.1", "--port", "3003"]]

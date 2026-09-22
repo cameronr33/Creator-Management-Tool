@@ -10,7 +10,7 @@ import {
   EXIT_REASONS_BY_STAGE,
 } from "@/lib/stages";
 import type { CmStage, CmShipment } from "@/lib/db/schema";
-import { Button, Field, Input, Select, Textarea, Segmented, Callout } from "@/components/ui";
+import { Button, Field, Input, Select, Textarea, Segmented } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 
 /* ── Stage ────────────────────────────────────────────────────── */
@@ -296,30 +296,21 @@ export function AddDeliverable({ partnershipId }: { partnershipId: string }) {
   const [url, setUrl] = useState("");
   const [showOverride, setShowOverride] = useState(false);
   const [publicViews, setPublicViews] = useState("");
-  const [warning, setWarning] = useState<string | null>(null);
 
   const submit = async () => {
-    setWarning(null);
     const r = await run(
       () =>
-        api<{ warning?: string }>("/api/deliverables", {
+        api("/api/deliverables", {
           partnershipId,
           url,
-          // Metrics + posted date come from the scraper (labelled estimated);
-          // the operator only types a number for a true public-views reading.
-          fetchMetrics: true,
           publicViews: publicViews ? Number(publicViews) : null,
         }),
       { success: "Video added" },
     );
     if (r.ok) {
-      if (r.data.warning) {
-        setWarning(r.data.warning);
-      } else {
-        setUrl("");
-        setPublicViews("");
-        setOpen(false);
-      }
+      setUrl("");
+      setPublicViews("");
+      setOpen(false);
     }
   };
 
@@ -333,7 +324,7 @@ export function AddDeliverable({ partnershipId }: { partnershipId: string }) {
 
   return (
     <div className="w-full space-y-2 rounded-lg border border-border bg-surface-2/60 p-3">
-      <Field label="Video link" hint="Views, likes and the posted date are fetched automatically (as estimates).">
+      <Field label="Video link" hint="Paste the link to the posted video. Saving it moves them to Posted.">
         <Input compact value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.instagram.com/reel/…" autoFocus />
       </Field>
       {showOverride ? (
@@ -342,13 +333,12 @@ export function AddDeliverable({ partnershipId }: { partnershipId: string }) {
         </Field>
       ) : (
         <Button variant="link" onClick={() => setShowOverride(true)} className="text-xs">
-          I read the public view count off Instagram — enter it
+          Add the view count shown on Instagram (optional)
         </Button>
       )}
-      {warning && <Callout tone="warn">{warning}</Callout>}
       <div className="flex gap-2">
         <Button size="sm" variant="primary" onClick={submit} pending={pending} disabled={!url}>
-          {pending ? "Fetching…" : "Save video"}
+          Save video
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
           Cancel

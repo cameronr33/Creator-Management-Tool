@@ -136,22 +136,6 @@ export async function getMessage(accessToken: string, id: string): Promise<Gmail
   return api(accessToken, `/messages/${id}?format=full`);
 }
 
-/** Headers only — ~10x cheaper than format=full; used by address discovery. */
-export async function getMessageMetadata(accessToken: string, id: string): Promise<GmailMessage> {
-  const params = new URLSearchParams({ format: "metadata" });
-  for (const h of ["From", "To", "Cc", "Subject", "Date"]) params.append("metadataHeaders", h);
-  return api(accessToken, `/messages/${id}?${params}`);
-}
-
-/**
- * Discovery query: every message where the connected mailbox is cc'd —
- * i.e. the outreach threads themselves, regardless of whether the app knows
- * the counterpart address yet. Both directions land here.
- */
-export function buildDiscoveryQuery(mailbox: string, windowDays: number): string {
-  return `cc:${mailbox} newer_than:${windowDays}d`;
-}
-
 /** "Name <a@b.com>" | "\"Name\" <a@b.com>" | "a@b.com" → { name, email } (email lowercased). */
 export function parseEmailAddress(raw: string): { name: string | null; email: string } | null {
   const m = raw.match(/^\s*(?:"?([^"<]*?)"?\s*)?<([^>]+)>\s*$/);

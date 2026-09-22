@@ -58,16 +58,6 @@ async function main() {
   check("no partnership at posted/completed without a deliverable", postedNoVideo === 0, `${postedNoVideo} violations`);
 
   console.log("\n── Metric provenance: estimates are never dressed as authoritative ──");
-  // A creator whose top reels carry "Caption: " descriptions (instant pass)
-  // must not claim ig_public_chrome views.
-  const captionButAccurate = await count(
-    db
-      .select({ n: N })
-      .from(schema.cmCreators)
-      .innerJoin(schema.cmCreatorReels, eq(schema.cmCreatorReels.creatorId, schema.cmCreators.id))
-      .where(and(eq(schema.cmCreators.viewsSource, "ig_public_chrome"), sql`${schema.cmCreatorReels.description} like 'Caption: %'`)),
-  );
-  check("no ig_public_chrome creator has caption-only (est) reel descriptions", captionButAccurate === 0, `${captionButAccurate}`);
   const viewsNoSource = await count(
     db
       .select({ n: N })
@@ -92,14 +82,6 @@ async function main() {
   );
   // Informational: the HELLA import deliberately left Trail Boss Dad unresolved.
   console.log(`  [info] passed/declined without an exit reason: ${terminalNoReason} (should trend to 0)`);
-  const dupOpenRequests = await scalar(sql`
-    select count(*)::int from (
-      select creator_id from cm_research_requests
-      where status in ('queued', 'running')
-      group by creator_id having count(*) > 1
-    ) dup`);
-  check("at most one open research request per creator", dupOpenRequests === 0, `${dupOpenRequests} creators with duplicates`);
-
   const multiShip = await scalar(sql`
     select count(*)::int from (
       select partnership_id from cm_shipments

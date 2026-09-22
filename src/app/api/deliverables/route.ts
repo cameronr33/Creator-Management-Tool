@@ -6,7 +6,6 @@ import { applyAutoStage } from "@/lib/auto-stage";
 import { db } from "@/lib/db";
 import { cmDeliverables, cmPlatformEnum } from "@/lib/db/schema";
 import { instagramShortcode } from "@/lib/csv";
-import { fetchPosts } from "@/lib/apify";
 
 const schema = z.object({
   partnershipId: z.string().uuid(),
@@ -14,11 +13,10 @@ const schema = z.object({
   url: httpUrl,
   postedAt: isoDate.nullable().optional(),
   caption: z.string().nullable().optional(),
-  /** Default path: pull views/likes/comments/postedAt from Apify (provisional). */
-  fetchMetrics: z.boolean().default(false),
   /**
-   * Manual override for a number the operator read off the Instagram app —
-   * the only path that earns the authoritative ig_public_chrome label.
+   * Optional number the operator read off the Instagram app. Saving a video
+   * is link-only (owner decision, 2026-09-22); a typed number is the one
+   * that earns the authoritative ig_public_chrome label.
    */
   publicViews: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
@@ -36,50 +34,17 @@ export async function POST(req: NextRequest) {
   const scope = await assertPartnershipInSelectedClient(d.partnershipId);
   if (scope) return scope;
 
-  let warning: string | null = null;
-  let fetched: {
-    views: number | null;
-    likes: number | null;
-    comments: number | null;
-    caption: string | null;
-    postedAt: Date | null;
-  } | null = null;
-
-  if (d.fetchMetrics && d.platform === "instagram") {
-    try {
-      const [post] = await fetchPosts([d.url]);
-      if (post) {
-        fetched = {
-          views: post.videoPlayCount,
-          likes: post.likesCount,
-          comments: post.commentsCount,
-          caption: post.caption,
-          postedAt: post.timestamp ? new Date(post.timestamp) : null,
-        };
-      } else {
-        warning = "Apify returned no data for this URL — saved without metrics.";
-      }
-    } catch (err) {
-      warning = `Metric fetch failed — saved without metrics. ${err instanceof Error ? err.message : ""}`.trim();
-    }
-  }
-
-  // Manual publicViews wins over the Apify number and carries the
-  // authoritative label; Apify-sourced figures stay provisional ("apify").
-  const views = d.publicViews ?? fetched?.views ?? null;
-  const metricsSource =
-    d.publicViews != null ? ("ig_public_chrome" as const) : fetched?.views != null ? ("apify" as const) : null;
+  const views = d.publicViews ?? null;
+  const metricsSource = views != null ? ("ig_public_chrome" as const) : null;
 
   await db.insert(cmDeliverables).values({
     partnershipId: d.partnershipId,
     platform: d.platform,
     url: d.url,
     shortcode: instagramShortcode(d.url),
-    postedAt: d.postedAt ? new Date(d.postedAt) : (fetched?.postedAt ?? null),
-    caption: d.caption ?? fetched?.caption ?? null,
+    postedAt: d.postedAt ? new Date(d.postedAt) : new Date(),
+    caption: d.caption ?? null,
     views,
-    likes: fetched?.likes ?? null,
-    comments: fetched?.comments ?? null,
     metricsSource,
     metricsRefreshedAt: views != null ? new Date() : null,
     notes: d.notes ?? null,
@@ -88,5 +53,5 @@ export async function POST(req: NextRequest) {
   // A live post advances the pipeline to posted.
   const stageChanged = await applyAutoStage(d.partnershipId, "deliverable_added", session.user.id);
 
-  return NextResponse.json({ ok: true, stageChanged, warning });
+  return NextResponse.json({ ok: true, stageChanged });
 }

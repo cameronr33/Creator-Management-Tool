@@ -2,12 +2,12 @@
  * Shared helpers for API route handlers.
  */
 
-import { createHash, timingSafeEqual } from "crypto";
+import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
-import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { cmApiKeys, cmCreators, cmPartnerships } from "@/lib/db/schema";
+import { cmCreators, cmPartnerships } from "@/lib/db/schema";
 import { resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 
@@ -21,58 +21,6 @@ export async function requireAuth() {
     };
   }
   return { session, error: null };
-}
-
-export function hashApiKey(raw: string): string {
-  return createHash("sha256").update(raw).digest("hex");
-}
-
-/**
- * Authenticates a machine caller (the creator-research skill) via
- * `Authorization: Bearer <key>`. Stamps lastUsedAt at most once an hour —
- * the research queue is polled, and a write per poll is pure amplification.
- */
-export async function requireApiKey(request: Request) {
-  const header = request.headers.get("authorization") ?? "";
-  const raw = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-
-  if (!raw) {
-    return {
-      apiKey: null,
-      error: NextResponse.json(
-        { error: "Missing Authorization: Bearer <key>" },
-        { status: 401 },
-      ),
-    };
-  }
-
-  const [key] = await db
-    .select()
-    .from(cmApiKeys)
-    .where(and(eq(cmApiKeys.keyHash, hashApiKey(raw)), isNull(cmApiKeys.revokedAt)))
-    .limit(1);
-
-  if (!key) {
-    return {
-      apiKey: null,
-      error: NextResponse.json({ error: "Invalid or revoked API key" }, { status: 401 }),
-    };
-  }
-
-  const staleAfter = new Date(Date.now() - 60 * 60 * 1000);
-  if (!key.lastUsedAt || key.lastUsedAt < staleAfter) {
-    await db
-      .update(cmApiKeys)
-      .set({ lastUsedAt: sql`now()` })
-      .where(
-        and(
-          eq(cmApiKeys.id, key.id),
-          or(isNull(cmApiKeys.lastUsedAt), lt(cmApiKeys.lastUsedAt, staleAfter)),
-        ),
-      );
-  }
-
-  return { apiKey: key, error: null };
 }
 
 /** Guards the /api/cron/* routes, which the Railway worker calls. Constant-time compare. */

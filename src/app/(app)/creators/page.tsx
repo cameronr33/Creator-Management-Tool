@@ -1,20 +1,17 @@
 import Link from "next/link";
-import { ExternalLink, Mail, Plus } from "lucide-react";
+import { ExternalLink, Mail, Plus, Upload } from "lucide-react";
 import { resolveClient, getCampaigns, getCreatorRows } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { PageHeader, EmptyState, StagePill, Avatar, Badge, Button } from "@/components/ui";
 import { CreatorsFilterBar } from "@/components/creators-filter-bar";
 import { compactNumber, relativeDays } from "@/lib/format";
 import type { CmStage } from "@/lib/db/schema";
-import { EST_VIEWS_NOTE } from "@/lib/copy";
-import { getWorkspaceItems } from "@/lib/workspace-data";
-import { CreatorWorkspace } from "@/components/creator-workspace";
 import { STAGES } from "@/lib/stages";
 
 export default async function CreatorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; stage?: string; campaign?: string; view?: string }>;
+  searchParams: Promise<{ q?: string; stage?: string; campaign?: string }>;
 }) {
   const sp = await searchParams;
   const client = await resolveClient(await getSelectedClientSlug());
@@ -29,15 +26,6 @@ export default async function CreatorsPage({
     );
   }
 
-  if (sp.view !== "research") {
-    const items = await getWorkspaceItems(client.id);
-    return <>
-      <PageHeader title="Creators" client={client.name} subtitle={`${items.length} partnerships across your campaigns`}
-        help="Open the next task, preview a partnership, or go deeper into the creator's profile and research."
-        actions={<><Button href="/creators?view=research">Research table</Button><Button href="/pipeline">Pipeline board</Button><Button href="/creators/new" variant="primary" icon={<Plus size={15} />}>Add creator</Button></>} />
-      <div className="p-4 sm:p-6"><CreatorWorkspace items={items} mode="directory" /></div>
-    </>;
-  }
   const campaigns = await getCampaigns(client.id);
   let rows = await getCreatorRows(client.id, {
     campaignId: sp.campaign || undefined,
@@ -59,6 +47,11 @@ export default async function CreatorsPage({
       Add creator
     </Button>
   );
+  const importButton = (
+    <Button href="/import" icon={<Upload size={15} />}>
+      Import CSV
+    </Button>
+  );
 
   return (
     <>
@@ -67,7 +60,7 @@ export default async function CreatorsPage({
         client={client.name}
         subtitle={`${rows.length} shown`}
         help="Everyone tracked for this client. Search by name, handle or content type, filter by campaign or stage, and open a row for the full record."
-        actions={<><Button href="/creators">Workspace view</Button>{addButton}</>}
+        actions={<>{importButton}{addButton}</>}
       >
         <CreatorsFilterBar campaigns={campaigns} />
       </PageHeader>
@@ -75,19 +68,17 @@ export default async function CreatorsPage({
         {rows.length === 0 ? (
           <EmptyState
             title="No creators match"
-            hint="Try clearing the filters, or add a creator by pasting their profile link."
-            action={addButton}
+            hint="Try clearing the filters, import a CSV of creators, or add one by pasting their profile link."
+            action={<div className="flex gap-2">{importButton}{addButton}</div>}
           />
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-card">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs font-semibold text-text-muted">
                   <th className="px-4 py-2.5 font-semibold">Creator</th>
                   <th className="px-4 py-2.5 font-semibold">Content type</th>
                   <th className="px-4 py-2.5 text-right font-semibold">Followers</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Avg views</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Max views</th>
                   <th className="px-4 py-2.5 font-semibold">Stage</th>
                   <th className="px-4 py-2.5 font-semibold">Last contact</th>
                   <th className="px-4 py-2.5 font-semibold">Campaign</th>
@@ -132,17 +123,6 @@ export default async function CreatorsPage({
                     </td>
                     <td className="px-4 py-2.5 text-text-muted">{r.contentPillar ?? "—"}</td>
                     <td className="px-4 py-2.5 text-right tabular">{compactNumber(r.followers)}</td>
-                    <td className="px-4 py-2.5 text-right tabular">
-                      <span className="inline-flex items-center gap-1">
-                        {compactNumber(r.avgViews)}
-                        {r.viewsSource === "apify" && (
-                          <Badge tone="muted" title={EST_VIEWS_NOTE}>
-                            est
-                          </Badge>
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular">{compactNumber(r.maxViews)}</td>
                     <td className="px-4 py-2.5">
                       <StagePill stage={r.stage} />
                     </td>

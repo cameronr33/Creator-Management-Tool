@@ -4,6 +4,6 @@
  */
 
 export const EST_VIEWS_NOTE =
-  "Estimated — from the scraper, which under-counts Instagram's public views. Run full research for the verified number.";
+  "Estimated — from a scraper that under-counts Instagram's public views. Don't use it in a client report.";
 
-export const VERIFIED_VIEWS_NOTE = "Verified — read from Instagram's public view counts in a full research run.";
+export const VERIFIED_VIEWS_NOTE = "Verified — read from Instagram's public view counts.";

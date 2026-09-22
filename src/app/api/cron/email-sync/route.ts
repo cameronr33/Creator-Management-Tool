@@ -5,7 +5,7 @@ import { runJob } from "@/lib/job-runs";
 import { requireCompleteSync } from "@/lib/gmail-sync-outcome";
 
 /**
- * POST /api/cron/email-sync — the twice-daily automatic sync, driven by
+ * POST /api/cron/email-sync — the scheduled sync, driven by
  * scripts/cron-worker.ts with the CRON_SECRET bearer. Every run leaves a
  * cm_job_runs heartbeat: "idle" when no mailbox is connected (healthy but
  * inert — and visibly so in Settings), "ok" after a real pass, "error" on
@@ -33,7 +33,6 @@ export async function POST(req: NextRequest) {
           skipped: result.skipped,
           unmatched: result.unmatched.length,
           stageChanges: result.stageChanges.length,
-          suggestionsOpen: result.suggestionsOpen,
         },
       };
     });

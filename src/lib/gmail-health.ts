@@ -6,7 +6,7 @@ export interface GmailHealthInput {
 }
 
 export interface GmailHealthSummary {
-  state: "disconnected" | "never" | "error" | "partial" | "stale" | "idle" | "review" | "checked" | "unknown";
+  state: "disconnected" | "never" | "error" | "partial" | "stale" | "idle" | "checked" | "unknown";
   tone: "info" | "good" | "warn" | "bad";
   label: string;
   detail: string;
@@ -28,7 +28,6 @@ export const GMAIL_STALE_AFTER_HOURS = 18;
 
 export function summarizeGmailHealth(
   account: GmailHealthInput | null,
-  openSuggestions = 0,
   now = new Date(),
 ): GmailHealthSummary {
   const base = { stale: false, fetchErrors: 0, lastCheckedAt: null };
@@ -61,27 +60,10 @@ export function summarizeGmailHealth(
     return { ...facts, state: "stale", tone: "warn", label: "Email check overdue", detail: "No check has been recorded in over 18 hours. Recent replies may be missing." };
   }
   if (status.startsWith("idle")) {
-    return { ...facts, state: "idle", tone: "warn", label: "No creator addresses to match", detail: "The last check had no creator email addresses to search. Add known addresses or review unmatched senders." };
+    return { ...facts, state: "idle", tone: "warn", label: "No creator addresses to match", detail: "No creator has an email address yet, so there is nothing to track. Add their email on the creator page." };
   }
   if (status !== "ok") {
     return { ...facts, state: "unknown", tone: "warn", label: "Email result unknown", detail: "The last check has no recognized completion status. Run another check before relying on it." };
   }
-  if (summary.messagesFetched === 0 && openSuggestions > 0) {
-    return { ...facts, state: "review", tone: "warn", label: "Sender review needed", detail: "The last check matched no messages, and unmatched senders need review. Confirm which addresses belong to creators." };
-  }
   return { ...facts, state: "checked", tone: "info", label: "Email checked recently", detail: "The last recorded check reported no fetch errors. Only messages visible to the connected mailbox can be tracked." };
-}
-
-/** Existing jobs can record "ok" even when their summary contains skipped fetches. */
-export function summarizeJobHealth(job: {
-  overdue: boolean;
-  failing: boolean;
-  lastRun: { status: string; summary?: unknown } | null;
-}): { label: string; tone: "info" | "good" | "warn" | "bad" } {
-  if (!job.lastRun) return { label: "never ran", tone: "warn" };
-  if (job.failing || job.lastRun.status === "error") return { label: "failing", tone: "bad" };
-  if (job.overdue) return { label: "overdue", tone: "warn" };
-  if (job.lastRun.status === "running") return { label: "running", tone: "info" };
-  if (count(asSummary(job.lastRun.summary).fetchErrors) > 0) return { label: "partial", tone: "warn" };
-  return { label: job.lastRun.status, tone: job.lastRun.status === "ok" || job.lastRun.status === "idle" ? "good" : "warn" };
 }

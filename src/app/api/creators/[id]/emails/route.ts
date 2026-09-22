@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth, badRequest } from "@/lib/api-helpers";
-import { addCreatorEmail, removeCreatorEmail } from "@/lib/email-suggestions";
+import { addCreatorEmail, removeCreatorEmail } from "@/lib/creator-emails";
 
 const schema = z.object({ email: z.string().min(3) });
 

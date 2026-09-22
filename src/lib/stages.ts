@@ -35,7 +35,7 @@ export const STAGES: StageMeta[] = [
     value: "shortlisted",
     label: "Shortlisted",
     group: "research",
-    hint: "Approved for outreach. Nothing sent yet — they'll appear on the Outreach list.",
+    hint: "Approved for outreach. Nothing sent yet — they appear on Today under To contact.",
     terminal: false,
   },
   {
@@ -218,7 +218,7 @@ export function exitReasonLabel(value: string | null | undefined): string {
  * what the engine does.
  */
 export const AUTO_TRIGGER_LABELS: Record<AutoStageTrigger, string> = {
-  outbound_message: "a first message is logged (from the Outreach list, the timeline, or the email sync)",
+  outbound_message: "a first message is logged (I messaged them, or an email found in the mailbox)",
   inbound_message: "the creator replies (logged by you, or found by the email sync)",
   address_complete: "a complete shipping address is saved",
   shipment_shipped: "the shipment is marked shipped",

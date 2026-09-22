@@ -12,7 +12,7 @@ async function main() {
   const days = Number(process.argv[2] ?? 90);
   const r = await runGmailSync({ windowDays: days });
   console.log(
-    `window ${r.windowDays}d · ${r.messagesFetched} messages · ${r.inserted} new · ${r.skipped} refreshed · ${r.suggestionsOpen} unmatched senders`,
+    `window ${r.windowDays}d · ${r.messagesFetched} messages · ${r.inserted} new · ${r.skipped} refreshed`,
   );
 }
 

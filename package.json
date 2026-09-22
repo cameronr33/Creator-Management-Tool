@@ -21,9 +21,7 @@
     "backfill:socials": "tsx --env-file=.env.local scripts/backfill-socials.ts",
     "verify:import": "tsx scripts/verify-import.ts",
     "verify:add-creator": "tsx --env-file=.env.local scripts/verify-add-creator.ts",
-    "verify:quick-analysis": "tsx --env-file=.env.local scripts/verify-quick-analysis.ts",
     "verify:auto-stage": "tsx --env-file=.env.local scripts/verify-auto-stage.ts",
-    "verify:outreach-flow": "tsx --env-file=.env.local scripts/verify-outreach-flow.ts",
     "verify:editors": "tsx --env-file=.env.local scripts/verify-editors.ts",
     "verify:email-ingest": "tsx --env-file=.env.local scripts/verify-email-ingest.ts",
     "verify:gmail-sync": "tsx --env-file=.env.local scripts/verify-gmail-sync.ts",
@@ -32,7 +30,6 @@
     "verify:workspace": "tsx scripts/verify-workspace.ts",
     "verify:workspace-db": "node scripts/preview/run.mjs verify scripts/verify-workspace-db.ts",
     "verify:creator-workspace": "tsx scripts/verify-creator-workspace.ts",
-    "verify:message-draft": "tsx scripts/verify-message-draft.ts",
     "verify:gmail-health": "tsx scripts/verify-gmail-health.ts",
     "verify:gmail-sync-outcome": "tsx scripts/verify-gmail-sync-outcome.ts",
     "verify:preview-cookies": "tsx scripts/verify-preview-cookies.ts",
@@ -46,7 +43,8 @@
     "verify:invariants": "tsx --env-file=.env.local scripts/verify-invariants.ts",
     "seed:clients": "tsx --env-file=.env.local scripts/seed-clients.ts",
     "fix:duplicate-shipments": "tsx --env-file=.env.local scripts/fix-duplicate-shipments.ts",
-    "cron": "tsx scripts/cron-worker.ts"
+    "cron": "tsx scripts/cron-worker.ts",
+    "db:backup": "tsx --env-file=.env.local scripts/backup-tables.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

@@ -10,12 +10,8 @@ import {
   cmShipments,
   cmDeliverables,
   cmProductsRequested,
-  cmCreatorReels,
   cmCreatorSocials,
-  cmAlerts,
-  cmMessageTemplates,
   cmResearchRuns,
-  cmApiKeys,
   cmClientSettings,
   type CmStage,
 } from "@/lib/db/schema";
@@ -257,19 +253,6 @@ export async function getOutreachStates(
   return map;
 }
 
-/** Count of partnerships per stage for the given client. */
-export async function getStageCounts(clientId: string): Promise<Record<string, number>> {
-  const rows = await db
-    .select({ stage: cmPartnerships.stage, count: sql<number>`count(*)::int` })
-    .from(cmPartnerships)
-    .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
-    .where(eq(cmCreators.clientId, clientId))
-    .groupBy(cmPartnerships.stage);
-  const out: Record<string, number> = {};
-  for (const r of rows) out[r.stage] = r.count;
-  return out;
-}
-
 /** Full detail for one partnership + creator. */
 export async function getPartnershipDetail(partnershipId: string) {
   const [row] = await db
@@ -285,9 +268,8 @@ export async function getPartnershipDetail(partnershipId: string) {
     .limit(1);
   if (!row) return null;
 
-  const [reels, socials, events, products, shipments, deliverables, otherPartnerships] =
+  const [socials, events, products, shipments, deliverables, otherPartnerships] =
     await Promise.all([
-      db.select().from(cmCreatorReels).where(eq(cmCreatorReels.creatorId, row.creator.id)).orderBy(cmCreatorReels.rank),
       db.select().from(cmCreatorSocials).where(eq(cmCreatorSocials.creatorId, row.creator.id)).orderBy(desc(cmCreatorSocials.isPrimary)),
       // Bounded: the email sync writes into this table, and a long-running
       // thread would otherwise ship every message body on every page view.
@@ -304,7 +286,6 @@ export async function getPartnershipDetail(partnershipId: string) {
 
   return {
     ...row,
-    reels,
     socials,
     events,
     products,
@@ -312,33 +293,6 @@ export async function getPartnershipDetail(partnershipId: string) {
     deliverables,
     outreach: deriveOutreachState(events),
     otherPartnerships: otherPartnerships.filter((p) => p.id !== partnershipId),
-  };
-}
-
-export async function getDefaultTemplate(clientId: string, channel: "ig_dm" | "email" = "ig_dm") {
-  const [tpl] = await db
-    .select()
-    .from(cmMessageTemplates)
-    .where(
-      and(
-        eq(cmMessageTemplates.clientId, clientId),
-        eq(cmMessageTemplates.isDefault, true),
-        eq(cmMessageTemplates.channel, channel),
-      ),
-    )
-    .limit(1);
-  return tpl ?? null;
-}
-
-/** Both channel defaults in one query — the worklist renders either. */
-export async function getDefaultTemplates(clientId: string) {
-  const rows = await db
-    .select()
-    .from(cmMessageTemplates)
-    .where(and(eq(cmMessageTemplates.clientId, clientId), eq(cmMessageTemplates.isDefault, true)));
-  return {
-    ig_dm: rows.find((r) => r.channel === "ig_dm") ?? null,
-    email: rows.find((r) => r.channel === "email") ?? null,
   };
 }
 
@@ -362,43 +316,4 @@ export async function getResearchRuns(clientId: string, limit = 15) {
     .where(eq(cmResearchRuns.clientId, clientId))
     .orderBy(desc(cmResearchRuns.startedAt))
     .limit(limit);
-}
-
-/** Never selects keyHash — it must not cross into the RSC payload. */
-export async function getApiKeys() {
-  return db
-    .select({
-      id: cmApiKeys.id,
-      name: cmApiKeys.name,
-      keyPrefix: cmApiKeys.keyPrefix,
-      lastUsedAt: cmApiKeys.lastUsedAt,
-      revokedAt: cmApiKeys.revokedAt,
-      createdAt: cmApiKeys.createdAt,
-    })
-    .from(cmApiKeys)
-    .orderBy(desc(cmApiKeys.createdAt));
-}
-
-export async function getTemplates(clientId: string) {
-  return db
-    .select()
-    .from(cmMessageTemplates)
-    .where(eq(cmMessageTemplates.clientId, clientId))
-    .orderBy(desc(cmMessageTemplates.isDefault));
-}
-
-export async function getOpenAlerts(clientId: string) {
-  return db
-    .select({
-      alert: cmAlerts,
-      partnershipId: cmPartnerships.id,
-      name: cmCreators.name,
-      username: cmCreators.username,
-      stage: cmPartnerships.stage,
-    })
-    .from(cmAlerts)
-    .innerJoin(cmPartnerships, eq(cmAlerts.partnershipId, cmPartnerships.id))
-    .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
-    .where(and(eq(cmCreators.clientId, clientId), eq(cmAlerts.status, "open")))
-    .orderBy(cmAlerts.dueAt);
 }

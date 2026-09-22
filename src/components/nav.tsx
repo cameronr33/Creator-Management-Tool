@@ -2,43 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Users,
-  Send,
-  Kanban,
-  Megaphone,
-  Upload,
-  Settings,
-  CircleHelp,
-  Inbox,
-  type LucideIcon,
-} from "lucide-react";
+import { LayoutDashboard, Users, Kanban, Settings, CircleHelp, type LucideIcon } from "lucide-react";
 
 /**
- * Ordered the way a day goes: what's stuck → send what's due → see the
- * funnel → look someone up. Setup lives under its own heading so a new
- * teammate can tell daily work from one-time configuration.
+ * Four places, in the order a day goes: what needs you (Today), where every
+ * deal stands (Pipeline), the list you manage (Creators), one-time setup
+ * (Settings). Everything else was cut on purpose — see README "Design system".
  */
-const SECTIONS: { label: string; links: { href: string; label: string; icon: LucideIcon; exact?: boolean }[] }[] = [
-  {
-    label: "Work",
-    links: [
-      { href: "/", label: "Today", icon: LayoutDashboard, exact: true },
-      { href: "/creators", label: "Creators", icon: Users },
-      { href: "/campaigns", label: "Campaigns", icon: Megaphone },
-      { href: "/review", label: "Needs review", icon: Inbox },
-    ],
-  },
-  {
-    label: "Tools & settings",
-    links: [
-      { href: "/outreach", label: "Outreach", icon: Send },
-      { href: "/pipeline", label: "Pipeline board", icon: Kanban },
-      { href: "/import", label: "Import research", icon: Upload },
-      { href: "/settings", label: "Settings", icon: Settings },
-    ],
-  },
+const LINKS: { href: string; label: string; icon: LucideIcon; exact?: boolean }[] = [
+  { href: "/", label: "Today", icon: LayoutDashboard, exact: true },
+  { href: "/pipeline", label: "Pipeline", icon: Kanban },
+  { href: "/creators", label: "Creators", icon: Users },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function NavLink({
@@ -78,20 +53,11 @@ export function NavLink({
   );
 }
 
-export function Nav({ settingsBadge }: { settingsBadge?: number }) {
+export function Nav() {
   return (
-    <nav className="flex flex-col gap-5">
-      {SECTIONS.map((section) => (
-        <div key={section.label}>
-          <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">
-            {section.label}
-          </div>
-          <div className="flex flex-col gap-0.5">
-            {section.links.map((l) => (
-              <NavLink key={l.href} {...l} badge={l.href === "/review" ? settingsBadge : undefined} />
-            ))}
-          </div>
-        </div>
+    <nav className="flex flex-col gap-0.5">
+      {LINKS.map((l) => (
+        <NavLink key={l.href} {...l} />
       ))}
     </nav>
   );

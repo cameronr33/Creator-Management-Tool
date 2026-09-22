@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Eye,
-  Play,
   MapPin,
   Package,
   Clapperboard,
@@ -14,7 +13,7 @@ import {
   Handshake,
   FlaskConical,
 } from "lucide-react";
-import { getPartnershipDetail, getClients, getDefaultTemplates } from "@/lib/queries";
+import { getPartnershipDetail, getClients } from "@/lib/queries";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
 import { Card, CardHeader, StagePill, Avatar, Badge, Callout } from "@/components/ui";
 import {
@@ -25,7 +24,6 @@ import {
   FeeEditor,
   AgreementEditor,
   BriefEditor,
-  Disclosure,
 } from "@/components/partnership-actions";
 import {
   EditableProfile,
@@ -34,11 +32,8 @@ import {
   AddressEditor,
   ProductEditor,
 } from "@/components/profile-editors";
-import { MessageComposer } from "@/components/message-composer";
-import { ReplyButton } from "@/components/reply-button";
-import { FullAnalysisButton } from "@/components/full-analysis-button";
-import { getLatestRequestForPartnership } from "@/lib/research-requests";
-import { getCreatorEmails } from "@/lib/email-suggestions";
+import { ReplyButton, MessagedButton } from "@/components/reply-button";
+import { getCreatorEmails } from "@/lib/creator-emails";
 import { compactNumber, fullNumber, money, shortDate, relativeDays } from "@/lib/format";
 import { channelLabel } from "@/lib/outreach";
 import { formatAddress } from "@/lib/address";
@@ -65,19 +60,15 @@ export default async function CreatorDetailPage({
   const section = creatorSection(query.tab);
   const returnTo = safeCreatorReturnTo(query.returnTo);
   const sectionHref = (target: CreatorSection) => creatorSectionHref(id, target, returnTo);
-  const [detail, latestRequest] = await Promise.all([
-    getPartnershipDetail(id),
-    getLatestRequestForPartnership(id),
-  ]);
+  const detail = await getPartnershipDetail(id);
   if (!detail) notFound();
 
-  const { creator, partnership, campaign, reels, socials, events, products, shipments, deliverables, outreach, otherPartnerships } =
+  const { creator, partnership, campaign, socials, events, products, shipments, deliverables, outreach, otherPartnerships } =
     detail;
-  const [clients, creatorEmails, gmailAccount, templates] = await Promise.all([
+  const [clients, creatorEmails, gmailAccount] = await Promise.all([
     getClients(),
     getCreatorEmails(creator.id),
     getActiveGmailAccount(),
-    getDefaultTemplates(creator.clientId),
   ]);
   const client = clients.find((item) => item.id === creator.clientId);
 
@@ -122,8 +113,6 @@ export default async function CreatorDetailPage({
     <Badge tone="muted">not contacted</Badge>
   );
 
-  const composerKind = outreach.totalOutbound === 0 ? "initial" : "follow_up";
-  const composerOpen = stageIndex(partnership.stage) >= 0 && stageIndex(partnership.stage) <= stageIndex("contacted");
   const visibleEvents = events.slice(0, TIMELINE_PREVIEW);
   const hiddenEvents = events.slice(TIMELINE_PREVIEW);
   const addressAlarm = !hasAddress && stageIndex(partnership.stage) >= stageIndex("awaiting_address");
@@ -245,6 +234,7 @@ export default async function CreatorDetailPage({
               actions={
                 <>
                   {conversationBadge}
+                  <MessagedButton partnershipId={partnership.id} name={creator.name} hasOutbound={outreach.totalOutbound > 0} />
                   <ReplyButton partnershipId={partnership.id} name={creator.name} />
                 </>
               }
@@ -276,24 +266,6 @@ export default async function CreatorDetailPage({
             )}
 
             <div className="mt-4 space-y-3 border-t border-border pt-4">
-              <Disclosure label={composerKind === "initial" ? "Write the first message" : "Write a follow-up"} defaultOpen={composerOpen}>
-                <MessageComposer
-                  target={{
-                    partnershipId: partnership.id,
-                    name: creator.name,
-                    username: creator.username,
-                    businessEmail: creator.businessEmail,
-                    contentPillar: creator.contentPillar,
-                    outreachReason: partnership.outreachReason,
-                  }}
-                  templates={{
-                    ig_dm: templates.ig_dm ? { subject: null, body: templates.ig_dm.body } : null,
-                    email: templates.email ? { subject: templates.email.subject, body: templates.email.body } : null,
-                    ccEmail: gmailAccount?.email ?? null,
-                  }}
-                  kind={composerKind}
-                />
-              </Disclosure>
               <TimelineNote partnershipId={partnership.id} hasOutbound={outreach.totalOutbound > 0} />
             </div>
           </Card>
@@ -313,9 +285,9 @@ export default async function CreatorDetailPage({
           </Card>
           <Card className="p-4">
             <CardHeader
-              title="Research"
+              title="Numbers"
               icon={<FlaskConical size={14} />}
-              actions={<FullAnalysisButton partnershipId={partnership.id} initialRequest={latestRequest} />}
+              description="From Instagram or an imported research file."
             />
             <div className="mt-3 grid grid-cols-3 gap-3 xl:grid-cols-6">
               {metrics.map((m) => (
@@ -350,32 +322,6 @@ export default async function CreatorDetailPage({
             )}
           </Card>
 
-          {reels.length > 0 && (
-            <Card className="p-4">
-              <CardHeader title="Top reels" />
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {reels.map((reel) => (
-                  <a
-                    key={reel.id}
-                    href={reel.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-lg border border-border p-3 transition hover:border-accent-ring hover:bg-surface-2"
-                  >
-                    <div className="flex items-center justify-between text-xs text-text-muted">
-                      <span className="flex items-center gap-1">
-                        <Play size={11} /> #{reel.rank}
-                      </span>
-                      <span className="flex items-center gap-1 tabular font-semibold text-text">
-                        <Eye size={11} /> {compactNumber(reel.views)}
-                      </span>
-                    </div>
-                    <p className="mt-2 line-clamp-4 text-xs text-text-muted">{reel.description ?? "No description"}</p>
-                  </a>
-                ))}
-              </div>
-            </Card>
-          )}
           </div>
         )}
 

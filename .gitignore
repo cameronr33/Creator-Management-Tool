@@ -48,3 +48,6 @@ __pycache__/
 
 # Isolated, synthetic local preview database and runtime
 /.local-preview/
+
+# Local JSON backups of production rows before destructive migrations
+/backups/

@@ -204,69 +204,13 @@ Present both files to the user with `mcp__cowork__present_files`.
 
 ---
 
-## Step 12 — Push into Creator Manager
+## Step 12 — Import into Creator Manager
 
-After the CSV is written, push the same records into the Creator Manager app so the research lands in the database automatically. The CSV write stays — it is the fallback and the audit trail.
+The CSV is the hand-off. In the Creator Manager app, open **Creators → Import CSV**, pick the file, check the preview (it shows which creators are new, which campaigns it will create from the `Campaign` column, and any rows it can't read), then click **Import**.
 
-Run the bundled push script:
+The import matches creators on their Instagram handle within the client and never overwrites stage, conversation, agreement, shipping or posted videos — re-importing research for a creator who is already shipping leaves their pipeline untouched. New creators start in **To contact**.
 
-```bash
-python scripts/push_to_creator_manager.py \
-  --csv "C:\Users\camer\Downloads\COWORK\CLAUDE OUTPUTS\<CLIENT>\<CLIENT> - Creator Research - YYYY-MM-DD.csv" \
-  --client <client-slug> \
-  --campaign "<Campaign name>"
-```
-
-It reads `CM_API_URL` (e.g. `https://creator-manager.up.railway.app` or `http://localhost:3002`) and `CM_API_KEY` from the environment, converts each CSV row to the ingest shape, and POSTs to `{CM_API_URL}/api/ingest/research` with `Authorization: Bearer {CM_API_KEY}`.
-
-The endpoint **upserts on (client, username)**: it refreshes each creator's research metrics and top-3 reels, and creates a partnership at stage `researched` only if one doesn't already exist for that campaign. It **never** overwrites stage, outreach history, agreement, shipping, or deliverables — re-running research on a creator who is already `signed` or `shipped` leaves their pipeline untouched.
-
-Create the API key once in the app under **Settings → API keys** (the raw key is shown a single time). If the push fails (missing key, app down), the CSV is still on disk — tell the user and let them upload it via the app's Import page instead.
-
-**View-count caveat.** The `Views Source` column carries through: rows scraped from the Chrome grid land as `ig_public_chrome` (trustworthy), Apify fallbacks as `apify` (provisional). The app relies on this label to keep estimated numbers out of client reports — do not relabel them.
-
----
-
-## Queue mode — running this skill for the "Full Analysis" button
-
-The app has a **Full Analysis** button on each creator's page. Clicking it runs an *instant* Apify-only pass on the server immediately (labelled `est.` throughout the UI — it is provisional for exactly the reasons in the Guardrails section below), and queues a request for the *accurate* pass: a full run of this skill, including the Chrome grid scrape and vision-based reel descriptions, which only your machine can do.
-
-Run this while you're at your machine, either as a one-off check or as a recurring `/loop`:
-
-```bash
-/loop 30m check the Creator Manager research queue and process pending requests with the creator-research skill
-```
-
-Each pass through the queue:
-
-1. **List open requests:**
-   ```bash
-   python scripts/queue_client.py --list
-   ```
-   Prints one tab-separated line per queued request: `requestId  clientSlug  campaignName  @username  name  contentPillar`. Empty output means nothing to do — stop here.
-
-2. **For each request, claim it** so a concurrent run (or a stale retry) doesn't duplicate the work:
-   ```bash
-   python scripts/queue_client.py --claim <requestId>
-   ```
-
-3. **Run the normal 11-step pipeline** (Steps 1–11 above) for just that one handle, under the campaign and content pillar named in the queue row. Confirm the campaign and content pillar with the user only if the queue row leaves either blank — otherwise proceed without asking, since the request already encodes the user's intent from clicking the button.
-
-4. **Push the result** exactly as in Step 12:
-   ```bash
-   python scripts/push_to_creator_manager.py --csv "<path>" --client <clientSlug> --campaign "<campaignName>"
-   ```
-   This is what actually overwrites the provisional `est.` data with the accurate Chrome-scraped numbers and vision-based descriptions — the ingest endpoint's upsert-without-clobbering-pipeline-state behavior (Step 12) applies here unchanged.
-
-5. **Report the outcome:**
-   ```bash
-   python scripts/queue_client.py --complete <requestId>
-   # or, on failure:
-   python scripts/queue_client.py --fail <requestId> --error "short reason"
-   ```
-   A `--fail`ed request is not retried automatically — leave it for the user to notice the "Analysis failed" chip and click Retry, which re-queues it.
-
-Skip a request rather than guessing if the handle can't be resolved, the account is private, or the pipeline hits a guardrail below with no safe fallback — `--fail` it with a clear reason instead of pushing partial or wrong data.
+**View-count caveat.** The `Views Source` column carries through: rows scraped from the Chrome grid land as `ig_public_chrome` (trustworthy), Apify fallbacks as `apify` (provisional, shown as "estimated"). The app never replaces a verified number with an estimate — do not relabel them.
 
 ---
 

@@ -1,8 +1,51 @@
 "use client";
 
-import { Reply } from "lucide-react";
+import { Reply, Send } from "lucide-react";
 import { Button } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
+
+/**
+ * Instagram DMs can't be read automatically, so sending one is logged by
+ * hand in one click. That starts the follow-up clock and moves a creator
+ * from To contact to Contacted. Email needs no button: it is tracked.
+ */
+export function MessagedButton({
+  partnershipId,
+  name,
+  hasOutbound,
+  variant = "secondary",
+}: {
+  partnershipId: string;
+  name: string;
+  /** Whether an earlier message exists — decides first message vs follow-up. */
+  hasOutbound: boolean;
+  variant?: "primary" | "secondary";
+}) {
+  const { pending, run } = useSave();
+  return (
+    <Button
+      size="sm"
+      variant={variant}
+      icon={<Send size={13} />}
+      pending={pending}
+      title="You sent them an Instagram DM — logs it on the timeline"
+      onClick={() =>
+        run(
+          () =>
+            api("/api/outreach", {
+              partnershipId,
+              direction: "outbound",
+              channel: "ig_dm",
+              kind: hasOutbound ? "follow_up" : "initial",
+            }),
+          { success: `Logged a DM to ${name}` },
+        )
+      }
+    >
+      I messaged them
+    </Button>
+  );
+}
 
 /** The most common event after a send, reduced to one click. */
 export function ReplyButton({ partnershipId, name }: { partnershipId: string; name: string }) {

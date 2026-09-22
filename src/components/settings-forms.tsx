@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Copy, Check, Trash2, KeyRound, RefreshCw, Unplug } from "lucide-react";
-import { Button, Field, Input, Textarea, Callout } from "@/components/ui";
+import { Plus, RefreshCw, Unplug } from "lucide-react";
+import { Button, Field, Input, Callout } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
@@ -37,67 +37,6 @@ export function CampaignAdder({ clientId }: { clientId: string }) {
   );
 }
 
-export function TemplateEditor({
-  clientId,
-  channel,
-  template,
-}: {
-  clientId: string;
-  channel: "ig_dm" | "email";
-  template: { id: string; name: string; subject: string | null; body: string; isDefault: boolean } | null;
-}) {
-  const { pending, run } = useSave();
-  const [name, setName] = useState(
-    template?.name ?? (channel === "email" ? "Default email outreach" : "Default DM outreach"),
-  );
-  const [subject, setSubject] = useState(template?.subject ?? "");
-  const [body, setBody] = useState(template?.body ?? "");
-  const dirty =
-    name !== (template?.name ?? "") || body !== (template?.body ?? "") || subject !== (template?.subject ?? "");
-
-  const save = () =>
-    run(
-      () =>
-        api("/api/templates", {
-          id: template?.id,
-          clientId,
-          name,
-          channel,
-          subject: channel === "email" ? subject.trim() || null : null,
-          body,
-          isDefault: true,
-        }),
-      { success: `${channel === "email" ? "Email" : "DM"} template saved` },
-    );
-
-  return (
-    <div className="space-y-3">
-      <Field label="Template name">
-        <Input value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      {channel === "email" && (
-        <Field label="Subject line" hint="Placeholders work here too.">
-          <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Partnership with {{client}}" />
-        </Field>
-      )}
-      <Field
-        label="Message"
-        hint={
-          <>
-            Placeholders: <code>{"{{name}}"}</code> first name · <code>{"{{content_descriptor}}"}</code> their content type ·{" "}
-            <code>{"{{reason}}"}</code> the one-liner typed on the Outreach page.
-          </>
-        }
-      >
-        <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} className="font-mono text-xs" />
-      </Field>
-      <Button variant="primary" onClick={save} pending={pending} disabled={!body.trim() || !dirty}>
-        Save template
-      </Button>
-    </div>
-  );
-}
-
 export interface GmailAccountView {
   email: string;
   connectedAt: string;
@@ -110,7 +49,6 @@ export interface GmailAccountView {
     unmatched?: number;
     stageChanges?: number;
     messagesFetched?: number;
-    suggestionsOpen?: number;
     windowDays?: number;
     fetchErrors?: number;
   } | null;
@@ -129,7 +67,6 @@ export function GmailSyncStatus({ account }: { account: GmailAccountView }) {
           messagesFetched?: number;
           inserted?: number;
           stageChanges?: unknown[];
-          suggestionsOpen?: number;
           fetchErrors?: number;
         }>("/api/gmail/sync"),
       {},
@@ -141,7 +78,7 @@ export function GmailSyncStatus({ account }: { account: GmailAccountView }) {
         tone: partial ? "info" : "good",
         detail: `${partial ? `${d.fetchErrors} fetch(es) skipped; some messages may be missing. ` : ""}${d.messagesFetched ?? 0} matched message(s) · ${d.inserted ?? 0} new on timelines · ${
           d.stageChanges?.length ?? 0
-        } stage change(s) · ${d.suggestionsOpen ?? 0} sender(s) to link`,
+        } stage change(s)`,
       });
     }
   };
@@ -154,7 +91,7 @@ export function GmailSyncStatus({ account }: { account: GmailAccountView }) {
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <div className="min-w-0 text-text-muted">
           <div className="break-all font-medium text-text">{account.email}</div>
-          <div className="mt-0.5 text-xs">{account.lastSyncAt ? `Last checked ${account.lastSyncAt}` : "Scheduled twice daily; no check recorded"}</div>
+          <div className="mt-0.5 text-xs">{account.lastSyncAt ? `Last checked ${account.lastSyncAt}` : "No check recorded yet"}</div>
           {s && <div className="mt-0.5 text-xs">{s.messagesFetched ?? 0} matched · {s.inserted ?? 0} new on timelines{s.windowDays != null ? ` · ${s.windowDays}-day search window` : ""}</div>}
           {account.health.state === "error" && account.lastSyncStatus && <p className="mt-1 break-words text-xs text-bad">{account.lastSyncStatus}</p>}
         </div>
@@ -189,9 +126,8 @@ export function GmailConnectCard({
     return (
       <div className="space-y-3">
         <p className="text-sm text-text-muted">
-          Connect the mailbox that gets cc&apos;d on creator outreach. The app gets <strong>read-only</strong> access,
-          matches visible messages to known creator addresses, and moves eligible stages when creators reply — twice a day and on
-          demand. Keep this mailbox included on replies too. It never sends mail.
+          Connect the mailbox your team emails creators from, or keeps on cc. The app gets <strong>read-only</strong> access and
+          only searches for the email addresses saved on creators — nothing else in the mailbox is read or stored. It never sends mail.
         </p>
         <Button variant="primary" href="/api/gmail/connect">
           Connect Gmail
@@ -214,90 +150,6 @@ export function GmailConnectCard({
         pending={pending}
         onConfirm={() => run(() => api("/api/gmail/disconnect"), { success: "Gmail disconnected" })}
       />
-    </div>
-  );
-}
-
-export function ApiKeyManager({
-  keys,
-}: {
-  keys: { id: string; name: string; keyPrefix: string; lastUsedAt: Date | null; revokedAt: Date | null }[];
-}) {
-  const { pending, run } = useSave();
-  const [name, setName] = useState("");
-  const [newKey, setNewKey] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  const create = async () => {
-    if (!name.trim()) return;
-    const r = await run(() => api<{ key: string }>("/api/api-keys", { name: name.trim() }), {
-      success: "Key created — copy it now",
-    });
-    if (r.ok) {
-      setNewKey(r.data.key);
-      setName("");
-    }
-  };
-
-  const copy = async () => {
-    if (!newKey) return;
-    await navigator.clipboard.writeText(newKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  return (
-    <div className="space-y-3">
-      {newKey && (
-        <Callout
-          tone="warn"
-          title="Copy this key now — it won't be shown again."
-          actions={
-            <Button size="sm" icon={copied ? <Check size={13} /> : <Copy size={13} />} onClick={copy}>
-              {copied ? "Copied" : "Copy"}
-            </Button>
-          }
-        >
-          <code className="block overflow-x-auto rounded bg-surface px-2 py-1 text-xs text-text">{newKey}</code>
-        </Callout>
-      )}
-
-      <div className="flex flex-wrap items-end gap-2">
-        <Field label="Key name" className="w-64" hint="What will use it, e.g. Claude Code on Cameron's laptop.">
-          <Input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
-        </Field>
-        <Button icon={<KeyRound size={14} />} onClick={create} pending={pending} disabled={!name.trim()} className="mb-5">
-          Create key
-        </Button>
-      </div>
-
-      {keys.length > 0 && (
-        <ul className="divide-y divide-border rounded-lg border border-border">
-          {keys.map((k) => (
-            <li key={k.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-              <div className="min-w-0">
-                <span className="font-medium text-text">{k.name}</span>
-                <span className="ml-2 text-xs text-text-muted">{k.keyPrefix}…</span>
-                {k.revokedAt && <span className="ml-2 text-xs text-bad">revoked</span>}
-                {!k.revokedAt && k.lastUsedAt && (
-                  <span className="ml-2 text-xs text-text-faint">last used {new Date(k.lastUsedAt).toLocaleDateString()}</span>
-                )}
-              </div>
-              {!k.revokedAt && (
-                <ConfirmButton
-                  iconOnly
-                  icon={<Trash2 size={14} />}
-                  label={`Revoke ${k.name}`}
-                  question="Revoke this key? Anything using it stops working."
-                  confirmLabel="Revoke"
-                  pending={pending}
-                  onConfirm={() => run(() => api("/api/api-keys", { id: k.id }, "DELETE"), { success: "Key revoked" })}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

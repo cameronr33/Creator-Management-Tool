@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { LayoutDashboard, Send, Kanban, Users, ArrowRight } from "lucide-react";
+import { LayoutDashboard, Kanban, Users, Settings, ArrowRight } from "lucide-react";
 import { PageHeader, Card, CardHeader, StagePill, Badge } from "@/components/ui";
 import { stagesByGroup, AUTO_TRIGGER_LABELS, stageLabel, STAGES } from "@/lib/stages";
 import { AUTO_STAGE_RULES, type AutoStageTrigger } from "@/lib/auto-stage";
@@ -38,29 +38,29 @@ export default function HelpPage() {
               n={1}
               icon={<LayoutDashboard size={16} />}
               href="/"
-              title="Dashboard — what's stuck?"
-              body="Four to-do lists: messages to send, addresses we're waiting on, products to ship, videos we're waiting on. Every row has its next action built in, so most days start and end here."
+              title="Today — what needs you?"
+              body="Who wrote back, who is due a follow-up, who still needs a first message, and what is waiting to ship. Every row has its next action built in, so most days start and end here."
             />
             <Step
               n={2}
-              icon={<Send size={16} />}
-              href="/outreach"
-              title="Outreach — send what's due"
-              body="Each creator's message is pre-written from the client's template. Add one line about their content, press Copy & open (it opens Instagram or your email app with the message ready), send it there, then press I sent it. The stage moves to Contacted on its own."
-            />
-            <Step
-              n={3}
               icon={<Kanban size={16} />}
               href="/pipeline"
-              title="Pipeline — the whole funnel"
+              title="Pipeline — where every deal stands"
               body="One column per stage. Drag a card to move it, or use the card's Move menu. Closing a deal asks who ended it and why, so the reason is never lost."
             />
             <Step
-              n={4}
+              n={3}
               icon={<Users size={16} />}
               href="/creators"
-              title="Creators — look anyone up"
-              body="Search and filter by campaign or stage, then open the record: conversation, agreement, product, shipping and posted videos in one page."
+              title="Creators — the list you manage"
+              body="Add creators one at a time or import a CSV, search and filter, and open a creator for their conversation, agreement, shipping and posted videos."
+            />
+            <Step
+              n={4}
+              icon={<Settings size={16} />}
+              href="/settings"
+              title="Settings — one-time setup"
+              body="Connect the Gmail mailbox, set follow-up timing, and manage campaigns."
             />
           </ol>
         </Card>
@@ -132,12 +132,9 @@ export default function HelpPage() {
         <Card id="follow-ups" className="p-5">
           <CardHeader
             title="Follow-ups"
-            description="The Outreach list is built from the timeline, so nobody has to remember who's overdue."
+            description="Today builds its follow-up list from each creator's messages, so nobody has to remember who's overdue."
           />
           <ul className="mt-3 space-y-1.5 text-sm text-text-muted">
-            <li>
-              Shortlisted and never messaged for <strong>{DEFAULT_THRESHOLDS.initialOutreachAfterDays} days</strong> → first message due.
-            </li>
             <li>
               Messaged, no reply for <strong>{DEFAULT_THRESHOLDS.followUp1AfterDays} days</strong> → follow-up 1 due.
             </li>
@@ -145,12 +142,12 @@ export default function HelpPage() {
               Still nothing <strong>{DEFAULT_THRESHOLDS.followUp2AfterDays} days</strong> after that → follow-up 2 due.
             </li>
             <li>
-              <strong>{DEFAULT_THRESHOLDS.markNoResponseAfterDays} days</strong> after the second follow-up → review unanswered outreach in Today.
-              Check the full conversation before manually closing as {stageLabel("no_response")}.
+              <strong>{DEFAULT_THRESHOLDS.markNoResponseAfterDays} days</strong> after the second follow-up → review the
+              conversation before closing as {stageLabel("no_response")}.
             </li>
           </ul>
           <p className="mt-3 text-xs text-text-faint">
-            These are the defaults; each client can have its own cadence under Settings → Follow-up cadence. Rows imported
+            These are the defaults; each client can have its own timing under Settings → Follow-up timing. Rows imported
             from the old spreadsheet have no real dates, so they are flagged for a human check instead of being given an
             invented clock.
           </p>
@@ -160,17 +157,16 @@ export default function HelpPage() {
           <CardHeader title="Estimated vs verified numbers" />
           <div className="mt-3 space-y-2 text-sm text-text-muted">
             <p>
-              View counts come from two places. The quick, automatic one is a scraper that under-reports Instagram&apos;s
-              public view numbers — sometimes by a lot on viral posts. Those numbers wear an{" "}
-              <Badge tone="muted" title="Estimated — from the scraper, not Instagram's public count">
-                est
+              Follower counts come from Instagram (<strong>Refresh from Instagram</strong> on a creator). View counts only
+              arrive in an imported research file. Numbers marked{" "}
+              <Badge tone="muted" title="Estimated — Instagram's own public count can be higher">
+                estimated
               </Badge>{" "}
-              badge everywhere.
+              came from a scraper that under-reports Instagram&apos;s public views, sometimes by a lot on viral posts.
             </p>
             <p>
-              Verified numbers come from a full research run on a logged-in machine (press <strong>Run full research</strong>{" "}
-              on a creator&apos;s record and it&apos;s queued). Nothing automatic ever overwrites a verified number with an
-              estimate. Don&apos;t put an estimated number in a client report.
+              Nothing automatic ever overwrites a verified number with an estimate. Don&apos;t put an estimated number in a
+              client report.
             </p>
           </div>
         </Card>
@@ -179,20 +175,16 @@ export default function HelpPage() {
           <CardHeader title="Email tracking" />
           <div className="mt-3 space-y-2 text-sm text-text-muted">
             <p>
-              The app reads one shared mailbox (read-only) twice a day and matches visible messages to known creator
-              addresses. Confirmed inbound messages move eligible stages. It never sends mail.
+              The app reads one shared mailbox (read-only) and searches it only for the email addresses saved on
+              creators. Nothing else in the mailbox is read or stored. It never sends mail.
             </p>
             <p>
-              <strong>The one rule:</strong> keep that mailbox on cc for every creator email you send. The Outreach page
-              pre-fills it. The mailbox must receive the reply too; a reply that leaves it off is invisible to the app.
+              <strong>The one rule:</strong> email creators from that mailbox or keep it on cc, and make sure their reply
+              reaches it too. A conversation the mailbox never sees is invisible to the app.
             </p>
             <p>
-              When someone writes from an address the app doesn&apos;t know yet, they show up under{" "}
-              <Link href="/review" className="text-accent hover:underline">
-                Needs review
-              </Link>
-              . Linking one takes a click and pulls their conversation in immediately. Please check that list when the
-              sidebar shows a number next to Needs review. This shared mailbox queue includes all clients.
+              To start tracking someone&apos;s email, add their address on their creator page. Instagram DMs can&apos;t be
+              read automatically, so log those with <strong>I messaged them</strong> and <strong>They replied</strong>.
             </p>
           </div>
         </Card>
