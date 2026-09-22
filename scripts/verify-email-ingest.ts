@@ -18,6 +18,7 @@ import {
   computeKinds,
   getEmailRoster,
   ingestEmails,
+  lastManualChangeAt,
   noteReason,
   teamIdentity,
   type IncomingEmailMessage,
@@ -192,6 +193,15 @@ async function main() {
     check("someone else writing to the creator never moves the stage", other.inserted === 1 && other.stageChanges.length === 0 && (await stageOf()) === "contacted");
     const [otherRow] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_other"));
     check("…and is recorded as someone else", otherRow?.senderRole === "other");
+
+    // Regression: max(changed_at) came back as a zone-less string and
+    // new Date() read it as local time — 7 hours off in Pacific, which would
+    // block every email move for 7 hours after any manual change.
+    const probeAt = Date.now();
+    await changeStage(partnershipId, "in_conversation");
+    await changeStage(partnershipId, "contacted");
+    const lm = (await lastManualChangeAt([partnershipId])).get(partnershipId);
+    check("the last manual change reads back as the real time, not shifted by a time zone", !!lm && Math.abs(lm.getTime() - probeAt) < 60_000, lm?.toISOString());
 
     // A person closes the deal; an older reply arriving later (a backfill)
     // must not reopen it. A newer one does.

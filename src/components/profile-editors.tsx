@@ -267,7 +267,14 @@ export function SocialsEditor({
 
 /* ── Shipping address ─────────────────────────────────────────── */
 
-export function AddressEditor({ partnership }: { partnership: CmPartnership }) {
+export function AddressEditor({
+  partnership,
+  suggested,
+}: {
+  partnership: CmPartnership;
+  /** An address the creator wrote in an email — offered as one click. */
+  suggested?: { text: string; when: string | null } | null;
+}) {
   const { pending, run } = useSave();
   const [open, setOpen] = useState(false);
   const [paste, setPaste] = useState("");
@@ -286,8 +293,8 @@ export function AddressEditor({ partnership }: { partnership: CmPartnership }) {
 
   // The DM almost always contains the address as one block — read it instead
   // of retyping six fields. Anything ambiguous is surfaced, never guessed.
-  const parsePasted = () => {
-    const parsed = parseAddress(paste);
+  const parsePasted = (text: string = paste) => {
+    const parsed = parseAddress(text);
     if (!parsed) {
       setParseIssues(["Couldn't read that — fill the fields in by hand."]);
       return;
@@ -323,10 +330,34 @@ export function AddressEditor({ partnership }: { partnership: CmPartnership }) {
   };
 
   if (!open) {
+    const offer = suggested && !partnership.addressLine1 ? suggested : null;
     return (
-      <Button size="sm" icon={<Pencil size={13} />} onClick={() => setOpen(true)}>
-        {partnership.addressLine1 ? "Edit address" : "Add address"}
-      </Button>
+      <div className="space-y-2">
+        {offer && (
+          <Callout
+            tone="info"
+            title={`Address found in their email${offer.when ? ` (${offer.when})` : ""}`}
+            actions={
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  setPaste(offer.text);
+                  parsePasted(offer.text);
+                  setOpen(true);
+                }}
+              >
+                Use it
+              </Button>
+            }
+          >
+            <span className="whitespace-pre-wrap">{offer.text}</span>
+          </Callout>
+        )}
+        <Button size="sm" icon={<Pencil size={13} />} onClick={() => setOpen(true)}>
+          {partnership.addressLine1 ? "Edit address" : "Add address"}
+        </Button>
+      </div>
     );
   }
 
@@ -341,7 +372,7 @@ export function AddressEditor({ partnership }: { partnership: CmPartnership }) {
             rows={3}
             placeholder={"Joe Hubbard\n3333 Simeon Bunker St\nSaint Charles, MO 63301"}
           />
-          <Button size="sm" onClick={parsePasted} disabled={!paste.trim()} className="self-start">
+          <Button size="sm" onClick={() => parsePasted()} disabled={!paste.trim()} className="self-start">
             Read it
           </Button>
         </div>

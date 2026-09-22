@@ -44,6 +44,8 @@ export interface StageMoveInput {
   expectFrom?: CmStage;
   /** Extra facts to keep with the transition (e.g. which trigger fired). */
   meta?: Record<string, unknown>;
+  /** Land exactly on `to` (Undo): no Agreed → Shipping continuation. */
+  exact?: boolean;
 }
 
 export type StageMoveResult =
@@ -86,7 +88,9 @@ export async function moveStage(input: StageMoveInput): Promise<StageMoveResult>
   const from = input.expectFrom ?? p.stage;
   if (p.stage !== from) return { status: "stale", stage: p.stage };
 
-  const { to, continued } = resolveTarget(input.to, { addressComplete: hasCompleteAddress(p) });
+  const { to, continued } = input.exact
+    ? { to: canonicalStage(input.to), continued: false }
+    : resolveTarget(input.to, { addressComplete: hasCompleteAddress(p) });
 
   if (to === p.stage) {
     if (input.exitReason !== undefined) {

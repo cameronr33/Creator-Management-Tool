@@ -33,6 +33,9 @@ import {
   ProductEditor,
 } from "@/components/profile-editors";
 import { ReplyButton, MessagedButton } from "@/components/reply-button";
+import { RereadEmailsButton } from "@/components/email-status";
+import { EmailStatusLines } from "@/components/email-status-lines";
+import { undoableMoves } from "@/lib/email-status";
 import { getCreatorEmails } from "@/lib/creator-emails";
 import { compactNumber, fullNumber, money, shortDate, relativeDays } from "@/lib/format";
 import { channelLabel } from "@/lib/outreach";
@@ -66,10 +69,11 @@ export default async function CreatorDetailPage({
 
   const { creator, partnership, campaign, socials, events, products, shipments, deliverables, outreach, otherPartnerships } =
     detail;
-  const [clients, creatorEmails, gmailAccount] = await Promise.all([
+  const [clients, creatorEmails, gmailAccount, undoable] = await Promise.all([
     getClients(),
     getCreatorEmails(creator.id),
     getActiveGmailAccount(),
+    undoableMoves([partnership.id]),
   ]);
   const client = clients.find((item) => item.id === creator.clientId);
 
@@ -173,6 +177,15 @@ export default async function CreatorDetailPage({
                   )}
                 </span>
               </div>
+              <EmailStatusLines
+                partnershipId={partnership.id}
+                stage={partnership.stage}
+                summary={partnership.emailSummary}
+                summaryAt={partnership.emailSummaryAt}
+                whoseTurn={partnership.emailWhoseTurn}
+                soundsLikeNo={partnership.emailSoundsLikeNo}
+                move={undoable.get(partnership.id) ?? null}
+              />
             </div>
           </div>
           <Link href={sectionHref("profile")} className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text hover:bg-surface-2">
@@ -237,6 +250,7 @@ export default async function CreatorDetailPage({
                   {conversationBadge}
                   <MessagedButton partnershipId={partnership.id} name={creator.name} hasOutbound={outreach.totalOutbound > 0} />
                   <ReplyButton partnershipId={partnership.id} name={creator.name} />
+                  {events.some((e) => e.channel === "email") && <RereadEmailsButton partnershipId={partnership.id} />}
                 </>
               }
             />
@@ -373,7 +387,10 @@ export default async function CreatorDetailPage({
               ) : (
                 <p className="text-sm text-text-muted">No address yet.</p>
               )}
-              <AddressEditor partnership={partnership} />
+              <AddressEditor
+                partnership={partnership}
+                suggested={partnership.suggestedAddress ? { text: partnership.suggestedAddress, when: partnership.emailSummaryAt ? shortDate(partnership.emailSummaryAt) : null } : null}
+              />
             </div>
           </Card>
           <Card className="p-4 lg:col-span-2">

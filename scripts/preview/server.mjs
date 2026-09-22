@@ -16,6 +16,9 @@ await new Promise((accept, reject) => {
 });
 const pg = new PGlite(resolve(runtime, 'pgdata'));
 await pg.waitReady;
+// Neon sessions run in UTC and drizzle reads timestamps as UTC. PGlite would
+// otherwise use the machine's zone, skewing now() defaults by hours.
+await pg.exec("SET TIME ZONE 'UTC'");
 
 // This is a brand-new isolated schema. Shared table definitions are fixtures here.
 const migrations = resolve(root, 'src/lib/db/migrations');

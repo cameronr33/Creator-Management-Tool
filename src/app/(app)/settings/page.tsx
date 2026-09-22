@@ -12,6 +12,7 @@ import {
 import { ClientVisibility, FollowUpCadence } from "@/components/client-settings";
 import { gmailConfigured } from "@/lib/gmail";
 import { getActiveGmailAccount, getEmailCoverage } from "@/lib/gmail-sync";
+import { emailAutomoveOn, emailMoveStats } from "@/lib/email-status";
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 import { summarizeGmailHealth } from "@/lib/gmail-health";
 
@@ -55,12 +56,16 @@ export default async function SettingsPage({
     );
   }
 
-  const [clients, campaigns, gmailAccount, coverage] = await Promise.all([
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const [clients, campaigns, gmailAccount, coverage, moveStats] = await Promise.all([
     getClientsWithSettings(),
     getCampaigns(client.id),
     getActiveGmailAccount(),
     getEmailCoverage(),
+    emailMoveStats(monthStart),
   ]);
+  const readingOn = !!process.env.ANTHROPIC_API_KEY;
+  const automove = emailAutomoveOn();
   const currentSettings = clients.find((c) => c.id === client.id) ?? null;
 
   const accountView: GmailAccountView | null = gmailAccount
@@ -94,6 +99,11 @@ export default async function SettingsPage({
             {accountView ? (
               <>
                 <GmailSyncStatus account={accountView} />
+                <p className="text-xs text-text-muted">
+                  {readingOn
+                    ? `Reading the latest email: on — after each check, new mail is read for a one-line summary and whose turn it is. Stage moves from email: ${automove ? "on" : "off (summaries only)"}${automove ? ` · ${moveStats.moves} this month · ${moveStats.undone} undone` : ""}.`
+                    : "Reading the latest email is off on this server."}
+                </p>
                 <TeamAddressesEditor entries={gmailAccount?.teamAddresses ?? []} />
                 {coverage.searchedNoMail.length > 0 && (
                   <Callout tone="info" title="No email found yet for these addresses">

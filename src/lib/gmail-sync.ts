@@ -25,6 +25,7 @@ import {
 } from "@/lib/email-ingest";
 import { cleanEmailBody } from "@/lib/email-body";
 import { runJob } from "@/lib/job-runs";
+import { readPendingConversations } from "@/lib/email-status";
 
 /**
  * The email check: connected Gmail account → search for the addresses of
@@ -230,7 +231,10 @@ export async function runGmailSync(opts: { trigger: SyncTrigger; windowDays?: nu
  * `requireComplete` (the scheduled job) a partial check fails the heartbeat
  * — after its successful work is saved — so a dead schedule can't look green.
  */
-export async function runEmailCheck(trigger: SyncTrigger, opts: { requireComplete?: boolean } = {}): Promise<SyncRunResult | null> {
+export async function runEmailCheck(
+  trigger: SyncTrigger,
+  opts: { requireComplete?: boolean; read?: "inline" | "later" | "none" } = {},
+): Promise<SyncRunResult | null> {
   let result: SyncRunResult | null = null;
   let busy = false;
   await runJob("email_sync", async () => {
@@ -266,6 +270,12 @@ export async function runEmailCheck(trigger: SyncTrigger, opts: { requireComplet
     };
   });
   if (busy) throw new SyncBusyError();
+  // Then read the conversations that got new mail (summary, whose turn, and
+  // any stage move the email-reading rules allow). Outside the heartbeat: the
+  // job reports the mailbox check; reading has its own error counts.
+  const read = opts.read ?? "inline";
+  if (read === "inline") await readPendingConversations();
+  else if (read === "later") after(() => readPendingConversations().then(() => undefined));
   return result;
 }
 

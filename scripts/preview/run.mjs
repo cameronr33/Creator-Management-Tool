@@ -35,7 +35,7 @@ const env = {
 const next = resolve(root, "node_modules/next/dist/bin/next");
 const suite = [
   "verify-add-creator", "verify-auto-stage",
-  "verify-editors", "verify-email-ingest", "verify-gmail-sync", "verify-email-body",
+  "verify-editors", "verify-email-ingest", "verify-email-status", "verify-gmail-sync", "verify-email-body",
   "verify-next-step", "verify-design", "verify-workspace", "verify-workspace-db", "verify-creator-workspace",
   "verify-gmail-health", "verify-gmail-sync-outcome", "verify-gmail-sync-partial", "verify-preview-cookies", "verify-invariants",
 ];

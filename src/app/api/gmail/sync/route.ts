@@ -8,7 +8,8 @@ export async function POST() {
   if (error) return error;
 
   try {
-    const result = await runEmailCheck("button");
+    // Reading the conversations can take a minute: it finishes after the response.
+    const result = await runEmailCheck("button", { read: "later" });
     return NextResponse.json({ ok: true, ...(result ?? {}) });
   } catch (err) {
     if (err instanceof SyncBusyError) {

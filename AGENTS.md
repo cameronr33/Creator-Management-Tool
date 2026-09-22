@@ -31,11 +31,20 @@ them. Changing one requires a human decision and an explanation in the commit.
    `apify` is provisional; `ig_public_chrome` is authoritative. Nothing
    automated may overwrite an `ig_public_chrome` value with an `apify` one
    (see `ingest.ts`, which the CSV import uses).
-2. **Auto-stage never moves an active stage backward** and never sets a
-   judgment stage (`negotiating`, `agreed`, `awaiting_address`, `completed`)
-   or `passed`/`declined`. The one reopen is `no_response → in_conversation`
-   on the creator's own reply. The full rule matrix is asserted in
-   `verify-auto-stage.ts`; edit both or neither.
+2. **Automation moves a stage only forward and never closes a deal.**
+   (Rewritten by the owner's decision of 2026-09-22 — "the status should be
+   based off of the last email", and Claude may move it.) Two engines may
+   move a stage: the rule table (`auto-stage.ts`) and the email reader
+   (`email-status.ts`). Both are strict from-stage allowlists; neither sets
+   `passed`/`declined`/`no_response`; the only reopen is `no_response` →
+   Talking on the creator's own message sent after the close. The email
+   reader also requires a verbatim quote from the cited message, that
+   message newer than the last manual change, not-low confidence, an
+   address for Shipping, the creator's own post link for Posted, and the
+   `EMAIL_AUTOMOVE` switch. A "no" only raises a flag; a person closes.
+   Every move records its source, quote and evidence and is undoable.
+   Matrices: `verify-auto-stage.ts` and `verify-email-status.ts`; edit the
+   code and its matrix together, or neither.
 3. **Verification leaves nothing behind.** Every live check cleans up in
    `finally`; `verify:invariants` asserts zero `__verify_` rows remain.
 4. **Shared tables (`users`, `sa_clients`) are never altered by this app's

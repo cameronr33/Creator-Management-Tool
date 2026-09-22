@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, max, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   cmCreators,
@@ -422,7 +422,9 @@ export async function lastManualChangeAt(partnershipIds: string[]): Promise<Map<
   const out = new Map<string, Date>();
   if (partnershipIds.length === 0) return out;
   const rows = await db
-    .select({ partnershipId: cmStageTransitions.partnershipId, at: sql<Date>`max(${cmStageTransitions.changedAt})` })
+    // max() on the column keeps its UTC mapping — a raw "max(...)" string
+    // parsed with new Date() would be read as local time (7h off in Pacific).
+    .select({ partnershipId: cmStageTransitions.partnershipId, at: max(cmStageTransitions.changedAt) })
     .from(cmStageTransitions)
     .where(
       and(
@@ -433,7 +435,7 @@ export async function lastManualChangeAt(partnershipIds: string[]): Promise<Map<
       ),
     )
     .groupBy(cmStageTransitions.partnershipId);
-  for (const r of rows) if (r.at) out.set(r.partnershipId, new Date(r.at));
+  for (const r of rows) if (r.at) out.set(r.partnershipId, r.at);
   return out;
 }
 

@@ -371,6 +371,25 @@ export const cmPartnerships = pgTable(
      * identity — the same creator in another campaign gets a fresh reason.
      */
     outreachReason: text("outreach_reason"),
+
+    // What the latest email says — written by email-status.ts after each
+    // check that brought new mail (never during a page render).
+    /** One plain line: what the most recent message says. */
+    emailSummary: text("email_summary"),
+    /** When that most recent message was sent. */
+    emailSummaryAt: timestamp("email_summary_at"),
+    /** "us" (they're waiting on us), "them" (we're waiting), or "none". */
+    emailWhoseTurn: text("email_whose_turn"),
+    /** When the conversation was last read — re-read when newer mail is stored. */
+    emailAssessedAt: timestamp("email_assessed_at"),
+    /** Their latest message sounds like a no. Flagged; a person closes the deal. */
+    emailSoundsLikeNo: boolean("email_sounds_like_no").default(false).notNull(),
+    /** A shipping address the creator wrote in an email, offered as "Use it". */
+    suggestedAddress: text("suggested_address"),
+    suggestedAddressEventId: uuid("suggested_address_event_id"),
+    /** "No reply needed": hides the Your-turn row until they write again. */
+    replyHandledAt: timestamp("reply_handled_at"),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -892,3 +911,5 @@ export type CmResearchRequest = typeof cmResearchRequests.$inferSelect;
 export type CmResearchRequestStatus = (typeof cmResearchRequestStatusEnum.enumValues)[number];
 export type CmStage = (typeof cmStageEnum.enumValues)[number];
 export type CmAlertType = (typeof cmAlertTypeEnum.enumValues)[number];
+
+export type CmStageTransition = typeof cmStageTransitions.$inferSelect;
