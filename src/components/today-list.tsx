@@ -84,7 +84,7 @@ function TodayItem({ row: r }: { row: TodayRow }) {
   return (
     <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start">
       <div className="flex min-w-0 flex-1 items-start gap-3">
-        <Avatar name={r.name} />
+        <Avatar name={r.name} src={r.photoUrl} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Link href={href(r, "overview")} className="text-sm font-semibold text-text hover:text-accent">

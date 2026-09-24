@@ -7,6 +7,7 @@ import { cmCreators } from "@/lib/db/schema";
 import { fetchProfiles } from "@/lib/apify";
 import { parseSocialUrl, ENRICHABLE_PLATFORMS, PLATFORM_LABELS } from "@/lib/social-links";
 import { addCreatorEmail } from "@/lib/creator-emails";
+import { savePhoto } from "@/lib/photos";
 import { checkEmailForNewAddress } from "@/lib/gmail-sync";
 
 const schema = z
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
         await addCreatorEmail(d.creatorId, found, "apify").catch(() => undefined);
       }
       if (found) after(() => checkEmailForNewAddress());
+      if (profile.profilePicUrl) await savePhoto(d.creatorId, profile.profilePicUrl);
     }
 
     return NextResponse.json({

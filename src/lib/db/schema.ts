@@ -782,6 +782,24 @@ export const cmCreatorEmails = pgTable(
 export type CmCreatorEmail = typeof cmCreatorEmails.$inferSelect;
 
 // ─────────────────────────────────────────────────────────────────
+// cm_creator_photos — the creator's profile picture, downloaded once and
+// served from the app (/api/creators/[id]/photo). Instagram's image links
+// expire and refuse to be embedded, so the bytes are kept, not the link.
+// ─────────────────────────────────────────────────────────────────
+
+export const cmCreatorPhotos = pgTable("cm_creator_photos", {
+  creatorId: uuid("creator_id")
+    .primaryKey()
+    .references(() => cmCreators.id, { onDelete: "cascade" }),
+  /** image/jpeg | image/png | image/webp — never SVG. */
+  mime: text("mime").notNull(),
+  /** Base64 of the image bytes (≤ 2 MB before encoding). */
+  data: text("data").notNull(),
+  sourceUrl: text("source_url"),
+  fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+});
+
+// ─────────────────────────────────────────────────────────────────
 // cm_email_suggestions — external addresses seen on cc'd outreach threads
 // that match no creator yet. The sync's "anchor": a sync that finds nothing
 // is only healthy if this list is empty too. The operator links each one to

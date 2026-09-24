@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ExternalLink, Mail, Trash2, X } from "lucide-react";
+import { ExternalLink, ImageDown, Mail, Trash2, X } from "lucide-react";
 import { Avatar, Badge, Button, Checkbox, Field, Select, StagePill } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
@@ -23,6 +23,7 @@ export interface CreatorsTableRow {
   emailWhoseTurn: string | null;
   lastOutboundAt: string | null;
   repliedAt: string | null;
+  photoUrl: string | null;
 }
 
 /**
@@ -124,6 +125,19 @@ export function CreatorsTable({
               </Select>
             </Field>
           )}
+          <div className="self-center">
+            <Button
+              size="sm"
+              icon={<ImageDown size={13} />}
+              pending={pending}
+              title="Looks each one up on Instagram: profile picture, followers, and their public email if none is saved"
+              onClick={() =>
+                bulk({ action: "refresh_instagram" }, (d) => `Getting photos and followers for ${d.queued ?? 0} — they'll appear in a minute or two`)
+              }
+            >
+              Get photos & followers
+            </Button>
+          </div>
           <div className="ml-auto self-center">
             <ConfirmButton
               label={`Delete ${chosen.length}`}
@@ -170,7 +184,7 @@ export function CreatorsTable({
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
-                      <Avatar name={r.name} />
+                      <Avatar name={r.name} src={r.photoUrl} />
                       <div className="min-w-0">
                         <Link href={`/creators/${r.partnershipId}?returnTo=/creators`} className="font-medium text-text hover:text-accent">
                           {r.name}

@@ -32,6 +32,7 @@ export default async function PipelinePage() {
     latestFromEmail: r.activity.fromEmail,
     latestAt: r.activity.at?.toISOString() ?? null,
     whoseTurn: r.activity.whoseTurn,
+    photoUrl: r.photoUrl,
   }));
 
   return (

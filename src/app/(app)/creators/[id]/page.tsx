@@ -14,7 +14,7 @@ import {
   Handshake,
   FlaskConical,
 } from "lucide-react";
-import { getPartnershipDetail, getClients } from "@/lib/queries";
+import { getPartnershipDetail, getClients, getPhotoUrl } from "@/lib/queries";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
 import { Card, CardHeader, StagePill, Avatar, Badge, Callout } from "@/components/ui";
 import {
@@ -70,11 +70,12 @@ export default async function CreatorDetailPage({
 
   const { creator, partnership, campaign, socials, events, products, shipments, deliverables, outreach, otherPartnerships } =
     detail;
-  const [clients, creatorEmails, gmailAccount, undoable] = await Promise.all([
+  const [clients, creatorEmails, gmailAccount, undoable, photo] = await Promise.all([
     getClients(),
     getCreatorEmails(creator.id),
     getActiveGmailAccount(),
     undoableMoves([partnership.id]),
+    getPhotoUrl(creator.id),
   ]);
   const client = clients.find((item) => item.id === creator.clientId);
 
@@ -133,7 +134,7 @@ export default async function CreatorDetailPage({
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
-            <Avatar name={creator.name} size="lg" />
+            <Avatar name={creator.name} size="lg" src={photo} />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-lg font-semibold tracking-tight text-text">{creator.name}</h1>

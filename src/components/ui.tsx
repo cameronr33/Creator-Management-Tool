@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { ArrowLeft, CircleHelp, Loader2 } from "lucide-react";
@@ -183,7 +184,25 @@ export function Badge({
   );
 }
 
-export function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
+/**
+ * A creator's picture, or their initials when there isn't one. `src` is the
+ * app's own photo URL (/api/creators/[id]/photo) — never Instagram's link.
+ */
+export function Avatar({ name, size = "md", src }: { name: string; size?: "sm" | "md" | "lg"; src?: string | null }) {
+  const px = size === "sm" ? 28 : size === "lg" ? 44 : 32;
+  if (src) {
+    return (
+      <Image
+        src={src}
+        alt=""
+        width={px}
+        height={px}
+        unoptimized
+        className="shrink-0 rounded-full object-cover ring-1 ring-inset ring-border"
+        style={{ width: px, height: px }}
+      />
+    );
+  }
   const label = name
     .trim()
     .split(/[\s&/]+/)

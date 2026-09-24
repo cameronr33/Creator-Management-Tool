@@ -45,7 +45,8 @@
     "db:backup": "tsx --env-file=.env.local scripts/backup-tables.ts",
     "stages:migrate": "tsx --env-file=.env.local scripts/stages-migrate.ts",
     "email:assess": "tsx --env-file=.env.local scripts/email-assess.ts",
-    "verify:email-status": "node scripts/preview/run.mjs verify scripts/verify-email-status.ts"
+    "verify:email-status": "node scripts/preview/run.mjs verify scripts/verify-email-status.ts",
+    "photos:backfill": "tsx --env-file=.env.local scripts/photos-backfill.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

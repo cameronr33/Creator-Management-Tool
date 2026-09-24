@@ -2,6 +2,7 @@ import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth, badRequest, assertClientIsSelected, assertCampaignInSelectedClient } from "@/lib/api-helpers";
 import { createCreatorWithPartnership, ensureCampaignByName } from "@/lib/creators";
+import { refreshFromInstagram } from "@/lib/instagram";
 import { STARTING_STAGES } from "@/lib/stages";
 import { checkEmailForNewAddress } from "@/lib/gmail-sync";
 
@@ -55,6 +56,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (d.businessEmail) after(() => checkEmailForNewAddress());
+    // Picture and followers arrive a moment later; a name-only creator has no handle and is skipped.
+    after(() => refreshFromInstagram([result.creatorId]).then(() => undefined));
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     return badRequest((e as Error).message);

@@ -1,6 +1,6 @@
 /**
  * Thin wrapper over the Apify REST API for "Refresh from Instagram": profile
- * details only (name, followers, public email).
+ * details only (name, followers, public email, profile picture link).
  *
  * It deliberately never produces view counts — Instagram's public "Views"
  * number needs the logged-in Chrome grid scrape in the creator-research skill,
@@ -15,6 +15,8 @@ export interface ApifyProfile {
   fullName: string | null;
   followersCount: number | null;
   businessEmail: string | null;
+  /** The picture link (HD when offered). It expires — download it, don't store it. */
+  profilePicUrl: string | null;
   verified: boolean;
 }
 
@@ -61,6 +63,7 @@ export async function fetchProfiles(usernames: string[]): Promise<ApifyProfile[]
       fullName: (it.fullName as string) ?? null,
       followersCount: typeof it.followersCount === "number" ? it.followersCount : null,
       businessEmail: (it.businessEmail as string) ?? (it.publicEmail as string) ?? null,
+      profilePicUrl: (it.profilePicUrlHD as string) || (it.profilePicUrl as string) || null,
       verified: Boolean(it.verified),
     }))
     // A redirected/renamed handle can come back as a different profile —

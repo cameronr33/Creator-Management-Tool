@@ -1,4 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
+import { inArray } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { cmPartnerships } from "@/lib/db/schema";
+import { refreshFromInstagram } from "@/lib/instagram";
 import { z } from "zod";
 import {
   requireAuth,
@@ -20,6 +24,7 @@ const schema = z.discriminatedUnion("action", [
     exitReason: z.enum(cmExitReasonEnum.enumValues).nullable().optional(),
   }),
   z.object({ action: z.literal("set_campaign"), ids: z.array(z.string()).min(1).max(500), campaignId: z.string() }),
+  z.object({ action: z.literal("refresh_instagram"), ids: z.array(z.string()).min(1).max(500) }),
 ]);
 
 /**
@@ -38,6 +43,12 @@ export async function POST(req: NextRequest) {
   if (d.action === "delete") {
     const r = await removePartnerships(d.ids);
     return NextResponse.json({ ok: true, ...r });
+  }
+  if (d.action === "refresh_instagram") {
+    // A lookup takes up to a couple of minutes per 25 creators: answer now, fetch after.
+    const rows = await db.selectDistinct({ creatorId: cmPartnerships.creatorId }).from(cmPartnerships).where(inArray(cmPartnerships.id, d.ids));
+    after(() => refreshFromInstagram(rows.map((r) => r.creatorId)).then((r) => console.log("[instagram] bulk refresh", r)));
+    return NextResponse.json({ ok: true, queued: rows.length });
   }
   if (d.action === "set_campaign") {
     const c = await assertCampaignInSelectedClient(d.campaignId);

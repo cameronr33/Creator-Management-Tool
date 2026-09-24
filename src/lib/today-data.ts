@@ -24,6 +24,7 @@ export interface TodayRow {
   hasOutbound: boolean;
   suggestedAddress: string | null;
   shipmentId: string | null;
+  photoUrl: string | null;
 }
 
 export interface TodayData {
@@ -92,6 +93,7 @@ export async function getTodayData(clientId: string, campaignId?: string): Promi
       hasOutbound: o.totalOutbound > 0,
       suggestedAddress: d && !hasCompleteAddress(d) ? d.suggestedAddress : null,
       shipmentId: latestShipment.get(c.partnershipId) ?? null,
+      photoUrl: c.photoUrl,
     });
   }
   return { rows, stageCounts };

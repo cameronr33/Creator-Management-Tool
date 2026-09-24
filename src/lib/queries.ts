@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import {
   clients,
   cmCampaigns,
+  cmCreatorPhotos,
   cmCreators,
   cmPartnerships,
   cmOutreachEvents,
@@ -142,6 +143,8 @@ export interface CreatorRow {
   replyHandledAt: Date | null;
   /** The last real message and whose move it is — every card and row shows this. */
   activity: Activity;
+  /** The app's URL for their stored profile picture, or null. */
+  photoUrl: string | null;
   lastOutboundAt: Date | null;
   repliedAt: Date | null;
   followUpCount: number;
@@ -185,10 +188,12 @@ export async function getCreatorRows(
       emailWhoseTurn: cmPartnerships.emailWhoseTurn,
       emailSoundsLikeNo: cmPartnerships.emailSoundsLikeNo,
       replyHandledAt: cmPartnerships.replyHandledAt,
+      photoFetchedAt: cmCreatorPhotos.fetchedAt,
     })
     .from(cmPartnerships)
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
     .innerJoin(cmCampaigns, eq(cmPartnerships.campaignId, cmCampaigns.id))
+    .leftJoin(cmCreatorPhotos, eq(cmCreatorPhotos.creatorId, cmCreators.id))
     .where(and(...conds))
     .orderBy(desc(cmCreators.followers));
 
@@ -202,10 +207,11 @@ export async function getCreatorRows(
     opts?.withOutreach === false ? Promise.resolve(new Map<string, OutreachState>()) : getOutreachStates(partnershipIds),
   ]);
 
-  return rows.map((r) => {
+  return rows.map(({ photoFetchedAt, ...r }) => {
     const st = outreachByPartnership.get(r.partnershipId);
     return {
       ...r,
+      photoUrl: photoUrl(r.creatorId, photoFetchedAt),
       activity: latestActivity({
         last: lastMessages.get(r.partnershipId) ?? null,
         emailSummary: r.emailSummary,
@@ -218,6 +224,17 @@ export async function getCreatorRows(
       followUpCount: st?.followUpCount ?? 0,
     };
   });
+}
+
+/** The app's URL for a stored picture; the ?v= changes when it's re-fetched, so browsers can cache each one for good. */
+export function photoUrl(creatorId: string, fetchedAt: Date | null | undefined): string | null {
+  return fetchedAt ? `/api/creators/${creatorId}/photo?v=${fetchedAt.getTime()}` : null;
+}
+
+/** One creator's picture URL, or null. */
+export async function getPhotoUrl(creatorId: string): Promise<string | null> {
+  const [p] = await db.select({ at: cmCreatorPhotos.fetchedAt }).from(cmCreatorPhotos).where(eq(cmCreatorPhotos.creatorId, creatorId)).limit(1);
+  return photoUrl(creatorId, p?.at);
 }
 
 /** The latest real message (never a note) per partnership, in one query. */

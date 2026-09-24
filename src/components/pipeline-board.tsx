@@ -25,6 +25,7 @@ export interface BoardCard {
   /** ISO time of the latest message; null when unknown or none. */
   latestAt: string | null;
   whoseTurn: WhoseTurn | null;
+  photoUrl: string | null;
 }
 
 // Active stages get their own column; the three terminal stages collapse into
@@ -201,7 +202,7 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                   )}
                 >
                   <div className="flex items-start gap-2">
-                    <Avatar name={c.name} size="sm" />
+                    <Avatar name={c.name} size="sm" src={c.photoUrl} />
                     <div className="min-w-0 flex-1">
                       <Link
                         href={`/creators/${c.partnershipId}?returnTo=/pipeline`}
