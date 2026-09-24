@@ -1,6 +1,6 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
 import { eq } from "drizzle-orm";
 import { updateCreatorProfile } from "@/lib/creators";
 import { removePartnerships } from "@/lib/campaigns";
@@ -18,7 +18,7 @@ const schema = z.object({
 });
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   const { id } = await ctx.params;
@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
 /** DELETE /api/creators/[id] — the creator everywhere: every campaign, conversation, shipment and video. */
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
   const { id } = await ctx.params;
   const scope = await assertCreatorInSelectedClient(id);

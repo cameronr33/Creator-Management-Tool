@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
 import { changeStage } from "@/lib/mutations";
 import { cmExitReasonEnum } from "@/lib/db/schema";
 import { STAGE_VALUES } from "@/lib/stages";
@@ -16,7 +16,7 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireAuth();
+  const { session, error } = await requireAgency();
   if (error) return error;
 
   const { id } = await ctx.params;

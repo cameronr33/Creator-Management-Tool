@@ -1,7 +1,7 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { requireAuth, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
 import { db } from "@/lib/db";
 import { cmCreators } from "@/lib/db/schema";
 import { fetchProfiles } from "@/lib/apify";
@@ -28,7 +28,7 @@ const schema = z.union([
  * { ok: false, error } so the form can fall back to typing it in.
  */
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   const parsed = schema.safeParse(await req.json().catch(() => null));

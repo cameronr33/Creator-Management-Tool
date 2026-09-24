@@ -17,6 +17,8 @@ import { emailAutomoveOn, emailMoveStats } from "@/lib/email-status";
 import { getCampaignCounts } from "@/lib/queries";
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 import { summarizeGmailHealth } from "@/lib/gmail-health";
+import { listClientUsers } from "@/lib/client-users";
+import { ClientTeam } from "@/components/client-team";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -66,7 +68,7 @@ export default async function SettingsPage({
     getEmailCoverage(),
     emailMoveStats(monthStart),
   ]);
-  const counts = await getCampaignCounts(client.id);
+  const [counts, clientPeople] = await Promise.all([getCampaignCounts(client.id), listClientUsers(client.id)]);
   const readingOn = !!process.env.ANTHROPIC_API_KEY;
   const automove = emailAutomoveOn();
   const currentSettings = clients.find((c) => c.id === client.id) ?? null;
@@ -180,6 +182,23 @@ export default async function SettingsPage({
             )}
           </div>
           <CampaignAdder clientId={client.id} />
+        </Card>
+
+        <Card id="client-team" className="scroll-mt-4 p-5">
+          <CardHeader
+            title={`${client.name}'s team`}
+            description={`People at ${client.name}. Their emails on a creator's thread show as ${client.name}'s — never as the creator replying, and never as us. Invite any of them to their own login: they see only ${client.name}'s creators, and can approve creators and mark product shipped.`}
+          />
+          <div className="mt-3">
+            <ClientTeam
+              clientName={client.name}
+              people={clientPeople.map((p) => ({
+                ...p,
+                inviteExpiresAt: p.inviteExpiresAt && p.inviteExpiresAt > new Date() ? p.inviteExpiresAt.toISOString() : null,
+                lastLoginAt: p.lastLoginAt?.toISOString() ?? null,
+              }))}
+            />
+          </div>
         </Card>
 
         <GroupHeading>Admin · applies to every client</GroupHeading>

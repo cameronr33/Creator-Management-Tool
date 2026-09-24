@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAgency } from "@/lib/api-helpers";
 import { buildAuthUrl, gmailConfigured } from "@/lib/gmail";
 
 /**
@@ -9,7 +9,7 @@ import { buildAuthUrl, gmailConfigured } from "@/lib/gmail";
  * httpOnly cookie and verified in the callback (CSRF).
  */
 export async function GET() {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   if (!gmailConfigured()) {

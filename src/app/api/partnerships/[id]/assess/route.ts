@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAuth, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
 import { assessPartnership } from "@/lib/email-status";
 
 /** POST /api/partnerships/[id]/assess — "Re-read emails": read this conversation now. */
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
   const { id } = await ctx.params;
   const scope = await assertPartnershipInSelectedClient(id);

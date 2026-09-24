@@ -1,7 +1,7 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { requireAgency, badRequest } from "@/lib/api-helpers";
 import { db } from "@/lib/db";
 import { cmGmailAccounts } from "@/lib/db/schema";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
@@ -22,7 +22,7 @@ const schema = z.object({ entries: z.array(entry).max(200) });
  * stored email (from saved headers, nothing downloaded).
  */
 export async function PUT(req: NextRequest) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
   const account = await getActiveGmailAccount();
   if (!account) return badRequest("Connect Gmail first");

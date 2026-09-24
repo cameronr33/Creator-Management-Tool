@@ -5,7 +5,7 @@ import { cmPartnerships } from "@/lib/db/schema";
 import { refreshFromInstagram } from "@/lib/instagram";
 import { z } from "zod";
 import {
-  requireAuth,
+  requireAgency,
   badRequest,
   assertPartnershipsInSelectedClient,
   assertCampaignInSelectedClient,
@@ -32,7 +32,7 @@ const schema = z.discriminatedUnion("action", [
  * row's "Move to campaign"). Every id must belong to the selected client.
  */
 export async function POST(req: NextRequest) {
-  const { session, error } = await requireAuth();
+  const { session, error } = await requireAgency();
   if (error) return error;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest("Invalid bulk action", parsed.error.flatten());

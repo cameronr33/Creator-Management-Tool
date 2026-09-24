@@ -159,8 +159,9 @@ export function GmailConnectCard({
 
 /**
  * "Our side": people who email creators for us from addresses the app can't
- * guess — client staff, a partner agency, a teammate's own domain. Their
- * messages count as ours, never as the creator replying.
+ * guess — a partner agency, a teammate's own domain. Their messages count as
+ * ours, never as the creator replying. Client staff go on the client's team
+ * instead (their messages count as the client's, not ours).
  */
 export function TeamAddressesEditor({ entries }: { entries: string[] }) {
   const { pending, run } = useSave();
@@ -174,9 +175,9 @@ export function TeamAddressesEditor({ entries }: { entries: string[] }) {
     <div className="space-y-2">
       <Field
         label="Our side — other addresses that email creators for us"
-        hint="One per line. An address (rob@partner.com) or a whole domain (@hella.com). Your mailbox's own domain and everyone who signs in here already count."
+        hint="One per line. An address (sam@partner-agency.com) or a whole domain (@partner-agency.com). Your mailbox's own domain and everyone who signs in here already count. People at a client go under that client's team instead."
       >
-        <Textarea compact rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder={"@hella.com\nrob@partner.com"} />
+        <Textarea compact rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder={"@partner-agency.com\nsam@freelance-studio.com"} />
       </Field>
       <Button
         size="sm"

@@ -213,6 +213,7 @@ export const EXIT_REASONS_BY_STAGE: Record<string, { value: string; label: strin
     { value: "wrong_pillar", label: "Wrong content type" },
     { value: "fee_too_high", label: "Fee too high" },
     { value: "budget", label: "Out of budget" },
+    { value: "client_passed", label: "Client passed" },
     { value: "other", label: "Other" },
   ],
   declined: [

@@ -1,0 +1,98 @@
+/**
+ * Verifies who may call what (2026-09-24: clients get their own logins).
+ *
+ *   npm run preview:verify -- scripts/verify-access.ts
+ *
+ * Static, over the source tree: every API route handler states its guard —
+ * the agency's (requireAgency), the portal's (requireClientUser, only under
+ * /api/client/), or the cron secret — and every agency server action refuses
+ * a client login. Portal routes never read the agency's client cookie: their
+ * brand comes from the login alone. Pure — no database.
+ */
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
+import { isClientSession } from "../src/lib/api-helpers";
+
+let failures = 0;
+function check(label: string, cond: boolean, detail?: string) {
+  console.log(`  [${cond ? "PASS" : "FAIL"}] ${label}${!cond && detail ? ` — ${detail}` : ""}`);
+  if (!cond) failures++;
+}
+
+const SRC = join(__dirname, "..", "src");
+const API = join(SRC, "app", "api");
+
+function routes(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) routes(p, out);
+    else if (name === "route.ts") out.push(p);
+  }
+  return out;
+}
+
+/** Each exported handler's source, by method. */
+function handlers(src: string): { method: string; body: string }[] {
+  const re = /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE)\b/g;
+  const starts = [...src.matchAll(re)].map((m) => ({ method: m[1], at: m.index! }));
+  return starts.map((s, i) => ({ method: s.method, body: src.slice(s.at, starts[i + 1]?.at ?? src.length) }));
+}
+
+const COOKIE_SCOPED = /getSelectedClientSlug|resolveClient\(|InSelectedClient|getSelectedCampaignId|resolveCampaign\(/;
+
+function main() {
+  console.log("\n── Every API route states who may call it ──");
+  const files = routes(API);
+  const unguarded: string[] = [];
+  const portalWrong: string[] = [];
+  const agencyUsesPortal: string[] = [];
+  let portalRoutes = 0;
+  let seen = 0;
+  for (const file of files) {
+    const rel = relative(API, file).split(sep).join("/");
+    if (rel.startsWith("auth/")) continue; // NextAuth's own sign-in endpoints
+    const src = readFileSync(file, "utf8");
+    const portal = rel.startsWith("client/");
+    if (portal) portalRoutes++;
+    for (const h of handlers(src)) {
+      seen++;
+      const agency = /requireAgency\(/.test(h.body);
+      const client = /requireClientUser\(/.test(h.body);
+      const cron = /requireCronSecret\(/.test(h.body);
+      // The photo route serves both: a client login is checked against its own brand first.
+      const photoBoth = rel === "creators/[id]/photo/route.ts" && agency && /isClientSession\(/.test(h.body);
+      // The one public route: its guard is the one-time invite token, and it may do nothing but accept one.
+      const invite = rel === "invite/route.ts" && /acceptInvite\(/.test(h.body) && !/\bdb\b|InSelectedClient|getSelectedClientSlug/.test(h.body);
+      if (!agency && !client && !cron && !invite) unguarded.push(`${rel} ${h.method}`);
+      if (portal && (!client || agency || COOKIE_SCOPED.test(h.body))) portalWrong.push(`${rel} ${h.method}`);
+      if (!portal && client && !photoBoth) agencyUsesPortal.push(`${rel} ${h.method}`);
+    }
+  }
+  // A checker that finds nothing passes everything: prove it read the handlers.
+  check(`the handlers were actually found (${seen} in ${files.length} files)`, seen >= files.length - 1);
+  check(`every handler in ${files.length} route files calls a guard`, unguarded.length === 0, unguarded.join(", "));
+  const probe = handlers("export async function GET() { return 1 }\nexport async function POST() { await requireAgency(); }");
+  check("the checker catches a handler without a guard", probe.length === 2 && !/requireAgency\(/.test(probe[0].body) && /requireAgency\(/.test(probe[1].body));
+  check(`portal routes (${portalRoutes}) use only the portal guard, and never the agency's client cookie`, portalWrong.length === 0, portalWrong.join(", "));
+  check("no agency route accepts a portal login", agencyUsesPortal.length === 0, agencyUsesPortal.join(", "));
+
+  console.log("\n── Server actions ──");
+  const actions = readFileSync(join(SRC, "app", "actions.ts"), "utf8");
+  const exported = [...actions.matchAll(/export\s+async\s+function\s+(\w+)\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/g)];
+  const loose = exported.filter(([, name, body]) => name !== "signOutAction" && !/await agencyOnly\(\)/.test(body)).map(([, n]) => n);
+  check(`every agency action (${exported.length - 1}) refuses a client login`, exported.length > 1 && loose.length === 0, loose.join(", "));
+
+  console.log("\n── The guards themselves ──");
+  const helpers = readFileSync(join(SRC, "lib", "api-helpers.ts"), "utf8");
+  const clientGuard = helpers.slice(helpers.indexOf("export async function requireClientUser"), helpers.indexOf("\n}\n", helpers.indexOf("export async function requireClientUser")));
+  check("the portal guard takes the brand from the login only (no cookie, no request)", clientGuard.length > 0 && !COOKIE_SCOPED.test(clientGuard) && !/cookies\(|req\b|request\b/.test(clientGuard));
+  check("a client login is recognised as one", isClientSession({ user: { kind: "client" } }) && !isClientSession({ user: { kind: "agency" } }) && !isClientSession({ user: {} }));
+  const layout = readFileSync(join(SRC, "app", "(app)", "layout.tsx"), "utf8");
+  check("the agency's pages send a client login to the portal", /kind === "client"\) redirect\("\/portal"\)/.test(layout));
+  const emailCheck = readFileSync(join(SRC, "lib", "page-email-check.ts"), "utf8");
+  check("a client login never starts a check of the agency's mailbox", /kind !== "client"/.test(emailCheck));
+}
+
+main();
+console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`}`);
+process.exit(failures === 0 ? 0 : 1);

@@ -1,6 +1,6 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest, assertClientIsSelected, assertCampaignInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertClientIsSelected, assertCampaignInSelectedClient } from "@/lib/api-helpers";
 import { createCreatorWithPartnership, ensureCampaignByName } from "@/lib/creators";
 import { refreshFromInstagram } from "@/lib/instagram";
 import { STARTING_STAGES } from "@/lib/stages";
@@ -28,7 +28,7 @@ const schema = z
   });
 
 export async function POST(req: NextRequest) {
-  const { session, error } = await requireAuth();
+  const { session, error } = await requireAgency();
   if (error) return error;
 
   const body = await req.json().catch(() => null);

@@ -1,5 +1,5 @@
 import { NextResponse, after, type NextRequest } from "next/server";
-import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { requireAgency, badRequest } from "@/lib/api-helpers";
 import { resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { applyImport, parseImportFile, planImport } from "@/lib/csv-import";
@@ -15,7 +15,7 @@ const MAX_BYTES = 2 * 1024 * 1024;
  * addresses) in the background. Always into the client selected in the sidebar.
  */
 export async function POST(req: NextRequest) {
-  const { session, error } = await requireAuth();
+  const { session, error } = await requireAgency();
   if (error) return error;
 
   const form = await req.formData().catch(() => null);

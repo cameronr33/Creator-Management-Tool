@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, isNull, max, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  cmClientUsers,
   cmCreators,
   cmCreatorEmails,
   cmPartnerships,
@@ -101,6 +102,10 @@ export interface TeamIdentity {
   emails: Set<string>;
   /** The mailbox's domain (unless free-mail) plus every "Our side" @domain. */
   domains: Set<string>;
+  /** People at a client (Settings → client team): address → their client. */
+  clientContacts?: Map<string, string>;
+  /** Each creator's client, so a client contact counts only on their own brand's creators. */
+  creatorClients?: Map<string, string>;
 }
 
 /**
@@ -126,8 +131,16 @@ export function teamIdentity(mailbox: string, userEmails: string[] = [], extra: 
 }
 
 export async function loadTeamIdentity(mailbox: string, extra: string[] = []): Promise<TeamIdentity> {
-  const rows = await db.select({ email: users.email }).from(users);
-  return teamIdentity(mailbox, rows.map((r) => r.email), extra);
+  const [rows, contacts, creators] = await Promise.all([
+    db.select({ email: users.email }).from(users),
+    db.select({ email: cmClientUsers.email, clientId: cmClientUsers.clientId }).from(cmClientUsers),
+    db.select({ id: cmCreators.id, clientId: cmCreators.clientId }).from(cmCreators),
+  ]);
+  return {
+    ...teamIdentity(mailbox, rows.map((r) => r.email), extra),
+    clientContacts: new Map(contacts.map((c) => [c.email.trim().toLowerCase(), c.clientId])),
+    creatorClients: new Map(creators.map((c) => [c.id, c.clientId])),
+  };
 }
 
 /* ── Classifying one message ────────────────────────────────────── */
@@ -150,15 +163,19 @@ export interface IncomingEmailMessage {
   hasCalendar?: boolean;
 }
 
-export type SenderRole = "team" | "creator" | "other";
+/** "client" = someone at the creator's own brand (their client team), kept as a note. */
+export type SenderRole = "team" | "creator" | "client" | "other";
 
 export interface Classification {
   creatorId: string;
   direction: "inbound" | "outbound";
   /** "other" = someone else on a creator's thread (a manager, a parent). */
   senderRole: SenderRole;
-  /** Calendar invites, auto-replies and no-reply mail never change whose turn it is. */
-  note: null | "calendar" | "auto_reply" | "automated";
+  /**
+   * Calendar invites, auto-replies and no-reply mail never change whose turn
+   * it is — nor does the client writing (it's neither the creator nor us).
+   */
+  note: null | "calendar" | "auto_reply" | "automated" | "client";
 }
 
 const CALENDAR_SUBJECT = /^(invitation|updated invitation|accepted|declined|tentatively accepted|cancell?ed( event)?|invitation from google calendar)\b.*[:@]/i;
@@ -210,9 +227,14 @@ export function classifyMessage(
     if (recipient) break;
   }
   if (!recipient) return null;
-  return team_
-    ? { creatorId: recipient, direction: "outbound", senderRole: "team", note }
-    : { creatorId: recipient, direction: "inbound", senderRole: "other", note };
+  if (team_) return { creatorId: recipient, direction: "outbound", senderRole: "team", note };
+  // Someone at the creator's own brand: shown as the client's, and kept as a note so it
+  // never counts as the creator replying or as us answering.
+  const contactOf = team.clientContacts?.get(from);
+  if (contactOf && contactOf === team.creatorClients?.get(recipient)) {
+    return { creatorId: recipient, direction: "inbound", senderRole: "client", note: note ?? "client" };
+  }
+  return { creatorId: recipient, direction: "inbound", senderRole: "other", note };
 }
 
 /**
@@ -477,6 +499,8 @@ export async function reclassifyStoredEmails(team: TeamIdentity): Promise<{ chan
       from: cmOutreachEvents.fromAddress,
       to: cmOutreachEvents.toAddress,
       cc: cmOutreachEvents.ccAddress,
+      subject: cmOutreachEvents.subject,
+      kind: cmOutreachEvents.kind,
     })
     .from(cmOutreachEvents)
     .where(and(eq(cmOutreachEvents.channel, "email"), isNotNull(cmOutreachEvents.fromAddress)));
@@ -491,7 +515,7 @@ export async function reclassifyStoredEmails(team: TeamIdentity): Promise<{ chan
         from: r.from ?? "",
         to: (r.to ?? "").split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((s) => s.trim()).filter(Boolean),
         cc: (r.cc ?? "").split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((s) => s.trim()).filter(Boolean),
-        subject: null,
+        subject: r.subject,
         bodyText: null,
       },
       creatorsByAddress,
@@ -501,7 +525,11 @@ export async function reclassifyStoredEmails(team: TeamIdentity): Promise<{ chan
     // Mail we sent was recognised by its SENT label, which isn't stored — the
     // headers alone can't overrule it, so ours stays ours.
     if (r.senderRole === "team" && c.senderRole !== "team") continue;
-    await db.update(cmOutreachEvents).set({ direction: c.direction, senderRole: c.senderRole }).where(eq(cmOutreachEvents.id, r.id));
+    // Becoming the client's makes it a note; no longer the client's, it's a message
+    // again — unless it's an invite or auto-reply by its subject or sender.
+    const kind =
+      c.senderRole === "client" ? "note" : r.senderRole === "client" ? (c.note ? "note" : c.direction === "inbound" ? "reply" : "follow_up") : undefined;
+    await db.update(cmOutreachEvents).set({ direction: c.direction, senderRole: c.senderRole, ...(kind ? { kind } : {}) }).where(eq(cmOutreachEvents.id, r.id));
     touched.add(r.partnershipId);
     changed++;
   }

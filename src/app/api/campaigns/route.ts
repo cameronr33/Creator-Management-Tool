@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest, assertClientIsSelected } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertClientIsSelected } from "@/lib/api-helpers";
 import { ensureCampaign, findCampaignByName } from "@/lib/campaigns";
 
 const schema = z.object({
@@ -10,7 +10,7 @@ const schema = z.object({
 
 /** POST /api/campaigns — create a campaign for the selected client. */
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   const body = await req.json().catch(() => null);

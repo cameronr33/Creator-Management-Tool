@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAgency } from "@/lib/api-helpers";
 import { runEmailCheck, SyncBusyError } from "@/lib/gmail-sync";
 
 /** POST /api/gmail/sync — "Check email now". Leaves the same heartbeat as the schedule. */
 export async function POST() {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   try {

@@ -1,6 +1,6 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
 import { addCreatorEmail, removeCreatorEmail } from "@/lib/creator-emails";
 import { checkEmailForNewAddress } from "@/lib/gmail-sync";
 
@@ -8,7 +8,7 @@ const schema = z.object({ email: z.string().min(3) });
 
 /** POST /api/creators/[id]/emails — add an address the creator uses. */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   const { id } = await ctx.params;
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
 /** DELETE /api/creators/[id]/emails — remove an address. */
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   const { id } = await ctx.params;

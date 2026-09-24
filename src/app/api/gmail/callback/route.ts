@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAgency } from "@/lib/api-helpers";
 import { db } from "@/lib/db";
 import { cmGmailAccounts } from "@/lib/db/schema";
 import { encrypt } from "@/lib/encryption";
@@ -12,7 +12,7 @@ import { exchangeCode, getProfile } from "@/lib/gmail";
  * keeps exactly one active account.
  */
 export async function GET(req: NextRequest) {
-  const { session, error } = await requireAuth();
+  const { session, error } = await requireAgency();
   if (error) return error;
 
   const url = new URL(req.url);

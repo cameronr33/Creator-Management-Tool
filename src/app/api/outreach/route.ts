@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
 import { isoDate } from "@/lib/validation";
 import { applyAutoStage } from "@/lib/auto-stage";
 import { db } from "@/lib/db";
@@ -22,7 +22,7 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { session, error } = await requireAuth();
+  const { session, error } = await requireAgency();
   if (error) return error;
 
   const body = await req.json().catch(() => null);

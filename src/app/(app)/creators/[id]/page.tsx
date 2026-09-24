@@ -285,14 +285,14 @@ export default async function CreatorDetailPage({
                             <summary className="cursor-pointer text-xs font-medium text-text-muted hover:text-accent">Show {earlier.length} earlier</summary>
                             <ul className="mt-3 space-y-3">
                               {earlier.map((e) => (
-                                <TimelineEvent key={e.id} e={e} />
+                                <TimelineEvent key={e.id} e={e} clientName={client?.name ?? "the client"} />
                               ))}
                             </ul>
                           </details>
                         </li>
                       )}
                       {recent.map((e) => (
-                        <TimelineEvent key={e.id} e={e} />
+                        <TimelineEvent key={e.id} e={e} clientName={client?.name ?? "the client"} />
                       ))}
                     </ul>
                   </section>
@@ -481,8 +481,9 @@ export default async function CreatorDetailPage({
   );
 }
 
-function TimelineEvent({ e }: { e: CmOutreachEvent }) {
+function TimelineEvent({ e, clientName }: { e: CmOutreachEvent; clientName: string }) {
   const inbound = e.direction === "inbound";
+  const fromClient = e.senderRole === "client";
   const label = e.fromAddress
     ? null
     : e.kind === "note"
@@ -496,7 +497,7 @@ function TimelineEvent({ e }: { e: CmOutreachEvent }) {
             : "We messaged them";
   return (
     <li className="flex gap-3 text-sm">
-      <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${e.kind === "note" ? "bg-border-strong" : inbound ? "bg-good-strong" : "bg-accent-ring"}`} />
+      <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${fromClient ? "bg-info" : e.kind === "note" ? "bg-border-strong" : inbound ? "bg-good-strong" : "bg-accent-ring"}`} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2">
           {e.fromAddress ? (
@@ -511,7 +512,11 @@ function TimelineEvent({ e }: { e: CmOutreachEvent }) {
           <span className="text-xs text-text-faint">
             {e.isMigrated ? "date not recorded" : `${shortDate(e.occurredAt)} · ${relativeDays(e.occurredAt)}`} · {channelLabel(e.channel)}
           </span>
-          {e.kind === "note" && e.fromAddress && <Badge tone="muted">invite / automatic</Badge>}
+          {fromClient ? (
+            <Badge tone="info">From {clientName}</Badge>
+          ) : (
+            e.kind === "note" && e.fromAddress && <Badge tone="muted">invite / automatic</Badge>
+          )}
           {e.isMigrated && <Badge tone="muted">{timelineSource(e)}</Badge>}
         </div>
         {e.body && e.body !== "migrated from sheet; original date unknown" && (

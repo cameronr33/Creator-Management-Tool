@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
 import { addCreatorSocial, removeCreatorSocial, setPrimarySocial } from "@/lib/creators";
 
 const postSchema = z.object({
@@ -13,7 +13,7 @@ const postSchema = z.object({
 const deleteSchema = z.object({ socialId: z.string().uuid() });
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   const { id } = await ctx.params;
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   const { id } = await ctx.params;

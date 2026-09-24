@@ -26,6 +26,7 @@ import {
 } from "../src/lib/email-ingest";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 import { changeStage } from "../src/lib/mutations";
+import { getLastMessages } from "../src/lib/queries";
 
 // Pinned so the time-zone regression below fails on any machine, not only one in Pacific time.
 process.env.TZ = "America/Los_Angeles";
@@ -78,6 +79,28 @@ async function main() {
   check(
     "…so a parent on gmail.com cc'ing the creator is someone else, not us",
     classifyMessage(msg({ from: "parent@gmail.com", to: [CREATOR] }), creators, freeMailbox)?.senderRole === "other",
+  );
+
+  console.log("\n── People at the client (pure) ──");
+  const withClient = {
+    ...teamIdentity("cameron@sentic.io"),
+    clientContacts: new Map([["rob@brand.example", "CLIENT_A"]]),
+    creatorClients: new Map([["C1", "CLIENT_A"], ["C2", "CLIENT_B"]]),
+  };
+  const both = new Map([[CREATOR, ["C1"]], [ALT, ["C2"]]]);
+  const rob = classifyMessage(msg({ from: "Rob <rob@brand.example>", to: ["sam@sentic.io"], cc: [CREATOR] }), both, withClient);
+  check("the client cc'ing their creator is the client's, kept as a note", rob?.senderRole === "client" && rob.direction === "inbound" && rob.note === "client", JSON.stringify(rob));
+  check(
+    "…never the creator and never us",
+    rob?.senderRole !== "creator" && rob?.senderRole !== "team",
+  );
+  check(
+    "the same person on another brand's creator is just someone else",
+    classifyMessage(msg({ from: "rob@brand.example", to: [ALT] }), both, withClient)?.senderRole === "other",
+  );
+  check(
+    "Our side still wins: a teammate is never the client",
+    classifyMessage(msg({ from: "rob@brand.example", to: [CREATOR], labelIds: ["SENT"] }), both, withClient)?.senderRole === "team",
   );
 
   console.log("\n── Invites, auto-replies and robots are notes (pure) ──");
@@ -215,6 +238,27 @@ async function main() {
     check("someone else writing to the creator never moves the stage", other.inserted === 1 && other.stageChanges.length === 0 && (await stageOf()) === "contacted");
     const [otherRow] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_other"));
     check("…and is recorded as someone else", otherRow?.senderRole === "other");
+
+    // Someone at the creator's own client writes on the thread.
+    const clientTeam = { ...liveTeam, clientContacts: new Map([["rob@brand.example", client.id]]), creatorClients: new Map([[creatorId, client.id]]) };
+    const lastBefore = (await getLastMessages([partnershipId])).get(partnershipId);
+    const fromClient = await ingestEmails(
+      [msg({ externalId: "__verify_ei_client", occurredAt: new Date(Date.now() + 60_000).toISOString(), from: "Rob <rob@brand.example>", to: ["sam@sentic.io"], cc: [CREATOR], subject: "Re: shipping" })],
+      { team: clientTeam },
+    );
+    const [clientRow] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_client"));
+    check("a client message is stored as the client's note", fromClient.inserted === 1 && clientRow?.senderRole === "client" && clientRow.kind === "note", JSON.stringify(clientRow && { r: clientRow.senderRole, k: clientRow.kind }));
+    check("…never moves the stage", fromClient.stageChanges.length === 0 && (await stageOf()) === "contacted");
+    const lastAfter = (await getLastMessages([partnershipId])).get(partnershipId);
+    check("…and never becomes the latest message, so whose turn it is doesn't change", lastAfter?.at.getTime() === lastBefore?.at.getTime());
+    // Adding someone to the client's team re-sorts their stored mail; removing them sorts it back.
+    const addedTeam = { ...clientTeam, clientContacts: new Map([["rob@brand.example", client.id], ["assistant@agency-x.com", client.id]]) };
+    await reclassifyStoredEmails(addedTeam);
+    const [becameClient] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_other"));
+    check("adding them to the client's team makes their earlier message the client's note", becameClient?.senderRole === "client" && becameClient.kind === "note");
+    await reclassifyStoredEmails(clientTeam);
+    const [backToOther] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_other"));
+    check("…and removing them makes it someone else's message again", backToOther?.senderRole === "other" && backToOther.kind === "reply", JSON.stringify(backToOther && { r: backToOther.senderRole, k: backToOther.kind }));
 
     // Regression: max(changed_at) came back as a zone-less string and
     // new Date() read it as local time — 7 hours off in Pacific, which would

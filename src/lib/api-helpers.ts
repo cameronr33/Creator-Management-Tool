@@ -11,8 +11,17 @@ import { cmCampaigns, cmCreators, cmPartnerships } from "@/lib/db/schema";
 import { resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 
-/** Returns the session or a 401 response. */
-export async function requireAuth() {
+/** A session that belongs to someone at a client (the portal), not the agency. */
+export function isClientSession(session: { user?: { kind?: string } } | null | undefined): boolean {
+  return session?.user?.kind === "client";
+}
+
+/**
+ * The agency's guard — every route and action outside the portal. Returns the
+ * session, a 401 when signed out, or a 403 for a client login (which may only
+ * use /api/client/*).
+ */
+export async function requireAgency() {
   const session = await auth();
   if (!session?.user) {
     return {
@@ -20,7 +29,23 @@ export async function requireAuth() {
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     };
   }
+  if (isClientSession(session)) {
+    return { session: null, error: NextResponse.json({ error: "That isn't available from the client portal." }, { status: 403 }) };
+  }
   return { session, error: null };
+}
+
+/**
+ * The portal's guard — /api/client/* only. The client comes from the login
+ * itself, never from a cookie or the request, so a client person can only
+ * ever reach their own brand.
+ */
+export async function requireClientUser() {
+  const session = await auth();
+  if (!session?.user || !isClientSession(session) || !session.user.clientId) {
+    return { person: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  return { person: { id: session.user.id, name: session.user.name ?? "Client", clientId: session.user.clientId }, error: null };
 }
 
 /** Guards the /api/cron/* routes, which the Railway worker calls. Constant-time compare. */

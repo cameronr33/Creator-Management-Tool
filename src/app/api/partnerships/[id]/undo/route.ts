@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
 import { undoMove } from "@/lib/email-status";
 import { db } from "@/lib/db";
 import { cmStageTransitions } from "@/lib/db/schema";
@@ -10,7 +10,7 @@ const schema = z.object({ transitionId: z.string().uuid() });
 
 /** POST /api/partnerships/[id]/undo — take back the latest automatic move. */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireAuth();
+  const { session, error } = await requireAgency();
   if (error) return error;
   const { id } = await ctx.params;
   const scope = await assertPartnershipInSelectedClient(id);

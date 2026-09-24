@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { requireAuth, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
 import { httpUrl, isoDate, money } from "@/lib/validation";
 import { applyAutoStage } from "@/lib/auto-stage";
 import { hasCompleteAddress } from "@/lib/address";
@@ -45,7 +45,7 @@ const ADDRESS_KEYS = [
 ] as const;
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireAuth();
+  const { session, error } = await requireAgency();
   if (error) return error;
 
   const { id } = await ctx.params;

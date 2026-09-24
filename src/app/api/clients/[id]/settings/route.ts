@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { requireAgency, badRequest } from "@/lib/api-helpers";
 import { db } from "@/lib/db";
 import { clients, cmClientSettings } from "@/lib/db/schema";
 
@@ -25,7 +25,7 @@ const schema = z.object({
 });
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   const { id } = await ctx.params;

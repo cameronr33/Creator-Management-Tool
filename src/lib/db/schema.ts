@@ -105,6 +105,7 @@ export const cmExitReasonEnum = pgEnum("cm_exit_reason", [
   "wrong_pillar",
   "fee_too_high",
   "budget",
+  "client_passed", // the client passed on them (approval, 2026-09-24)
   // they passed
   "not_interested",
   "competitor_conflict",
@@ -113,6 +114,9 @@ export const cmExitReasonEnum = pgEnum("cm_exit_reason", [
   "went_dark",
   "other",
 ]);
+
+/** A client's say on a creator before outreach; null = no approval needed. */
+export const cmClientApprovalEnum = pgEnum("cm_client_approval", ["pending", "approved", "passed"]);
 
 export const cmPlatformEnum = pgEnum("cm_platform", [
   "instagram",
@@ -339,6 +343,13 @@ export const cmPartnerships = pgTable(
     suggestedAddressEventId: uuid("suggested_address_event_id"),
     /** "No reply needed": hides the Your-turn row until they write again. */
     replyHandledAt: timestamp("reply_handled_at"),
+
+    // The client's approval before outreach (when the client requires it).
+    clientApproval: cmClientApprovalEnum("client_approval"),
+    /** Who decided — a client person or a teammate, by name. */
+    approvalByName: text("approval_by_name"),
+    approvalAt: timestamp("approval_at"),
+    approvalNote: text("approval_note"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -670,8 +681,41 @@ export const cmClientSettings = pgTable("cm_client_settings", {
    * {"initialOutreachAfterDays":3,"followUp1AfterDays":5,...}. Null = defaults.
    */
   followUpThresholds: jsonb("follow_up_thresholds"),
+  /** New creators wait for the client's approval before anyone reaches out. */
+  requiresApproval: boolean("requires_approval").default(false).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// ─────────────────────────────────────────────────────────────────
+// cm_client_users — people at the client (e.g. HELLA staff). Every one is a
+// client contact for email; those invited get their own login, scoped to
+// their brand, in a table of this app's own — never the shared `users`
+// (frozen node 4), which other tools and the email team list also read.
+// ─────────────────────────────────────────────────────────────────
+
+export const cmClientUsers = pgTable(
+  "cm_client_users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** Lowercased. */
+    email: text("email").notNull(),
+    /** Set by the person themselves through their invite link; null = no password yet. */
+    passwordHash: text("password_hash"),
+    loginEnabled: boolean("login_enabled").default(false).notNull(),
+    /** sha256 of the one-time invite token; the token itself is never stored. */
+    inviteTokenHash: text("invite_token_hash"),
+    inviteExpiresAt: timestamp("invite_expires_at"),
+    lastLoginAt: timestamp("last_login_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique("cm_client_users_email_uq").on(t.email), index("cm_client_users_client_idx").on(t.clientId)],
+);
+
+export type CmClientUser = typeof cmClientUsers.$inferSelect;
 
 export type CmClientSettings = typeof cmClientSettings.$inferSelect;
 

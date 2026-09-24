@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
-import { requireAuth, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
 import { httpUrl } from "@/lib/validation";
 import { db } from "@/lib/db";
 import { cmProductsRequested, cmPartnerships, cmCreators } from "@/lib/db/schema";
@@ -20,7 +20,7 @@ const createSchema = z.object({
 const deleteSchema = z.object({ id: z.string().uuid() });
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   const body = await req.json().catch(() => null);
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { error } = await requireAuth();
+  const { error } = await requireAgency();
   if (error) return error;
 
   const body = await req.json().catch(() => null);

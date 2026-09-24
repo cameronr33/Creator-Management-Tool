@@ -20,6 +20,8 @@ export default async function AppLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  // Someone at a client only ever sees their brand's portal.
+  if (session.user.kind === "client") redirect("/portal");
 
   const [clients, active] = await Promise.all([getClients(), resolveClient(await getSelectedClientSlug())]);
   const [campaigns, campaign] = active ? await Promise.all([getCampaigns(active.id), resolveCampaign(active.id)]) : [[], null];

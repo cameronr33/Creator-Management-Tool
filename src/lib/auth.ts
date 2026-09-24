@@ -1,9 +1,9 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { cmClientUsers, users } from "@/lib/db/schema";
 import { getPreviewAuthCookies } from "@/lib/auth-cookies";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -32,17 +32,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.email, email))
           .limit(1);
 
-        if (!user) return null;
+        if (user) {
+          const isValid = await compare(password, user.passwordHash);
+          if (!isValid) return null;
+          return { id: user.id, name: user.name, email: user.email, role: user.role, kind: "agency" as const, clientId: null };
+        }
 
-        const isValid = await compare(password, user.passwordHash);
-        if (!isValid) return null;
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        };
+        // Someone at a client: only once invited and their password is set.
+        const [person] = await db
+          .select()
+          .from(cmClientUsers)
+          .where(and(eq(cmClientUsers.email, email.trim().toLowerCase()), eq(cmClientUsers.loginEnabled, true)))
+          .limit(1);
+        if (!person?.passwordHash) return null;
+        if (!(await compare(password, person.passwordHash))) return null;
+        await db.update(cmClientUsers).set({ lastLoginAt: sql`now()` }).where(eq(cmClientUsers.id, person.id));
+        return { id: person.id, name: person.name, email: person.email, role: "client", kind: "client" as const, clientId: person.clientId };
       },
     }),
   ],
@@ -56,13 +61,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id as string;
         token.name = user.name ?? null;
         token.email = user.email ?? null;
-        token.role = (user as { role: string }).role;
+        const u = user as { role: string; kind?: "agency" | "client"; clientId?: string | null };
+        token.role = u.role;
+        token.kind = u.kind ?? "agency";
+        token.clientId = u.clientId ?? null;
       }
       return token;
     },
     session({ session, token }) {
       session.user.id = token.id;
       session.user.role = token.role;
+      session.user.kind = token.kind ?? "agency";
+      session.user.clientId = token.clientId ?? null;
       return session;
     },
   },

@@ -9,5 +9,7 @@ import { scheduleEmailCheck } from "@/lib/gmail-sync";
  * Kept apart from gmail-sync.ts so the cron worker doesn't load auth.
  */
 export async function scheduleEmailCheckForVisitor(): Promise<void> {
-  if ((await auth())?.user) scheduleEmailCheck();
+  const session = await auth();
+  // Agency only: a client login never starts a check of the agency's mailbox.
+  if (session?.user && session.user.kind !== "client") scheduleEmailCheck();
 }
