@@ -25,6 +25,8 @@ export interface CreateCreatorInput {
   userId?: string;
   /** Attach to this creator (the CSV import matched a name-only row to them). */
   existingCreatorId?: string;
+  /** Always create a new creator (never match an existing one by handle/slug). */
+  forceNew?: boolean;
 }
 
 export interface CreateCreatorResult {
@@ -55,8 +57,8 @@ async function uniqueUsername(clientId: string, base: string): Promise<string> {
  * Create (or attach to) a creator from pasted profile links, and put them on a
  * campaign so they show up on the board.
  *
- * Mirrors src/lib/ingest.ts: all the logic lives here so it can be exercised by
- * a script without a browser session. Like ingest, it never clobbers an
+ * Used by Add creator and the CSV import; all the logic lives here so it can
+ * be exercised by a script without a browser session. It never clobbers an
  * existing partnership's pipeline state — if the creator is already on this
  * campaign, it just returns that partnership so the caller can open it.
  */
@@ -77,7 +79,9 @@ export async function createCreatorWithPartnership(
 
   // Match an existing creator by the primary handle so re-adding someone who is
   // already tracked attaches to them rather than duplicating.
-  const [existingCreator] = await db
+  const [existingCreator] = input.forceNew
+    ? []
+    : await db
     .select({ id: cmCreators.id, username: cmCreators.username, businessEmail: cmCreators.businessEmail })
     .from(cmCreators)
     .where(
@@ -228,7 +232,19 @@ export async function addCreatorSocial(creatorId: string, rawUrl: string) {
     })
     .onConflictDoNothing()
     .returning({ id: cmCreatorSocials.id });
-  if (first && added) await setPrimarySocial(creatorId, added.id);
+  if (first && added) {
+    await setPrimarySocial(creatorId, added.id);
+    // Their handle was a slug of their name; the link's handle is the real one
+    // (shown as @handle, and what the next import matches on) — unless another
+    // creator of this client already has it.
+    if (link.handle) {
+      const [me] = await db.select({ clientId: cmCreators.clientId }).from(cmCreators).where(eq(cmCreators.id, creatorId)).limit(1);
+      const [taken] = me
+        ? await db.select({ id: cmCreators.id }).from(cmCreators).where(and(eq(cmCreators.clientId, me.clientId), eq(cmCreators.username, link.handle))).limit(1)
+        : [];
+      if (me && !taken) await db.update(cmCreators).set({ username: link.handle }).where(eq(cmCreators.id, creatorId));
+    }
+  }
   return link;
 }
 

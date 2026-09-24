@@ -73,7 +73,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 function readProfile(raw: string): ReturnType<typeof parseSocialUrl> {
   const t = raw.trim();
-  if (/:\/\/|\//.test(t) || /\.(com|net|org|io|tv|co)\b/i.test(t)) return parseSocialUrl(t);
+  // A link has a slash ("instagram.com/x", "https://…"); "@jane.co" or "jane.co" is a handle.
+  if (t.includes("/")) return parseSocialUrl(t);
   const handle = t.replace(/^@/, "").toLowerCase();
   return /^[a-z0-9._]{1,30}$/.test(handle) ? { platform: "instagram", handle, url: `https://www.instagram.com/${handle}` } : null;
 }
@@ -189,12 +190,16 @@ async function findExisting(clientId: string, rows: ImportRow[]) {
   // A name-only row joins an existing creator only when exactly one has that name.
   const nameCount = new Map<string, { id: string; name: string }[]>();
   for (const c of byName) nameCount.set(c.name.toLowerCase(), [...(nameCount.get(c.name.toLowerCase()) ?? []), c]);
-  return (r: ImportRow): { id: string; name: string } | null => {
+  return (r: ImportRow): { id: string; name: string } | null | { ambiguous: number } => {
     if (r.handle) return handleMap.get(r.handle) ?? null;
     const hits = nameCount.get(r.name.toLowerCase()) ?? [];
-    return hits.length === 1 ? hits[0] : null;
+    return hits.length === 1 ? hits[0] : hits.length > 1 ? { ambiguous: hits.length } : null;
   };
 }
+
+type Match = ReturnType<Awaited<ReturnType<typeof findExisting>>>;
+const isAmbiguous = (m: Match): m is { ambiguous: number } => !!m && "ambiguous" in m;
+const ambiguousMessage = (r: ImportRow, n: number) => `${n} creators are already named "${r.name}" — add their Instagram so it's clear which one.`;
 
 export async function planImport(clientId: string, parsed: ParsedFile): Promise<ImportPlan> {
   const existing = await findExisting(clientId, parsed.rows);
@@ -202,7 +207,14 @@ export async function planImport(clientId: string, parsed: ParsedFile): Promise<
   for (const name of new Set(parsed.rows.map((r) => r.campaign))) {
     campaignIds.set(name, (await findCampaignByName(clientId, name))?.id ?? null);
   }
-  const creatorIds = parsed.rows.map((r) => existing(r)?.id).filter((x): x is string => !!x);
+  const problems = [...parsed.problems];
+  const usable = parsed.rows.filter((r) => {
+    const m = existing(r);
+    if (isAmbiguous(m)) problems.push({ line: r.line, message: ambiguousMessage(r, m.ambiguous) });
+    return !isAmbiguous(m);
+  });
+  const known = (r: ImportRow) => existing(r) as { id: string; name: string } | null;
+  const creatorIds = usable.map((r) => known(r)?.id).filter((x): x is string => !!x);
   const memberships = creatorIds.length
     ? await db
         .select({ creatorId: cmPartnerships.creatorId, campaignId: cmPartnerships.campaignId })
@@ -210,8 +222,8 @@ export async function planImport(clientId: string, parsed: ParsedFile): Promise<
         .where(inArray(cmPartnerships.creatorId, [...new Set(creatorIds)]))
     : [];
   const counts: Record<RowOutcome, number> = { new: 0, added_to_campaign: 0, already_there: 0 };
-  const rows = parsed.rows.map((r) => {
-    const c = existing(r);
+  const rows = usable.map((r) => {
+    const c = known(r);
     const campaignId = campaignIds.get(r.campaign);
     const outcome: RowOutcome = !c
       ? "new"
@@ -222,7 +234,8 @@ export async function planImport(clientId: string, parsed: ParsedFile): Promise<
     return { ...r, outcome, existingName: c?.name ?? null };
   });
   const newCampaigns = [...campaignIds.entries()].filter(([, id]) => !id).map(([name]) => name);
-  return { rows, problems: parsed.problems, columns: parsed.columns, newCampaigns, counts };
+  const used = new Set(usable.map((r) => r.campaign));
+  return { rows, problems: problems.sort((a, b) => a.line - b.line), columns: parsed.columns, newCampaigns: newCampaigns.filter((n) => used.has(n)), counts };
 }
 
 /* ── Doing it ────────────────────────────────────────────────────── */
@@ -251,7 +264,12 @@ export async function applyImport(clientId: string, parsed: ParsedFile, userId?:
         campaignIds.set(row.campaign, c.id);
         if (c.created) result.campaignsCreated.push(c.name);
       }
-      const known = existing(row);
+      const match = existing(row);
+      if (isAmbiguous(match)) {
+        result.failed.push({ line: row.line, message: ambiguousMessage(row, match.ambiguous) });
+        continue;
+      }
+      const known = match;
       const r = await createCreatorWithPartnership({
         clientId,
         name: known?.name ?? row.name,
@@ -265,6 +283,9 @@ export async function applyImport(clientId: string, parsed: ParsedFile, userId?:
         notes: row.notes,
         userId,
         existingCreatorId: known?.id,
+        // A name-only row with no single match is a new person — exactly what the
+        // preview said — never attached to whoever's handle happens to equal the name's slug.
+        forceNew: !known && !row.link,
       });
       if (!r.reusedCreator) result.created++;
       else if (!r.reusedPartnership) result.addedToCampaign++;
@@ -280,26 +301,30 @@ export async function applyImport(clientId: string, parsed: ParsedFile, userId?:
 }
 
 /**
- * The research numbers, when the file carries them. Hand-checked views
- * (ig_public_chrome) are never replaced by estimated ones.
+ * The research numbers, when the file carries them. Like every other field
+ * they only fill what's empty — with one exception: hand-checked views
+ * (ig_public_chrome) replace views that aren't hand-checked. Nothing ever
+ * replaces hand-checked views (frozen node 1).
  */
 async function writeNumbers(creatorId: string, row: ImportRow) {
   const hasViews = row.avgViews != null || row.medianViews != null || row.maxViews != null;
   if (!hasViews && row.cadence == null) return;
-  const [cur] = await db.select({ viewsSource: cmCreators.viewsSource }).from(cmCreators).where(eq(cmCreators.id, creatorId)).limit(1);
-  const downgrade = cur?.viewsSource === "ig_public_chrome" && row.viewsSource !== "ig_public_chrome";
+  const [cur] = await db
+    .select({ viewsSource: cmCreators.viewsSource, avgViews: cmCreators.avgViews, medianViews: cmCreators.medianViews, maxViews: cmCreators.maxViews, cadence: cmCreators.cadencePerWeek })
+    .from(cmCreators)
+    .where(eq(cmCreators.id, creatorId))
+    .limit(1);
+  if (!cur) return;
+  const haveViews = cur.avgViews != null || cur.medianViews != null || cur.maxViews != null;
+  const upgrade = row.viewsSource === "ig_public_chrome" && cur.viewsSource !== "ig_public_chrome";
+  const writeViews = hasViews && (!haveViews || upgrade);
   await db
     .update(cmCreators)
     .set({
-      ...(hasViews && !downgrade
-        ? {
-            avgViews: row.avgViews ?? undefined,
-            medianViews: row.medianViews ?? undefined,
-            maxViews: row.maxViews ?? undefined,
-            viewsSource: row.viewsSource ?? undefined,
-          }
+      ...(writeViews
+        ? { avgViews: row.avgViews ?? null, medianViews: row.medianViews ?? null, maxViews: row.maxViews ?? null, viewsSource: row.viewsSource ?? null }
         : {}),
-      cadencePerWeek: row.cadence != null ? String(row.cadence) : undefined,
+      cadencePerWeek: row.cadence != null && cur.cadence == null ? String(row.cadence) : undefined,
       updatedAt: new Date(),
     })
     .where(eq(cmCreators.id, creatorId));

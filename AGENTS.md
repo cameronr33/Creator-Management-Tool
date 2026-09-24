@@ -45,7 +45,8 @@ them. Changing one requires a human decision and an explanation in the commit.
    Every move records its source, quote and evidence and is undoable.
    (2026-09-23, owner: "there should be a Ready to ship status" — Shipping
    split into Ready to ship → Shipped; a move to Shipped marks the shipment
-   shipped. Email never moves anyone to Shipped: that is ours to mark.)
+   shipped. Email never moves anyone to Shipped: that is ours to mark, and it
+   only moves to Waiting on video from Shipped — 2026-09-24 review finding.)
    Matrices: `verify-auto-stage.ts` and `verify-email-status.ts`; edit the
    code and its matrix together, or neither.
 3. **Verification leaves nothing behind.** Every live check cleans up in

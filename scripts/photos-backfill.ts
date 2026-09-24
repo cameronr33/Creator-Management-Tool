@@ -10,7 +10,7 @@
  */
 import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "./db";
-import { isInstagramHandle, refreshFromInstagram } from "../src/lib/instagram";
+import { instagramHandles, refreshFromInstagram } from "../src/lib/instagram";
 
 async function main() {
   const args = process.argv.slice(2);
@@ -18,16 +18,18 @@ async function main() {
   if (!apply && !args.includes("--dry-run")) throw new Error("Pass --dry-run or --apply");
 
   const rows = await db
-    .select({ id: schema.cmCreators.id, name: schema.cmCreators.name, username: schema.cmCreators.username, platform: schema.cmCreators.platform })
+    .select({ id: schema.cmCreators.id, name: schema.cmCreators.name })
     .from(schema.cmCreators)
     .leftJoin(schema.cmCreatorPhotos, eq(schema.cmCreatorPhotos.creatorId, schema.cmCreators.id))
     .where(and(isNull(schema.cmCreatorPhotos.creatorId)));
-  const lookable = rows.filter((r) => r.platform === "instagram" && isInstagramHandle(r.username));
-  const skipped = rows.filter((r) => !lookable.includes(r));
+  // Only a creator's own Instagram link counts (never a slug of their name).
+  const handles = await instagramHandles(rows.map((r) => r.id));
+  const lookable = rows.filter((r) => handles.get(r.id)).map((r) => ({ ...r, username: handles.get(r.id)! }));
+  const skipped = rows.filter((r) => !handles.get(r.id));
 
   console.log(`${rows.length} creator(s) without a picture · ${lookable.length} with an Instagram handle · ${skipped.length} skipped\n`);
   for (const r of lookable) console.log(`  look up  @${r.username}  (${r.name})`);
-  for (const r of skipped) console.log(`  skip     ${r.name} — ${r.platform !== "instagram" ? `platform ${r.platform}` : `"${r.username}" isn't an Instagram handle`}`);
+  for (const r of skipped) console.log(`  skip     ${r.name} — no Instagram link saved`);
   if (!apply) {
     console.log(`\nDry run — nothing fetched. Estimated cost with --apply: about $${(lookable.length * 0.003).toFixed(2)}.`);
     return;

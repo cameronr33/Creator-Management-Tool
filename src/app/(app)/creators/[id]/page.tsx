@@ -46,6 +46,7 @@ import { channelLabel } from "@/lib/outreach";
 import { formatAddress } from "@/lib/address";
 import { displayNames } from "@/lib/email-body";
 import { groupThreads } from "@/lib/conversation";
+import { latestActivity } from "@/lib/activity";
 import { AUTO_STAGE_RULES, type AutoStageTrigger } from "@/lib/auto-stage";
 import { AUTO_TRIGGER_LABELS, stageLabel, stageIndex } from "@/lib/stages";
 import { nextStep } from "@/lib/next-step";
@@ -130,6 +131,20 @@ export default async function CreatorDetailPage({
   );
 
   const threads = groupThreads(events);
+  // Same "whose turn" as Today and the Pipeline: No reply needed and a DM logged
+  // after the summary both count. Events are newest first; notes never count.
+  const lastReal = [...events]
+    .filter((e) => e.kind !== "note")
+    .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime() || (a.direction === "inbound" ? -1 : 1))[0];
+  const activity = latestActivity({
+    last: lastReal
+      ? { at: lastReal.occurredAt, direction: lastReal.direction, channel: lastReal.channel, senderRole: lastReal.senderRole, subject: lastReal.subject, isMigrated: lastReal.isMigrated }
+      : null,
+    emailSummary: partnership.emailSummary,
+    emailSummaryAt: partnership.emailSummaryAt,
+    emailWhoseTurn: partnership.emailWhoseTurn,
+    replyHandledAt: partnership.replyHandledAt,
+  });
   const addressAlarm = !hasAddress && stageIndex(partnership.stage) >= stageIndex("awaiting_address");
   const anchor = (section: Parameters<typeof creatorSectionHref>[1]) => `#${section}`;
 
@@ -198,7 +213,7 @@ export default async function CreatorDetailPage({
                 stage={partnership.stage}
                 summary={partnership.emailSummary}
                 summaryAt={partnership.emailSummaryAt}
-                whoseTurn={partnership.emailWhoseTurn}
+                whoseTurn={activity.whoseTurn}
                 soundsLikeNo={partnership.emailSoundsLikeNo}
                 move={undoable.get(partnership.id) ?? null}
               />

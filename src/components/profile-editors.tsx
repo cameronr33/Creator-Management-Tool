@@ -43,7 +43,7 @@ export function EditableProfile({ creator }: { creator: CmCreator }) {
 
   const refresh = async () => {
     const r = await run(() => api<{ followers?: number }>("/api/enrich", { creatorId: creator.id, save: true }), {
-      success: "Followers and public email refreshed from Instagram",
+      success: "Picture, followers and public email refreshed from Instagram",
     });
     if (r.ok && r.data.followers != null) setFollowers(String(r.data.followers));
   };

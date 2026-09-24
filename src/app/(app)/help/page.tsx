@@ -7,11 +7,11 @@ import { AUTO_STAGE_RULES, type AutoStageTrigger } from "@/lib/auto-stage";
 import { EMAIL_STAGE_RULES } from "@/lib/email-status";
 import type { CmStage } from "@/lib/db/schema";
 
-/** What an email-driven move needs besides the creator's own words, in plain English. */
+/** What each requirement in EMAIL_STAGE_RULES means, in plain English (decideEmailMove checks it). */
 const EMAIL_REQUIRES: Record<string, string> = {
   nothing: "",
-  address: " — and there's an address on file, or they wrote one",
-  shipped_or_receipt: " — the shipment was marked shipped, or they say it arrived",
+  address: " — and there's an address on file, or one they wrote",
+  receipt: " — it's marked delivered too",
   post_link: " — and they sent the link to the post",
 };
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
@@ -180,7 +180,7 @@ export default function HelpPage() {
                 </span>
                 <ArrowRight size={14} className="shrink-0 text-text-faint" />
                 <StagePill stage={to} />
-                <span>when the creator&apos;s own latest email says so{EMAIL_REQUIRES[rule.requires]}</span>
+                <span>when one of the creator&apos;s own recent emails says so, quoted word for word{EMAIL_REQUIRES[rule.requires]}</span>
               </li>
             ))}
           </ul>

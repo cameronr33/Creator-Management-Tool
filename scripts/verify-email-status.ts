@@ -45,7 +45,7 @@ const EXPECTED: Partial<Record<CmStage, CmStage[]>> = {
   in_conversation: ["contacted"],
   awaiting_address: ["contacted", "in_conversation"],
   fulfilling: ["contacted", "in_conversation", "awaiting_address"],
-  content_pending: ["fulfilling", "shipped"],
+  content_pending: ["shipped"],
   posted: ["fulfilling", "shipped", "content_pending"],
 };
 
@@ -131,15 +131,20 @@ async function main() {
     move("in_conversation", { stage: "fulfilling", address: "9 Injected Road, Faketown, NV 89000" }).move === null,
   );
   check("a calendar invite or automatic reply is never evidence", move("contacted", { stage: "awaiting_address", evidence_quote: "Sounds great, we agreed.", evidence_message: 10 }).move === null);
-  const received = move("fulfilling", { stage: "content_pending", evidence_quote: "Got the lights yesterday", evidence_message: 6 });
-  check("the creator confirming receipt → Waiting on video, and marks it delivered", received.move?.to === "content_pending" && received.move.markDelivered);
+  const received = move("shipped", { stage: "content_pending", evidence_quote: "Got the lights yesterday", evidence_message: 6 }, { shipmentStatuses: ["shipped"] });
+  check("Shipped, and the creator says it arrived → Waiting on video, and marks it delivered", received.move?.to === "content_pending" && received.move.markDelivered);
+  // Review finding (2026-09-24): from Ready to ship, excitement read as receipt marked an unsent parcel delivered.
+  check(
+    "still Ready to ship: nothing moves to Waiting on video, whatever their email says",
+    move("fulfilling", { stage: "content_pending", evidence_quote: "Got the lights yesterday", evidence_message: 6 }).move === null,
+  );
   check(
     "our own claim it arrived, with nothing shipped → no move",
-    move("fulfilling", { stage: "content_pending", evidence_quote: "Shipped today!", evidence_message: 5 }).move === null,
+    move("shipped", { stage: "content_pending", evidence_quote: "Shipped today!", evidence_message: 5 }).move === null,
   );
   check(
     "shipped already → Waiting on video without re-marking",
-    move("fulfilling", { stage: "content_pending", evidence_quote: "Got the lights yesterday", evidence_message: 6 }, { shipmentStatuses: ["delivered"] }).move?.markDelivered === false,
+    move("shipped", { stage: "content_pending", evidence_quote: "Got the lights yesterday", evidence_message: 6 }, { shipmentStatuses: ["delivered"] }).move?.markDelivered === false,
   );
   const posted = move("content_pending", { stage: "posted", post_url: "https://www.instagram.com/reel/ABC123/", evidence_quote: "Video is live:", evidence_message: 7 });
   check("the creator's own post link → Posted, with the video", posted.move?.to === "posted" && posted.move.videoUrl === "https://www.instagram.com/reel/ABC123/");

@@ -34,7 +34,7 @@ import { displayNames } from "@/lib/email-body";
  *  - the quote is found word-for-word in the message it cites, and that
  *    message is newer than the last time a person set the stage;
  *  - confidence isn't low, and the EMAIL_AUTOMOVE switch is on;
- *  - Shipping needs an address (on file, or written by the creator), Posted
+ *  - Ready to ship needs an address (on file, or written by the creator), Posted
  *    needs the creator's own post link (it becomes the video record).
  *
  * Email text is data: the model is told never to follow instructions in it,
@@ -58,11 +58,13 @@ export function emailAutomoveOn(): boolean {
  * The only stage moves an email may make, keyed by target. Asserted as a
  * full matrix in scripts/verify-email-status.ts — edit both or neither.
  */
-export const EMAIL_STAGE_RULES: Partial<Record<CmStage, { from: CmStage[]; requires: "nothing" | "address" | "shipped_or_receipt" | "post_link" }>> = {
+export const EMAIL_STAGE_RULES: Partial<Record<CmStage, { from: CmStage[]; requires: "nothing" | "address" | "receipt" | "post_link" }>> = {
   in_conversation: { from: ["contacted"], requires: "nothing" },
   awaiting_address: { from: ["contacted", "in_conversation"], requires: "nothing" },
   fulfilling: { from: ["contacted", "in_conversation", "awaiting_address"], requires: "address" },
-  content_pending: { from: ["fulfilling", "shipped"], requires: "shipped_or_receipt" },
+  // Only from Shipped: while it's still Ready to ship, "can't wait to try it!"
+  // can read as "it arrived" — and would mark an unsent parcel delivered.
+  content_pending: { from: ["shipped"], requires: "receipt" },
   posted: { from: ["fulfilling", "shipped", "content_pending"], requires: "post_link" },
 };
 
@@ -238,9 +240,8 @@ export function decideEmailMove(i: DecisionInput): Decision {
   if (rule.requires === "address" && !i.hasAddress && !verifiedAddress(a, i.messages)) {
     return { move: null, why: "Shipping needs an address on file or one the creator wrote" };
   }
-  if (rule.requires === "shipped_or_receipt") {
-    // Either it was marked shipped, or the evidence — always the creator's own
-    // message (checked above) — is them saying it arrived; mark it delivered.
+  if (rule.requires === "receipt") {
+    // It's on its way (Shipped) and the creator's own message says it arrived.
     markDelivered = !i.shipmentStatuses.includes("delivered");
   }
   if (rule.requires === "post_link") {

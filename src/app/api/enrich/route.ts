@@ -5,104 +5,60 @@ import { requireAuth, badRequest, assertCreatorInSelectedClient } from "@/lib/ap
 import { db } from "@/lib/db";
 import { cmCreators } from "@/lib/db/schema";
 import { fetchProfiles } from "@/lib/apify";
-import { parseSocialUrl, ENRICHABLE_PLATFORMS, PLATFORM_LABELS } from "@/lib/social-links";
-import { addCreatorEmail } from "@/lib/creator-emails";
-import { savePhoto } from "@/lib/photos";
+import { parseSocialUrl } from "@/lib/social-links";
+import { refreshFromInstagram } from "@/lib/instagram";
 import { checkEmailForNewAddress } from "@/lib/gmail-sync";
 
-const schema = z
-  .object({
-    /** Preview mode — enrich a pasted URL before the creator exists. */
-    url: z.string().optional(),
-    /** Existing creator; combine with save:true to write the result. */
-    creatorId: z.string().uuid().optional(),
-    save: z.boolean().default(false),
-  })
-  .refine((d) => d.url || d.creatorId, { message: "Provide a url or creatorId" });
+const schema = z.union([
+  /** Preview — look up a pasted link before the creator exists. Never writes. */
+  z.object({ url: z.string().min(1), creatorId: z.undefined().optional(), save: z.literal(false).optional() }),
+  /** Refresh a creator from their own Instagram link, and save it. */
+  z.object({ creatorId: z.string().uuid(), url: z.undefined().optional(), save: z.literal(true) }),
+]);
 
 /**
- * One-click "Fetch" — tier-1 Apify lookup for followers / name / public email.
+ * "Fetch" on the add form (preview a pasted link, nothing saved) and
+ * "Refresh from Instagram" on a creator (followers, picture, and a public
+ * email only where none is saved). Saving always goes through
+ * refreshFromInstagram, which checks nothing but the creator's own Instagram
+ * link — a request can't point a creator at someone else's profile. View
+ * counts are never touched: those come from the research file.
  *
- * Serves both the add form (preview from a pasted URL, nothing saved) and the
- * detail page (fetch + save onto an existing creator). Only Instagram, TikTok
- * and YouTube are fetchable; Facebook and websites stay manual.
- *
- * Deliberately does NOT touch view metrics — per src/lib/refresh.ts, trustworthy
- * public Views only come from the Chrome-grid (tier-2) run.
- *
- * Never throws on a missing APIFY_TOKEN or a private profile: it returns
- * { ok: false, error } so the form can degrade to manual entry.
+ * Never throws on a missing token or a private profile: it returns
+ * { ok: false, error } so the form can fall back to typing it in.
  */
 export async function POST(req: NextRequest) {
   const { error } = await requireAuth();
   if (error) return error;
 
-  const body = await req.json().catch(() => null);
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) return badRequest("Invalid request", parsed.error.flatten());
+  const parsed = schema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return badRequest("Send either a link to preview, or a creator to refresh — not both", parsed.error.flatten());
   const d = parsed.data;
 
-  let handle: string | null = null;
-  let platform: string | null = null;
-
-  if (d.url) {
-    const link = parseSocialUrl(d.url);
-    handle = link?.handle ?? null;
-    platform = link?.platform ?? null;
-  } else {
-    const scope = await assertCreatorInSelectedClient(d.creatorId!);
+  if (d.creatorId) {
+    const scope = await assertCreatorInSelectedClient(d.creatorId);
     if (scope) return scope;
-    const [creator] = await db
-      .select({ username: cmCreators.username, platform: cmCreators.platform })
-      .from(cmCreators)
-      .where(eq(cmCreators.id, d.creatorId!))
-      .limit(1);
-    if (!creator) return badRequest("Creator not found");
-    handle = creator.username;
-    platform = creator.platform;
+    try {
+      const r = await refreshFromInstagram([d.creatorId]);
+      if (r.skipped) return NextResponse.json({ ok: false, error: "No Instagram link on this creator yet — add one under Profile first." });
+      if (r.errors.length && !r.found) return NextResponse.json({ ok: false, error: r.errors[0] });
+      if (!r.found) return NextResponse.json({ ok: false, error: "No profile returned — it may be private." });
+      if (r.emailsFound) after(() => checkEmailForNewAddress());
+      const [c] = await db.select({ followers: cmCreators.followers }).from(cmCreators).where(eq(cmCreators.id, d.creatorId)).limit(1);
+      return NextResponse.json({ ok: true, followers: c?.followers ?? null, photo: r.photos > 0 });
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: (e as Error).message });
+    }
   }
 
-  if (!handle || !platform || !ENRICHABLE_PLATFORMS.includes(platform as never)) {
-    const label = platform ? PLATFORM_LABELS[platform as keyof typeof PLATFORM_LABELS] : "that link";
-    return NextResponse.json({
-      ok: false,
-      error: `Auto-fetch only works for Instagram, TikTok and YouTube — ${label} has to be filled in manually.`,
-    });
+  const link = parseSocialUrl(d.url!);
+  if (!link?.handle || link.platform !== "instagram") {
+    return NextResponse.json({ ok: false, error: "Only Instagram profiles can be looked up — fill the rest in by hand." });
   }
-
   try {
-    const [profile] = await fetchProfiles([handle]);
-    if (!profile) {
-      return NextResponse.json({ ok: false, error: "No profile returned — it may be private." });
-    }
-
-    if (d.save && d.creatorId) {
-      // The tracked address is never silently replaced: Instagram's public
-      // email only fills an empty one, and a different one is added alongside.
-      const [cur] = await db.select({ businessEmail: cmCreators.businessEmail }).from(cmCreators).where(eq(cmCreators.id, d.creatorId)).limit(1);
-      const found = profile.businessEmail?.trim().toLowerCase() || null;
-      await db
-        .update(cmCreators)
-        .set({
-          followers: profile.followersCount ?? undefined,
-          businessEmail: !cur?.businessEmail && found ? found : undefined,
-          lastRefreshedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(cmCreators.id, d.creatorId));
-      if (found && cur?.businessEmail && cur.businessEmail.toLowerCase() !== found) {
-        await addCreatorEmail(d.creatorId, found, "apify").catch(() => undefined);
-      }
-      if (found) after(() => checkEmailForNewAddress());
-      if (profile.profilePicUrl) await savePhoto(d.creatorId, profile.profilePicUrl);
-    }
-
-    return NextResponse.json({
-      ok: true,
-      name: profile.fullName,
-      followers: profile.followersCount,
-      businessEmail: profile.businessEmail,
-    });
+    const [profile] = await fetchProfiles([link.handle]);
+    if (!profile) return NextResponse.json({ ok: false, error: "No profile returned — it may be private." });
+    return NextResponse.json({ ok: true, name: profile.fullName, followers: profile.followersCount, businessEmail: profile.businessEmail });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message });
   }

@@ -32,26 +32,38 @@ export interface RefreshResult {
   errors: string[];
 }
 
+/**
+ * Each creator's Instagram handle, taken only from an Instagram link saved on
+ * them (primary first) — never from the stored username, which for a creator
+ * added by name is a slug of their name and may be someone else's handle.
+ */
+export async function instagramHandles(creatorIds: string[]): Promise<Map<string, string | null>> {
+  const ids = [...new Set(creatorIds)];
+  const out = new Map<string, string | null>(ids.map((id) => [id, null]));
+  if (!ids.length) return out;
+  const socials = await db
+    .select({ creatorId: cmCreatorSocials.creatorId, handle: cmCreatorSocials.handle, isPrimary: cmCreatorSocials.isPrimary })
+    .from(cmCreatorSocials)
+    .where(and(inArray(cmCreatorSocials.creatorId, ids), eq(cmCreatorSocials.platform, "instagram")));
+  for (const id of ids) {
+    const own = socials.filter((s) => s.creatorId === id && isInstagramHandle(s.handle)).sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary))[0];
+    out.set(id, own?.handle?.toLowerCase() ?? null);
+  }
+  return out;
+}
+
 export async function refreshFromInstagram(creatorIds: string[], opts: { fetch?: typeof fetchProfiles } = {}): Promise<RefreshResult> {
   const result: RefreshResult = { looked: 0, found: 0, photos: 0, emailsFound: 0, skipped: 0, errors: [] };
   if (creatorIds.length === 0) return result;
   const ids = [...new Set(creatorIds)];
-  const [creators, socials] = await Promise.all([
+  const [creators, handles] = await Promise.all([
     db
-      .select({ id: cmCreators.id, username: cmCreators.username, platform: cmCreators.platform, businessEmail: cmCreators.businessEmail })
+      .select({ id: cmCreators.id, businessEmail: cmCreators.businessEmail })
       .from(cmCreators)
       .where(inArray(cmCreators.id, ids)),
-    db
-      .select({ creatorId: cmCreatorSocials.creatorId, handle: cmCreatorSocials.handle, isPrimary: cmCreatorSocials.isPrimary })
-      .from(cmCreatorSocials)
-      .where(and(inArray(cmCreatorSocials.creatorId, ids), eq(cmCreatorSocials.platform, "instagram"))),
+    instagramHandles(ids),
   ]);
-  // The handle is their Instagram link's (primary first); the stored username
-  // only counts for an Instagram creator — for a name-only one it's a slug.
-  const rows = creators.map((c) => {
-    const own = socials.filter((s) => s.creatorId === c.id && isInstagramHandle(s.handle)).sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary))[0];
-    return { ...c, username: own?.handle ?? (c.platform === "instagram" ? c.username : "") };
-  });
+  const rows = creators.map((c) => ({ ...c, username: handles.get(c.id) ?? "" }));
   const lookable = rows.filter((r) => isInstagramHandle(r.username));
   result.skipped = rows.length - lookable.length;
   const get = opts.fetch ?? fetchProfiles;

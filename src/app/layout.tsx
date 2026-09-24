@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     default: "Creator Manager · Sentic",
     template: "%s · Creator Manager",
   },
-  description: "Sentic's creator relationship tool — research, outreach, deals, shipping and posted content in one place.",
+  description: "Sentic's creator relationship tool — conversations, deals, shipping and posted videos in one place.",
 };
 
 export default function RootLayout({

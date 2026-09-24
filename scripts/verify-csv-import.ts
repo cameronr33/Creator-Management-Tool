@@ -28,6 +28,7 @@ async function main() {
   check("no default and no column → General", parseImportFile("Name\nA\n", "").rows[0]?.campaign === "General");
   const handleOnly = parseImportFile("Instagram\n@solo\n", "");
   check("a handle with no name uses the handle as the name", handleOnly.rows[0]?.name === "solo");
+  check('"@jane.co" is an Instagram handle, not a website', parseImportFile("Name,Instagram\nJane,@jane.co\n", "").rows[0]?.handle === "jane.co");
   const dupes = parseImportFile("Name,Campaign,Instagram\nA,X,@a\nA again,X,@a\nA,Y,@a\n", "");
   check("the same creator twice in one campaign is skipped with a reason", dupes.rows.length === 2 && /line 2/.test(dupes.problems[0]?.message ?? ""), JSON.stringify(dupes.problems));
   const bad = parseImportFile("Name,Email\n,\nB,not-an-email\n", "");
@@ -48,7 +49,8 @@ async function main() {
     `Verify Three,${tag} Beta,@${h}_three,`,
   ].join("\n");
   const campaignsNow = () => db.select().from(schema.cmCampaigns).where(sql`${schema.cmCampaigns.name} ilike ${tag + "%"}`);
-  const creatorsNow = () => db.select().from(schema.cmCreators).where(sql`${schema.cmCreators.name} like 'Verify %' and (${schema.cmCreators.username} like ${h + "%"} or ${schema.cmCreators.name} = 'Verify Two')`);
+  // Everything this test creates: handles and name slugs start with h; plus the one plain name.
+  const creatorsNow = () => db.select().from(schema.cmCreators).where(sql`${schema.cmCreators.username} like ${h + "%"} or ${schema.cmCreators.name} like ${h + "%"} or ${schema.cmCreators.name} = 'Verify Two'`);
   try {
     const parsed = parseImportFile(file, "");
     const plan = await planImport(client.id, parsed);
@@ -84,6 +86,32 @@ async function main() {
     check("…the new address is tracked too", alts.some((a) => a.email === `other@${h}.test`));
     check("hand-checked views are never replaced by estimated ones", oneAfter.avgViews === 999 && oneAfter.viewsSource === "ig_public_chrome");
     check("a name-only row joins the one existing creator with that name", (await creatorsNow()).filter((c) => c.name === "Verify Two").length === 1);
+
+    // Review findings (2026-09-24).
+    // (a) A name-only row whose name slugs to someone else's handle is a new person, as previewed.
+    const slugRow = parseImportFile(`Name,Campaign\n${h}_one,${tag} Beta\n`, "");
+    const slugPlan = await planImport(client.id, slugRow);
+    const slugDone = await applyImport(client.id, slugRow);
+    check("a name that slugs to another creator's handle is created new — as the preview said", slugPlan.counts.new === 1 && slugDone.created === 1 && slugDone.addedToCampaign === 0, JSON.stringify({ p: slugPlan.counts, d: slugDone }));
+    const [oneAgain] = await db.select().from(schema.cmCreators).where(eq(schema.cmCreators.id, one.id));
+    check("…and the creator with that handle is untouched", oneAgain.name === "Verify One");
+    // (b) Two creators share a name: a name-only row is skipped with a reason, not guessed.
+    const twin = parseImportFile(`Name,Campaign\n${h}_twin a,${tag} Alpha\n${h}_twin b,${tag} Alpha\n`, "");
+    await applyImport(client.id, twin);
+    await db.update(schema.cmCreators).set({ name: `${h} Twin` }).where(sql`${schema.cmCreators.name} like ${h + "_twin %"}`);
+    const twinRow = parseImportFile(`Name,Campaign\n${h} Twin,${tag} Beta\n`, "");
+    const twinPlan = await planImport(client.id, twinRow);
+    const twinDone = await applyImport(client.id, twinRow);
+    check("a name shared by two creators is skipped with a reason in the preview and the import", twinPlan.rows.length === 0 && /2 creators/.test(twinPlan.problems[0]?.message ?? "") && twinDone.failed.length === 1 && twinDone.created === 0, JSON.stringify({ twinPlan: twinPlan.problems, twinDone }));
+    // (c) Numbers already there are kept; only hand-checked views replace estimated ones.
+    const three = made.find((c) => c.username === `${h}_three`)!;
+    await db.update(schema.cmCreators).set({ avgViews: 100, viewsSource: null, cadencePerWeek: "2" }).where(eq(schema.cmCreators.id, three.id));
+    await applyImport(client.id, parseImportFile(`Instagram,Campaign,Avg Views (IG),Posting Cadence (reels/wk)\n@${h}_three,${tag} Alpha,5,9\n`, ""));
+    const [threeA] = await db.select().from(schema.cmCreators).where(eq(schema.cmCreators.id, three.id));
+    check("views and cadence already there are never overwritten by a file", threeA.avgViews === 100 && Number(threeA.cadencePerWeek) === 2, JSON.stringify({ v: threeA.avgViews, c: threeA.cadencePerWeek }));
+    await applyImport(client.id, parseImportFile(`Instagram,Campaign,Avg Views (IG),Views Source\n@${h}_three,${tag} Alpha,777,IG public (Chrome)\n`, ""));
+    const [threeB] = await db.select().from(schema.cmCreators).where(eq(schema.cmCreators.id, three.id));
+    check("…except that hand-checked views replace views that aren't", threeB.avgViews === 777 && threeB.viewsSource === "ig_public_chrome", JSON.stringify({ v: threeB.avgViews, s: threeB.viewsSource }));
   } finally {
     const made = await creatorsNow();
     if (made.length) await db.delete(schema.cmCreators).where(inArray(schema.cmCreators.id, made.map((c) => c.id)));

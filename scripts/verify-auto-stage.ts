@@ -172,6 +172,11 @@ async function main() {
     const [afterSent] = await shipments(pid3);
     check("a person's move to Shipped marks the ready shipment shipped", sent.status === "moved" && afterSent?.status === "shipped" && !!afterSent.shippedAt, JSON.stringify(afterSent));
     check("…and still adds no second shipment", (await shipments(pid3)).length === 1);
+    // Review finding (2026-09-24): a misclick to Shipped and back left an invented ship date.
+    await changeStage(pid3, "fulfilling");
+    const [backAgain] = await shipments(pid3);
+    check("moving back from Shipped to Ready to ship puts the shipment back, with no ship date", backAgain?.status === "ready" && backAgain.shippedAt === null, JSON.stringify(backAgain));
+    await changeStage(pid3, "shipped");
 
     // Closing records why; reopening to an active stage clears it.
     await changeStage(pid3, "declined", undefined, { exitReason: "not_interested" });

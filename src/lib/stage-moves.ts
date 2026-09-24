@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cmDeliverables, cmPartnerships, cmShipments, type CmStage } from "@/lib/db/schema";
-import { canonicalStage, isTerminal, requiresDeliverable, requiresShipment } from "@/lib/stages";
+import { canonicalStage, isTerminal, requiresDeliverable, requiresShipment, stageIndex } from "@/lib/stages";
 import { hasCompleteAddress } from "@/lib/address";
 import { instagramShortcode } from "@/lib/csv";
 import type { cmExitReasonEnum } from "@/lib/db/schema";
@@ -14,7 +14,9 @@ import type { cmExitReasonEnum } from "@/lib/db/schema";
  *  - Ready to ship or later always has a shipment row (one is created at
  *    "ready" only when none exists — existing records, duplicates included,
  *    are never touched), and Shipped means it went out: moving there marks
- *    the latest shipment shipped if it was still "ready" (Undo puts it back).
+ *    the latest shipment shipped if it was still "ready", and moving back
+ *    from Shipped to an earlier stage puts it back to "ready" (no invented
+ *    ship date survives a misclick).
  *  - Posted always has a video: a move to Posted without one needs the link.
  *  - Agreed with a complete address on file continues straight to Ready to ship.
  *  - Every move writes a cm_stage_transitions row saying who moved it
@@ -112,6 +114,8 @@ export async function moveStage(input: StageMoveInput): Promise<StageMoveResult>
 
   const needShipment = requiresShipment(to);
   const markShipped = to === "shipped";
+  // Back from Shipped to an earlier live stage: it hasn't gone out after all.
+  const unmarkShipped = canonicalStage(from) === "shipped" && !isTerminal(to) && stageIndex(to) < stageIndex("shipped");
   const setExit = input.exitReason !== undefined;
   const clearExit = !isTerminal(to);
   const meta = {
@@ -145,6 +149,12 @@ export async function moveStage(input: StageMoveInput): Promise<StageMoveResult>
       where ${markShipped} and exists (select 1 from moved) and status = 'ready'
         and id = (select s.id from ${cmShipments} s where s.partnership_id = ${input.partnershipId} order by s.created_at desc limit 1)
       returning id
+    ), unmarked as (
+      update ${cmShipments}
+      set status = 'ready', shipped_at = null, updated_at = now()
+      where ${unmarkShipped} and exists (select 1 from moved) and status = 'shipped'
+        and id = (select s.id from ${cmShipments} s where s.partnership_id = ${input.partnershipId} order by s.created_at desc limit 1)
+      returning id
     ), vid as (
       insert into ${cmDeliverables} (partnership_id, platform, url, shortcode, posted_at)
       select id, ${video?.platform ?? "instagram"}::cm_platform, ${video?.url ?? ""}, ${video?.shortcode ?? null}, now()
@@ -159,6 +169,7 @@ export async function moveStage(input: StageMoveInput): Promise<StageMoveResult>
                || jsonb_strip_nulls(jsonb_build_object(
                     'createdShipmentId', (select id from ship),
                     'markedShippedId', (select id from marked),
+                    'unmarkedShippedId', (select id from unmarked),
                     'createdDeliverableId', (select id from vid)))
       from moved
       returning id

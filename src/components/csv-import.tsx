@@ -108,7 +108,7 @@ export function CsvImport({ defaultCampaign }: { defaultCampaign: string }) {
 
       {plan && (
         <div className="space-y-3">
-          <Callout tone="info" title={`Ready to import into ${plan.rows.length ? "" : "nothing — "}this client`}>
+          <Callout tone="info" title="Here's what will happen — nothing is saved until you press Import">
             {plan.counts.new} new · {plan.counts.added_to_campaign} join a campaign · {plan.counts.already_there} already there
             {plan.newCampaigns.length > 0 && (
               <>
@@ -155,7 +155,7 @@ export function CsvImport({ defaultCampaign }: { defaultCampaign: string }) {
         </div>
       )}
       <p className="text-xs text-text-faint">
-        New creators start in To contact. People already here only get empty fields filled — nothing they have is overwritten. Want one at a time?{" "}
+        New creators start in To contact. People already here only get empty fields filled — nothing they have is overwritten, except that hand-checked view counts replace estimated ones. Want one at a time?{" "}
         <Link href="/creators/new" className="underline hover:text-accent">
           Add a creator
         </Link>

@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "./db";
 import { downloadPhoto, isAllowedPhotoUrl, sniffImageType } from "../src/lib/photos";
 import { isInstagramHandle, refreshFromInstagram } from "../src/lib/instagram";
-import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
+import { addCreatorSocial, createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 import type { ApifyProfile } from "../src/lib/apify";
 
 let failures = 0;
@@ -70,6 +70,21 @@ async function main() {
       };
       const r = await refreshFromInstagram([handle.creatorId, named.creatorId], { fetch: fake });
       check("only the creator with a real handle is looked up", asked.flat().join() === "__verify_photo__" && r.skipped === 1, JSON.stringify({ asked, r }));
+
+      // Review finding (2026-09-24): an older name-only creator was saved as "instagram"
+      // with a slug username that is also a real handle — a stranger's.
+      await db.update(schema.cmCreators).set({ platform: "instagram", username: "verifyslugname" }).where(eq(schema.cmCreators.id, named.creatorId));
+      asked.length = 0;
+      await refreshFromInstagram([named.creatorId], { fetch: fake });
+      check("a creator with no Instagram link is never looked up by their username", asked.length === 0, JSON.stringify(asked));
+      // When they get a link, that link's handle is what's looked up — and becomes their @handle.
+      await db.update(schema.cmCreators).set({ platform: "other", profileUrl: "", username: "verify-name-only" }).where(eq(schema.cmCreators.id, named.creatorId));
+      await addCreatorSocial(named.creatorId, "https://www.instagram.com/__verify_named_real__");
+      const [namedNow] = await db.select().from(schema.cmCreators).where(eq(schema.cmCreators.id, named.creatorId));
+      check("their first link becomes primary, and its handle their @handle", namedNow.platform === "instagram" && namedNow.username === "__verify_named_real__", JSON.stringify({ p: namedNow.platform, u: namedNow.username }));
+      asked.length = 0;
+      await refreshFromInstagram([named.creatorId], { fetch: fake });
+      check("…and the lookup uses that link's handle", asked.flat().join() === "__verify_named_real__", JSON.stringify(asked));
       const [photo] = await db.select().from(schema.cmCreatorPhotos).where(eq(schema.cmCreatorPhotos.creatorId, handle.creatorId));
       check("the picture is stored as bytes, with its type", photo?.mime === "image/jpeg" && Buffer.from(photo.data, "base64").subarray(0, 3).equals(Buffer.from(JPEG.subarray(0, 3))));
       const [c] = await db.select().from(schema.cmCreators).where(eq(schema.cmCreators.id, handle.creatorId));
