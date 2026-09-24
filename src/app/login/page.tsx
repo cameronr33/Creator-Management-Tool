@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { activeClientPerson } from "@/lib/client-session";
 import { BrandMark } from "@/components/brand";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage() {
   const session = await auth();
-  if (session?.user) redirect("/");
+  // A client whose login was turned off still holds an old token: show the form, never loop.
+  if (session?.user && session.user.kind !== "client") redirect("/");
+  if (session?.user && (await activeClientPerson(session))) redirect("/portal");
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand-navy px-4">

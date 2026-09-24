@@ -12,7 +12,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "./db";
 import { getPortalCreators, partnershipOfClient, PORTAL_CREATOR_KEYS } from "../src/lib/portal-data";
-import { recordShipment } from "../src/lib/shipments";
+import { clientMayShip, recordShipment } from "../src/lib/shipments";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 import { changeStage } from "../src/lib/mutations";
 
@@ -26,11 +26,15 @@ const SECRETS = ["SECRET_SUMMARY_7731", "SECRET_TERMS_7731", "SECRET_NOTE_7731",
 
 async function main() {
   const [client] = await db.select({ id: schema.clients.id }).from(schema.clients).where(eq(schema.clients.slug, "hella")).limit(1);
-  const [other] = await db.insert(schema.clients).values({ name: "__verify_po_other", slug: `__verify_po_${Date.now()}` }).returning();
-  const campaignId = await ensureCampaignByName(client.id, "__verify_portal__");
-  const otherCampaign = await ensureCampaignByName(other.id, "__verify_portal_other__");
+  const NONE = "00000000-0000-0000-0000-000000000000";
+  let other = { id: NONE };
+  let campaignId = NONE;
+  let otherCampaign = NONE;
   const creatorIds: string[] = [];
   try {
+    [other] = await db.insert(schema.clients).values({ name: "__verify_po_other", slug: `__verify_po_${Date.now()}` }).returning();
+    campaignId = await ensureCampaignByName(client.id, "__verify_portal__");
+    otherCampaign = await ensureCampaignByName(other.id, "__verify_portal_other__");
     const a = await createCreatorWithPartnership({ clientId: client.id, name: "Verify Portal", links: ["https://www.instagram.com/__verify_portal__"], campaignId, businessEmail: "secret-creator@example.test", notes: "SECRET_CREATOR_NOTE_7731" });
     const b = await createCreatorWithPartnership({ clientId: other.id, name: "Verify Portal Other", links: ["https://www.instagram.com/__verify_portal_o__"], campaignId: otherCampaign });
     creatorIds.push(a.creatorId, b.creatorId);
@@ -56,6 +60,12 @@ async function main() {
     check("Ready to ship: the address is shown so they can send it", ready.stage === "fulfilling" && /1 Test St/.test(ready.shipTo ?? ""));
 
     console.log("\n── What the portal can do ──");
+    const matrix = (["shortlisted", "awaiting_address", "fulfilling", "shipped", "content_pending", "posted", "passed"] as const).map((s) => [s, clientMayShip(s, "shipped"), clientMayShip(s, "delivered")] as const);
+    check(
+      "the client marks shipped only from Ready to ship, and delivered only once it's on its way",
+      matrix.every(([s, sh, de]) => sh === (s === "fulfilling") && de === (s === "shipped")),
+      JSON.stringify(matrix),
+    );
     check("a client can't reach another client's creator", (await partnershipOfClient(client.id, b.partnershipId)) === null && (await partnershipOfClient(other.id, a.partnershipId)) === null);
     const p = await partnershipOfClient(client.id, a.partnershipId);
     const shipped = await recordShipment({ id: p?.shipmentId ?? undefined, partnershipId: a.partnershipId, status: "shipped", carrier: "UPS", trackingNumber: "1ZVERIFY" }, { kind: "client", id: "00000000-0000-0000-0000-000000000009", name: "Rob Client" });

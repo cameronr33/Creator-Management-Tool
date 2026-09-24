@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireClientUser, badRequest } from "@/lib/api-helpers";
 import { partnershipOfClient } from "@/lib/portal-data";
-import { recordShipment } from "@/lib/shipments";
+import { clientMayShip, recordShipment } from "@/lib/shipments";
 
 /**
  * POST /api/client/ship { partnershipId, status: "shipped"|"delivered", carrier?, trackingNumber? }
@@ -25,8 +25,7 @@ export async function POST(req: NextRequest) {
   const d = parsed.data;
   const p = await partnershipOfClient(person.clientId, d.partnershipId);
   if (!p) return badRequest("That creator isn't one of yours");
-  const allowed = d.status === "shipped" ? p.stage === "fulfilling" : p.stage === "shipped";
-  if (!allowed) return badRequest(d.status === "shipped" ? "That creator isn't ready to ship" : "That shipment isn't on its way yet");
+  if (!clientMayShip(p.stage, d.status)) return badRequest(d.status === "shipped" ? "That creator isn't ready to ship" : "That shipment isn't on its way yet");
   const r = await recordShipment(
     {
       id: p.shipmentId ?? undefined,

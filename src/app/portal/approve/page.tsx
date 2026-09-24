@@ -13,7 +13,7 @@ export default async function PortalApprove() {
     <>
       <div>
         <h1 className="text-lg font-semibold tracking-tight text-text">Approve creators</h1>
-        <p className="text-sm text-text-muted">Nobody reaches out to these creators until you approve. Pass on anyone who isn&apos;t right — a reason helps us find better ones.</p>
+        <p className="text-sm text-text-muted">We won&apos;t reach out to these creators until you approve. Pass on anyone who isn&apos;t right — a reason helps us find better ones.</p>
       </div>
       {waiting.length === 0 ? (
         <EmptyState title="Nothing waiting for you" hint="New creators appear here when we shortlist them for you." />

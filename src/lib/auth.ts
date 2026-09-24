@@ -5,6 +5,10 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cmClientUsers, users } from "@/lib/db/schema";
 import { getPreviewAuthCookies } from "@/lib/auth-cookies";
+import { passwordVersion } from "@/lib/client-session";
+
+/** Compared against when no account matches, so a miss takes as long as a hit (no email probing by timing). */
+const DUMMY_HASH = "$2a$10$CwTycUXWue0Thq9StjUM0uJ8.Wf2V7d0oP8QJ5gtJ3Bv1JmS7wYfK";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET,
@@ -44,10 +48,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .from(cmClientUsers)
           .where(and(eq(cmClientUsers.email, email.trim().toLowerCase()), eq(cmClientUsers.loginEnabled, true)))
           .limit(1);
-        if (!person?.passwordHash) return null;
+        if (!person?.passwordHash) {
+          await compare(password, DUMMY_HASH);
+          return null;
+        }
         if (!(await compare(password, person.passwordHash))) return null;
         await db.update(cmClientUsers).set({ lastLoginAt: sql`now()` }).where(eq(cmClientUsers.id, person.id));
-        return { id: person.id, name: person.name, email: person.email, role: "client", kind: "client" as const, clientId: person.clientId };
+        return { id: person.id, name: person.name, email: person.email, role: "client", kind: "client" as const, clientId: person.clientId, pwv: passwordVersion(person.passwordHash) };
       },
     }),
   ],
@@ -61,10 +68,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id as string;
         token.name = user.name ?? null;
         token.email = user.email ?? null;
-        const u = user as { role: string; kind?: "agency" | "client"; clientId?: string | null };
+        const u = user as { role: string; kind?: "agency" | "client"; clientId?: string | null; pwv?: string };
         token.role = u.role;
         token.kind = u.kind ?? "agency";
         token.clientId = u.clientId ?? null;
+        token.pwv = u.pwv ?? null;
       }
       return token;
     },
@@ -73,6 +81,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.role = token.role;
       session.user.kind = token.kind ?? "agency";
       session.user.clientId = token.clientId ?? null;
+      session.user.pwv = token.pwv ?? null;
       return session;
     },
   },

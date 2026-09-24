@@ -79,6 +79,13 @@ What the scripts anchor:
   hand-checked views never replaced by estimates.
 - **bulk** — removing from a campaign (orphans deleted, others kept), moving
   between campaigns (conflicts skipped), deleting a campaign.
+- **access** — every API handler calls a guard (agency, portal, cron, or the
+  invite token for `/api/invite` only), portal routes never read the agency's
+  client cookie, every agency server action refuses a client login.
+- **client-users / approvals / portal** — invites work once and expire, only
+  the hash is stored; approvals only for the right brand and only what's
+  waiting; the portal returns exactly the agreed fields and never a planted
+  private value; a client's shipment moves the stage through the same rule.
 - **add-creator / editors / next-step / creator-workspace / design** — link
   parsing, address parsing, the "Next:" line for every stage, section anchors,
   and the design tokens/primitives rule (frozen node 7).
@@ -111,7 +118,11 @@ With the dev server on port 3002, unauthenticated requests to app routes must
 
 ```
 /  /pipeline  /creators  /creators/new  /import  /settings  /help  /login
+/portal  /portal/approve  /portal/ship  /portal/creators
 ```
+
+A client login must land on `/portal` and get 403/redirect from every agency
+page and `/api/*` route; a teammate opening `/portal` sees it read-only.
 
 Signing in is the owner's job — never enter a password. Once they have, open
 the changed pages in the Browser pane: zero new console errors, and every

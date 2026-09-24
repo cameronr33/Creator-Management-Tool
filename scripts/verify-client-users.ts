@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import { compare } from "bcryptjs";
 import { db, schema } from "./db";
 import { acceptInvite, addClientUser, createInvite, findInvite, hashInviteToken, removeClientUser, revokeLogin } from "../src/lib/client-users";
+import { activeClientPerson, passwordVersion } from "../src/lib/client-session";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail?: string) {
@@ -51,12 +52,27 @@ async function main() {
     const third = (await createInvite(client.id, id))!;
     check("a new link replaces the old one", (await findInvite(second)) === null && (await findInvite(third))?.id === id);
 
+    // Their session, as the sign-in would issue it — and what ends it (security review, 2026-09-24).
+    const [signedIn] = await db.select().from(schema.cmClientUsers).where(eq(schema.cmClientUsers.id, id));
+    const session = { user: { id, kind: "client", clientId: client.id, pwv: passwordVersion(signedIn.passwordHash!) } };
+    check("a fresh session is valid", (await activeClientPerson(session))?.clientId === client.id);
+    check("a session claiming another brand isn't", (await activeClientPerson({ user: { ...session.user, clientId: other.id } })) === null);
+    check("an agency session is never a client person", (await activeClientPerson({ user: { ...session.user, kind: "agency" } })) === null);
+
     check("another client can't turn their login off", !(await revokeLogin(other.id, id)));
     await revokeLogin(client.id, id);
+    check("turning their login off ends the session they already have", (await activeClientPerson(session)) === null);
     const [row3] = await db.select().from(schema.cmClientUsers).where(eq(schema.cmClientUsers.id, id));
     check("turning the login off clears the password and any open link", !row3.loginEnabled && !row3.passwordHash && !row3.inviteTokenHash && (await findInvite(third)) === null);
+    const again = (await createInvite(client.id, id))!;
+    await acceptInvite(again, "a different long secret");
+    check("re-invited with a new password, the old session still doesn't come back", (await activeClientPerson(session)) === null);
+    const [reSigned] = await db.select().from(schema.cmClientUsers).where(eq(schema.cmClientUsers.id, id));
+    const sessionB = { user: { ...session.user, pwv: passwordVersion(reSigned.passwordHash!) } };
+    check("…while signing in again with the new one works", (await activeClientPerson(sessionB))?.id === id);
     check("another client can't remove them", !(await removeClientUser(other.id, id)));
     check("their own client can", await removeClientUser(client.id, id));
+    check("removing them ends the session they have", (await activeClientPerson(sessionB)) === null);
     id = "";
   } finally {
     if (id) await db.delete(schema.cmClientUsers).where(eq(schema.cmClientUsers.id, id));

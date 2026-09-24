@@ -75,7 +75,40 @@ matched ignoring case and created when missing — `src/lib/csv-import.ts`) or
 **Add creator**; their Instagram photo and followers are fetched afterwards
 (`src/lib/instagram.ts`, stored in `cm_creator_photos`).
 
-## Loops
+## Clients in the tool
+
+People at a client (e.g. HELLA staff) live in `cm_client_users` — this app's
+own table, never the shared `users` (which other tools and the email team list
+read). Settings → *<client>'s team*:
+
+- **Everyone listed is a client contact for email.** Their messages on their
+  own brand's creator threads are stored as the client's notes. They never
+  count as the creator replying or as us, and they never become the "latest
+  message".
+- **Invite to log in** creates a one-time link (sha256 stored, 7 days). You
+  send it yourself; the person chooses their own password. They sign in on
+  the same login page and only ever see `/portal`, for their own brand.
+- **"<client> approves each creator before anyone reaches out"** makes new
+  creators wait. The client approves or passes in the portal, or the agency
+  does it for them. Approval is an attribute of the partnership, never a stage
+  move; passing closes the partnership as We passed · Client passed.
+
+**The portal:**
+
+- **Pages:** Overview, Approve creators, Ship product (the confirmed address
+  while it's theirs to send), and All creators.
+- **Shipping:** a client marking something shipped moves the stage through the
+  same rule as ours, and who did it is recorded.
+- **Data:** `src/lib/portal-data.ts` picks every column by name. There are no
+  email bodies or summaries, fees, terms or notes, and nothing from another
+  client.
+
+**Access:**
+
+- Every agency route calls `requireAgency()`, and every portal route calls
+  `requireClientUser()`.
+- `scripts/verify-access.ts` fails the build graph if a handler has no guard.
+
 
 - **Email check** (`src/lib/gmail-sync.ts`) — reads the Gmail mailbox connected
   in Settings (read-only) and searches it **only** for the addresses saved on

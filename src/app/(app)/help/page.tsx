@@ -1,3 +1,4 @@
+import { requireAgencyPage } from "@/lib/page-guards";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { LayoutDashboard, Kanban, Users, Settings, ArrowRight } from "lucide-react";
@@ -23,7 +24,8 @@ export const metadata: Metadata = { title: "How it works" };
  * the app runs on (STAGES, AUTO_STAGE_RULES, EMAIL_STAGE_RULES,
  * DEFAULT_THRESHOLDS), so the explanation can't drift from the behaviour.
  */
-export default function HelpPage() {
+export default async function HelpPage() {
+  await requireAgencyPage();
   const triggers = Object.keys(AUTO_STAGE_RULES) as AutoStageTrigger[];
   const autoTargets = new Map<string, AutoStageTrigger[]>();
   for (const t of triggers) {

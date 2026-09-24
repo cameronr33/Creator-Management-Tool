@@ -30,11 +30,14 @@ export function ClientTeam({
   clientName,
   people,
   requiresApproval,
+  ourSideDomains = [],
 }: {
   clientId: string;
   clientName: string;
   people: ClientPerson[];
   requiresApproval: boolean;
+  /** Whole domains on "Our side" — anyone there who isn't listed here still counts as us. */
+  ourSideDomains?: string[];
 }) {
   const { pending, run } = useSave();
   const [name, setName] = useState("");
@@ -72,6 +75,15 @@ export function ClientTeam({
       <p className="-mt-2 text-xs text-text-muted">
         New creators then wait in &ldquo;Waiting on client approval&rdquo; on Today. {clientName} approves or passes in their portal, or you can for them. Creators already here aren&apos;t affected.
       </p>
+      {(() => {
+        const overlap = [...new Set(people.map((p) => p.email.split("@")[1]).filter((d) => ourSideDomains.includes(d)))];
+        return overlap.length ? (
+          <Callout tone="warn" title={`@${overlap.join(", @")} is also on Our side`}>
+            People listed here count as {clientName}&apos;s either way, but anyone else at @{overlap.join(", @")} still counts as us. If they&apos;re
+            all {clientName} staff, take the domain off Our side (Email tracking, above).
+          </Callout>
+        ) : null;
+      })()}
       {people.length === 0 ? (
         <p className="text-sm text-text-muted">No one from {clientName} yet.</p>
       ) : (

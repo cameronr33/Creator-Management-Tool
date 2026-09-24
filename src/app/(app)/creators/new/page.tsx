@@ -1,3 +1,4 @@
+import { requireAgencyPage } from "@/lib/page-guards";
 import type { Metadata } from "next";
 import { resolveClient, getCampaigns } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
@@ -7,6 +8,7 @@ import { AddCreatorForm } from "@/components/add-creator-form";
 export const metadata: Metadata = { title: "Add creator" };
 
 export default async function NewCreatorPage() {
+  await requireAgencyPage();
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) {
     return (

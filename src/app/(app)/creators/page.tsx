@@ -1,3 +1,4 @@
+import { requireAgencyPage } from "@/lib/page-guards";
 import type { Metadata } from "next";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
 import { Plus, Upload } from "lucide-react";
@@ -17,6 +18,7 @@ export default async function CreatorsPage({
 }: {
   searchParams: Promise<{ q?: string; stage?: string }>;
 }) {
+  await requireAgencyPage();
   await scheduleEmailCheckForVisitor();
   const sp = await searchParams;
   const client = await resolveClient(await getSelectedClientSlug());

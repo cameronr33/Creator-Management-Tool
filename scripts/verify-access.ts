@@ -89,6 +89,30 @@ function main() {
   check("a client login is recognised as one", isClientSession({ user: { kind: "client" } }) && !isClientSession({ user: { kind: "agency" } }) && !isClientSession({ user: {} }));
   const layout = readFileSync(join(SRC, "app", "(app)", "layout.tsx"), "utf8");
   check("the agency's pages send a client login to the portal", /kind === "client"\) redirect\("\/portal"\)/.test(layout));
+
+  console.log("\n── Pages check for themselves (a layout alone can be skipped) ──");
+  // Security review (2026-09-24): Next can render a page without re-running its layout.
+  const pagesUnder = (dir: string, out: string[] = []): string[] => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) pagesUnder(p, out);
+      else if (name === "page.tsx") out.push(p);
+    }
+    return out;
+  };
+  const agencyPages = pagesUnder(join(SRC, "app", "(app)"));
+  const agencyLoose = agencyPages.filter((p) => !/await requireAgencyPage\(\)/.test(readFileSync(p, "utf8"))).map((p) => relative(SRC, p));
+  check(`every agency page (${agencyPages.length}) calls requireAgencyPage() itself`, agencyPages.length >= 8 && agencyLoose.length === 0, agencyLoose.join(", "));
+  const portalPages = pagesUnder(join(SRC, "app", "portal"));
+  const portalLoose = portalPages.filter((p) => !/await getPortalContext\(\)/.test(readFileSync(p, "utf8"))).map((p) => relative(SRC, p));
+  check(`every portal page (${portalPages.length}) resolves its brand from the login itself`, portalPages.length >= 4 && portalLoose.length === 0, portalLoose.join(", "));
+  const guard = readFileSync(join(SRC, "lib", "page-guards.ts"), "utf8");
+  check("the page guard refuses signed-out and client logins", /if \(!session\?\.user\) redirect\("\/login"\)/.test(guard) && /kind === "client"\) redirect\("\/portal"\)/.test(guard));
+
+  console.log("\n── A client login is re-checked every time ──");
+  const clientPaths = [join(SRC, "lib", "api-helpers.ts"), join(SRC, "lib", "portal-data.ts"), join(SRC, "app", "api", "creators", "[id]", "photo", "route.ts")];
+  const trusting = clientPaths.filter((p) => !/activeClientPerson\(/.test(readFileSync(p, "utf8"))).map((p) => relative(SRC, p));
+  check("the portal guard, the portal's data and the photo route check the login against the database", trusting.length === 0, trusting.join(", "));
   const emailCheck = readFileSync(join(SRC, "lib", "page-email-check.ts"), "utf8");
   check("a client login never starts a check of the agency's mailbox", /kind !== "client"/.test(emailCheck));
 }

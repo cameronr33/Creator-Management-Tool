@@ -1,3 +1,4 @@
+import { requireAgencyPage } from "@/lib/page-guards";
 import type { Metadata } from "next";
 import { resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
@@ -8,6 +9,7 @@ import { CsvImport } from "@/components/csv-import";
 export const metadata: Metadata = { title: "Import creators" };
 
 export default async function ImportPage() {
+  await requireAgencyPage();
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) {
     return (

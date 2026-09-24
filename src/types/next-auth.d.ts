@@ -14,6 +14,8 @@ declare module "next-auth" {
       kind?: "agency" | "client";
       /** Client logins only: the one brand they may see. */
       clientId?: string | null;
+      /** Client logins only: fingerprint of the password at sign-in (re-checked every request). */
+      pwv?: string | null;
     } & DefaultSession["user"];
   }
 }
@@ -24,5 +26,6 @@ declare module "next-auth/jwt" {
     role: string;
     kind?: "agency" | "client";
     clientId?: string | null;
+    pwv?: string | null;
   }
 }

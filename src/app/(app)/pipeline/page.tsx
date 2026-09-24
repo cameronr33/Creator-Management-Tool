@@ -1,3 +1,4 @@
+import { requireAgencyPage } from "@/lib/page-guards";
 import { resolveClient, getCreatorRows } from "@/lib/queries";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
@@ -6,6 +7,7 @@ import { PageHeader, EmptyState, Button } from "@/components/ui";
 import { PipelineBoard, type BoardCard } from "@/components/pipeline-board";
 
 export default async function PipelinePage() {
+  await requireAgencyPage();
   await scheduleEmailCheckForVisitor();
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) {

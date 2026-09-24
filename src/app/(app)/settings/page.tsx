@@ -1,3 +1,4 @@
+import { requireAgencyPage } from "@/lib/page-guards";
 import type { Metadata } from "next";
 import { resolveClient, getClientsWithSettings, getCampaigns } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
@@ -46,6 +47,7 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAgencyPage();
   const sp = await searchParams;
   const gmailResult = describeGmailResult(typeof sp.gmail === "string" ? sp.gmail : null);
   const client = await resolveClient(await getSelectedClientSlug());
@@ -193,6 +195,7 @@ export default async function SettingsPage({
             <ClientTeam
               clientId={client.id}
               requiresApproval={!!currentSettings?.requiresApproval}
+              ourSideDomains={(gmailAccount?.teamAddresses ?? []).filter((e) => e.startsWith("@")).map((e) => e.slice(1).toLowerCase())}
               clientName={client.name}
               people={clientPeople.map((p) => ({
                 ...p,

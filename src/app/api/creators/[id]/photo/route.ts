@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 import { requireAgency, assertCreatorInSelectedClient, isClientSession } from "@/lib/api-helpers";
 import { auth } from "@/lib/auth";
+import { activeClientPerson } from "@/lib/client-session";
 import { db } from "@/lib/db";
 import { cmCreatorPhotos, cmCreators } from "@/lib/db/schema";
 
@@ -15,8 +16,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const { id } = await ctx.params;
   const session = await auth();
   if (isClientSession(session)) {
+    const person = await activeClientPerson(session);
+    if (!person) return new NextResponse(null, { status: 401 });
     const [c] = /^[0-9a-f-]{36}$/i.test(id) ? await db.select({ clientId: cmCreators.clientId }).from(cmCreators).where(eq(cmCreators.id, id)).limit(1) : [];
-    if (!c || c.clientId !== session!.user.clientId) return new NextResponse(null, { status: 404 });
+    if (!c || c.clientId !== person.clientId) return new NextResponse(null, { status: 404 });
   } else {
     const { error } = await requireAgency();
     if (error) return error;

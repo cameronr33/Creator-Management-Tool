@@ -30,7 +30,7 @@ export default async function PortalOverview() {
       </div>
       {toApprove > 0 && (
         <Callout tone="warn" icon={<Check size={16} />} title={`${toApprove} creator${toApprove === 1 ? " is" : "s are"} waiting for your approval`} actions={<Link href="/portal/approve" className="inline-flex items-center gap-1 text-sm font-medium underline">Review them <ArrowRight size={13} /></Link>}>
-          Nobody reaches out to them until you approve.
+          We won&apos;t reach out to them until you approve.
         </Callout>
       )}
       {toShip > 0 && (

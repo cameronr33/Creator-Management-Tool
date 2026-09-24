@@ -16,6 +16,7 @@ import { resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { canonicalStage } from "@/lib/stages";
 import { formatAddress } from "@/lib/address";
+import { activeClientPerson } from "@/lib/client-session";
 
 /**
  * What the client portal may show — and nothing else. Every column is picked
@@ -75,9 +76,11 @@ export async function getPortalContext(): Promise<PortalContext | null> {
   const session = await auth();
   if (!session?.user) return null;
   if (session.user.kind === "client") {
-    if (!session.user.clientId) return null;
-    const [c] = await db.select({ id: clients.id, name: clients.name }).from(clients).where(eq(clients.id, session.user.clientId)).limit(1);
-    return c ? { clientId: c.id, clientName: c.name, readOnly: false, viewerName: session.user.name ?? "" } : null;
+    // Re-checked every time: a login turned off, removed or re-invited ends at once.
+    const person = await activeClientPerson(session);
+    if (!person) return null;
+    const [c] = await db.select({ id: clients.id, name: clients.name }).from(clients).where(eq(clients.id, person.clientId)).limit(1);
+    return c ? { clientId: c.id, clientName: c.name, readOnly: false, viewerName: person.name } : null;
   }
   const c = await resolveClient(await getSelectedClientSlug());
   return c ? { clientId: c.id, clientName: c.name, readOnly: true, viewerName: session.user.name ?? "" } : null;

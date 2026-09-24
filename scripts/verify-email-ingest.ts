@@ -98,6 +98,16 @@ async function main() {
     "the same person on another brand's creator is just someone else",
     classifyMessage(msg({ from: "rob@brand.example", to: [ALT] }), both, withClient)?.senderRole === "other",
   );
+  // Security review (2026-09-24): a listed client person outranks a blanket Our-side domain.
+  const domainToo = { ...withClient, domains: new Set([...withClient.domains, "brand.example"]) };
+  check(
+    "a client person whose whole domain is on Our side is still the client's",
+    classifyMessage(msg({ from: "rob@brand.example", to: [CREATOR] }), both, domainToo)?.senderRole === "client",
+  );
+  check(
+    "…while an unlisted colleague at that domain still counts as us",
+    classifyMessage(msg({ from: "ana@brand.example", to: [CREATOR] }), both, domainToo)?.senderRole === "team",
+  );
   check(
     "Our side still wins: a teammate is never the client",
     classifyMessage(msg({ from: "rob@brand.example", to: [CREATOR], labelIds: ["SENT"] }), both, withClient)?.senderRole === "team",

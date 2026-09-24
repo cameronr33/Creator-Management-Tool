@@ -24,6 +24,11 @@ export interface ShipmentInput {
   notes?: string | null;
 }
 
+/** Pure: the client may mark shipped only from Ready to ship, and delivered only once it's on its way. */
+export function clientMayShip(stage: string, status: "shipped" | "delivered"): boolean {
+  return status === "shipped" ? stage === "fulfilling" : stage === "shipped";
+}
+
 export type ShipmentActor = { kind: "agency"; userId: string | null } | { kind: "client"; id: string; name: string };
 
 export async function recordShipment(

@@ -1,3 +1,4 @@
+import { requireAgencyPage } from "@/lib/page-guards";
 import Link from "next/link";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
 import { notFound } from "next/navigation";
@@ -72,6 +73,7 @@ export default async function CreatorDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ returnTo?: string | string[] }>;
 }) {
+  await requireAgencyPage();
   await scheduleEmailCheckForVisitor();
   const { id } = await params;
   const query = await searchParams;
@@ -221,7 +223,7 @@ export default async function CreatorDetailPage({
               {partnership.clientApproval === "pending" ? (
                 <div className="mt-2">
                   <Callout tone="warn" title={`Waiting on ${client?.name ?? "the client"}'s approval`} actions={<ApprovalButtons partnershipId={partnership.id} name={creator.name} who="agency" />}>
-                    Nobody reaches out until they approve — in their portal, or you for them.
+                    Hold off reaching out until they approve — in their portal, or approve for them here.
                   </Callout>
                 </div>
               ) : partnership.clientApproval ? (

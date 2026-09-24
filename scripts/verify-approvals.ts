@@ -12,6 +12,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "./db";
 import { approve, pass, setApprovalRequired } from "../src/lib/approvals";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
+import { changeStage } from "../src/lib/mutations";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail?: string) {
@@ -21,9 +22,9 @@ function check(label: string, cond: boolean, detail?: string) {
 
 async function main() {
   const [client] = await db.select({ id: schema.clients.id }).from(schema.clients).where(eq(schema.clients.slug, "hella")).limit(1);
-  const [other] = await db.insert(schema.clients).values({ name: "__verify_ap_other", slug: `__verify_ap_${Date.now()}` }).returning();
   const [settingsBefore] = await db.select().from(schema.cmClientSettings).where(eq(schema.cmClientSettings.clientId, client.id));
-  const campaignId = await ensureCampaignByName(client.id, "__verify_approvals__");
+  let other = { id: "00000000-0000-0000-0000-000000000000" };
+  let campaignId = "00000000-0000-0000-0000-000000000000";
   const creatorIds: string[] = [];
   const add = async (h: string) => {
     const r = await createCreatorWithPartnership({ clientId: client.id, name: h, links: [`https://www.instagram.com/${h}`], campaignId });
@@ -34,6 +35,8 @@ async function main() {
   const rob = { name: "Rob Client", kind: "client" as const, clientUserId: "00000000-0000-0000-0000-000000000001" };
   const teammate = { name: "Sam Teammate", kind: "agency" as const };
   try {
+    [other] = await db.insert(schema.clients).values({ name: "__verify_ap_other", slug: `__verify_ap_${Date.now()}` }).returning();
+    campaignId = await ensureCampaignByName(client.id, "__verify_approvals__");
     await setApprovalRequired(client.id, false);
     const free = await add("__verify_ap_free");
     check("switch off: a new creator doesn't wait for anyone", (await row(free)).clientApproval === null);
@@ -63,11 +66,32 @@ async function main() {
     check("another client can't pass on them", !(await pass(other.id, c, rob)).ok && (await row(c)).stage === "shortlisted");
     const forThem = await approve(client.id, [c, free], teammate);
     check("the agency can approve for the client — even someone who wasn't waiting", forThem.approved === 2 && (await row(c)).approvalByName === "Sam Teammate");
+
+    // Security review (2026-09-24).
+    const moved = await add("__verify_ap_moved");
+    await changeStage(moved, "fulfilling");
+    check("a creator who moved on while waiting can't be approved by the client", (await approve(client.id, [moved], rob)).approved === 0);
+    check("…nor closed by the client", !(await pass(client.id, moved, rob)).ok && (await row(moved)).stage === "fulfilling" && (await row(moved)).clientApproval === "pending");
+    check("the agency never approves someone already passed on", (await approve(client.id, [b], teammate)).approved === 0 && (await row(b)).clientApproval === "passed");
+    const declined = await add("__verify_ap_declined");
+    await changeStage(declined, "declined");
+    check("…nor anyone closed", (await approve(client.id, [declined], teammate)).approved === 0);
+    check("the agency can't pass on a closed deal either", !(await pass(client.id, declined, teammate)).ok && (await row(declined)).stage === "declined");
+    const racy = await add("__verify_ap_racy");
+    const [first, second] = await Promise.all([approve(client.id, [racy], rob), pass(client.id, racy, { ...rob, name: "Other Person" })]);
+    const rr = await row(racy);
+    check(
+      "two people deciding at once: exactly one decision stands, and the stage agrees with it",
+      (first.approved === 1) !== second.ok && (rr.clientApproval === "approved" ? rr.stage === "shortlisted" : rr.stage === "passed"),
+      JSON.stringify({ first, second, a: rr.clientApproval, s: rr.stage }),
+    );
   } finally {
     await db.delete(schema.cmCreators).where(inArray(schema.cmCreators.id, creatorIds.length ? creatorIds : ["00000000-0000-0000-0000-000000000000"]));
     await db.delete(schema.cmCampaigns).where(eq(schema.cmCampaigns.id, campaignId));
     await db.delete(schema.clients).where(eq(schema.clients.id, other.id));
-    await setApprovalRequired(client.id, settingsBefore?.requiresApproval ?? false);
+    // Leave HELLA's settings exactly as found — including not having a row at all.
+    if (settingsBefore) await setApprovalRequired(client.id, settingsBefore.requiresApproval);
+    else await db.delete(schema.cmClientSettings).where(eq(schema.cmClientSettings.clientId, client.id));
   }
   check("test rows cleaned up", (await db.select().from(schema.cmCampaigns).where(eq(schema.cmCampaigns.id, campaignId))).length === 0);
 }

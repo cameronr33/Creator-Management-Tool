@@ -85,6 +85,11 @@ here — it looks like health. So:
     (a typo or the wrong address looks exactly like a quiet creator
     otherwise) and addresses saved on **more than one creator**;
   - `npm run gmail:diagnose` shows per-address match counts in the mailbox.
+- Every route states who may call it (2026-09-24, client logins): the agency's
+  `requireAgency()`, the portal's `requireClientUser()` (brand from the login,
+  never a cookie), the cron secret, or — for `/api/invite` only — the one-time
+  invite token. `verify-access` fails on any handler without one, and
+  `verify-portal` plants private values and asserts none reach the portal.
 - Counter-metrics: outreach volume is paired with reply rate (worklist +
   timeline), follow-ups sent with `no_response` closes and reopens.
 - Measurement decay: imported sheet rows have unknown dates and are flagged

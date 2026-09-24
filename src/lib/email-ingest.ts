@@ -217,7 +217,12 @@ export function classifyMessage(
 ): Classification | null {
   const from = normAddress(msg.from);
   const note = noteReason(msg);
-  const team_ = isTeamSender(msg.from, msg.labelIds, team);
+  // Someone listed on a client's team outranks an Our-side *domain* (the list
+  // is explicit, the domain a blanket rule) — never our own mailbox's SENT
+  // mail or an address listed on Our side by name.
+  const contactOf = team.clientContacts?.get(from);
+  const explicitlyOurs = !!msg.labelIds?.includes("SENT") || team.emails.has(from);
+  const team_ = contactOf ? explicitlyOurs : isTeamSender(msg.from, msg.labelIds, team);
   const fromCreator = team_ ? undefined : creatorsByAddress.get(from)?.[0];
   if (fromCreator) return { creatorId: fromCreator, direction: "inbound", senderRole: "creator", note };
 
@@ -230,7 +235,6 @@ export function classifyMessage(
   if (team_) return { creatorId: recipient, direction: "outbound", senderRole: "team", note };
   // Someone at the creator's own brand: shown as the client's, and kept as a note so it
   // never counts as the creator replying or as us answering.
-  const contactOf = team.clientContacts?.get(from);
   if (contactOf && contactOf === team.creatorClients?.get(recipient)) {
     return { creatorId: recipient, direction: "inbound", senderRole: "client", note: note ?? "client" };
   }
@@ -523,8 +527,10 @@ export async function reclassifyStoredEmails(team: TeamIdentity): Promise<{ chan
     );
     if (!c || (c.direction === r.direction && c.senderRole === r.senderRole)) continue;
     // Mail we sent was recognised by its SENT label, which isn't stored — the
-    // headers alone can't overrule it, so ours stays ours.
-    if (r.senderRole === "team" && c.senderRole !== "team") continue;
+    // headers alone can't overrule it, so ours stays ours. The one exception:
+    // a sender now listed on the creator's client team (explicit) was only
+    // "ours" by an Our-side domain rule, and becomes the client's.
+    if (r.senderRole === "team" && c.senderRole !== "team" && c.senderRole !== "client") continue;
     // Becoming the client's makes it a note; no longer the client's, it's a message
     // again — unless it's an invite or auto-reply by its subject or sender.
     const kind =

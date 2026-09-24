@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { cmCampaigns, cmCreators, cmPartnerships } from "@/lib/db/schema";
 import { resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
+import { activeClientPerson } from "@/lib/client-session";
 
 /** A session that belongs to someone at a client (the portal), not the agency. */
 export function isClientSession(session: { user?: { kind?: string } } | null | undefined): boolean {
@@ -42,10 +43,12 @@ export async function requireAgency() {
  */
 export async function requireClientUser() {
   const session = await auth();
-  if (!session?.user || !isClientSession(session) || !session.user.clientId) {
+  // Re-checked in the database every time: a login turned off, removed or re-invited ends at once.
+  const person = isClientSession(session) ? await activeClientPerson(session) : null;
+  if (!person) {
     return { person: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
-  return { person: { id: session.user.id, name: session.user.name ?? "Client", clientId: session.user.clientId }, error: null };
+  return { person, error: null };
 }
 
 /** Guards the /api/cron/* routes, which the Railway worker calls. Constant-time compare. */

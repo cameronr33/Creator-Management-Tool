@@ -1,3 +1,4 @@
+import { requireAgencyPage } from "@/lib/page-guards";
 import { Plus, Mail } from "lucide-react";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
 import { resolveClient } from "@/lib/queries";
@@ -11,6 +12,7 @@ import { summarizeGmailHealth } from "@/lib/gmail-health";
 import { resolveCampaign } from "@/lib/campaigns";
 
 export default async function TodayPage() {
+  await requireAgencyPage();
   await scheduleEmailCheckForVisitor();
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) return <><PageHeader title="Today" /><div className="p-6"><EmptyState title="No clients to show" hint="Choose which clients to show in Settings." action={<Button href="/settings">Open settings</Button>} /></div></>;

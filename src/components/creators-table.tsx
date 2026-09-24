@@ -225,7 +225,7 @@ export function CreatorsTable({
                   <td className="px-4 py-2.5">
                     <div className="flex flex-wrap items-center gap-1">
                       <StagePill stage={r.stage} />
-                      {r.clientApproval === "pending" && <Badge tone="warn">Awaiting approval</Badge>}
+                      {r.clientApproval === "pending" && r.stage === "shortlisted" && <Badge tone="warn">Awaiting approval</Badge>}
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-text-muted">

@@ -18,7 +18,7 @@ export default async function PortalCreators() {
         <li key={c.partnershipId} className="space-y-1.5 px-4 py-3">
           <PortalCreatorHeader c={c} />
           <div className="ml-11 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
-            {c.clientApproval === "pending" && <Badge tone="warn">Waiting for your approval</Badge>}
+            {c.clientApproval === "pending" && c.stage === "shortlisted" && <Badge tone="warn">Waiting for your approval</Badge>}
             {c.shipment?.status === "shipped" && <span>Shipped{c.shipment.shippedAt ? ` ${shortDate(c.shipment.shippedAt)}` : ""}{c.shipment.trackingNumber ? ` · ${c.shipment.trackingNumber}` : ""}</span>}
             {c.shipment?.status === "delivered" && <span>Delivered{c.shipment.deliveredAt ? ` ${shortDate(c.shipment.deliveredAt)}` : ""}</span>}
             {c.videos.map((v, i) => (

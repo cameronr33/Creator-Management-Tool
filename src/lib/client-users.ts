@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { hash } from "bcryptjs";
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cmClientUsers, users } from "@/lib/db/schema";
+import { cmClientUsers, cmGmailAccounts, users } from "@/lib/db/schema";
 
 /**
  * People at a client (HELLA staff and the like). Every one is a client
@@ -45,6 +45,8 @@ export async function addClientUser(clientId: string, name: string, rawEmail: st
   if (!EMAIL.test(email)) return { ok: false, error: `"${rawEmail}" isn't an email address` };
   const [agency] = await db.select({ id: users.id }).from(users).where(sql`lower(${users.email}) = ${email}`).limit(1);
   if (agency) return { ok: false, error: "That address already signs in as part of the agency" };
+  const [mailbox] = await db.select({ id: cmGmailAccounts.id }).from(cmGmailAccounts).where(sql`lower(${cmGmailAccounts.email}) = ${email}`).limit(1);
+  if (mailbox) return { ok: false, error: "That's the agency's own mailbox" };
   const [taken] = await db.select({ id: cmClientUsers.id }).from(cmClientUsers).where(eq(cmClientUsers.email, email)).limit(1);
   if (taken) return { ok: false, error: "That person is already on a client team" };
   const [row] = await db.insert(cmClientUsers).values({ clientId, name: n, email }).returning({ id: cmClientUsers.id });
