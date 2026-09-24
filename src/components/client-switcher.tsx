@@ -36,7 +36,7 @@ export function ClientSwitcher({
         aria-label="Active client"
       >
         {clients.map((c) => (
-          <option key={c.id} value={c.slug} className="text-text">
+          <option key={c.id} value={c.slug}>
             {c.name}
           </option>
         ))}

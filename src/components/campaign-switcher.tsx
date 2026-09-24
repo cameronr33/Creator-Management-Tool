@@ -28,11 +28,11 @@ export function CampaignSwitcher({
           className="select-chevron-light h-9 w-full appearance-none rounded-md border border-sidebar-line bg-sidebar-bg-2 pl-3 pr-8 text-sm font-medium text-white transition hover:border-white/20 focus:border-brand-lime focus-visible:outline-none"
           aria-label="Campaign"
         >
-          <option value="" className="text-text">
+          <option value="">
             All campaigns
           </option>
           {campaigns.map((c) => (
-            <option key={c.id} value={c.id} className="text-text">
+            <option key={c.id} value={c.id}>
               {c.name}
             </option>
           ))}

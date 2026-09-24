@@ -64,6 +64,21 @@ function main() {
   check("no text smaller than 11px", tinyHits.length === 0, tinyHits.slice(0, 8).join("; "));
   check("no hard-coded hex colours outside globals.css and the brand mark", hexHits.length === 0, hexHits.slice(0, 8).join("; "));
 
+  // Regression (2026-09-24): sidebar dropdown options set dark text on a list the
+  // browser painted dark — unreadable. Options take their colours from globals.css.
+  const optionColour: string[] = [];
+  for (const file of files) {
+    const rel = relative(ROOT, file);
+    if (rel.endsWith(".css")) continue;
+    for (const m of readFileSync(file, "utf8").match(/<option[^>]*className=/g) ?? []) optionColour.push(`${rel}: ${m}`);
+  }
+  check("no <option> sets its own colours (globals.css styles every dropdown list)", optionColour.length === 0, optionColour.slice(0, 5).join("; "));
+  const cssAll = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
+  check(
+    "dropdown lists have explicit colours, and the sidebar's are dark",
+    /select option\s*\{[^}]*background-color[^}]*color/.test(cssAll) && /\.select-chevron-light option\s*\{[^}]*background-color/.test(cssAll),
+  );
+
   console.log("\n── primitives exist ──");
   const ui = readFileSync(join(ROOT, "components", "ui.tsx"), "utf8");
   for (const name of ["Button", "IconButton", "Input", "Select", "Textarea", "Field", "Callout", "Badge", "StagePill", "PageHeader", "Card", "CardHeader", "EmptyState", "Segmented", "Checkbox"]) {
