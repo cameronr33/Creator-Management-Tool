@@ -314,6 +314,16 @@ async function main() {
       getAttachment: async (_t, _m, attachmentId) => (attachmentId === "fresh-id" ? pdfBytes : new Uint8Array()),
     }, recorded.map((r) => r.id));
     const [downloadedRow] = (await contractsNow()).filter((r) => r.gmailMessageId === "__verify_ei_pdf");
+    // Regression (2026-09-24 backfill): Gmail's per-minute quota made three real contracts "give up".
+    const [limited] = await db.insert(schema.cmContracts).values({ partnershipId, source: "email", filename: "later.pdf", gmailMessageId: "__verify_ei_pdf_q", gmailPartId: "2" }).returning();
+    const quota = await downloadContracts("token", 10, {
+      getMessage: async () => {
+        throw new Error("Gmail API /messages/x?format=full failed (HTTP 403): Quota exceeded for quota metric 'Total Query Cost'");
+      },
+      getAttachment: async () => pdfBytes,
+    }, [limited.id]);
+    const [afterQuota] = (await contractsNow()).filter((r) => r.id === limited.id);
+    check("Gmail's rate limit never counts against an attachment — it's simply tried next check", quota.failed === 0 && afterQuota.attempts === 0 && afterQuota.readError === null);
     check("the check downloads it by its part, with a fresh attachment id, and queues it for reading", dl.downloaded === 1 && !!downloadedRow.data && downloadedRow.readStatus === "pending" && !!downloadedRow.sha256);
 
     // Regression: max(changed_at) came back as a zone-less string and

@@ -324,6 +324,11 @@ export async function runEmailCheck(
 
 const DOWNLOADS_PER_CHECK = 10;
 
+/** Pure: Gmail refused because of its rate or quota limits (HTTP 429, or 403 "Quota exceeded" / rateLimitExceeded). */
+export function isRateLimited(message: string): boolean {
+  return /HTTP 429|Quota exceeded|rateLimitExceeded|userRateLimitExceeded/i.test(message);
+}
+
 export interface AttachmentFetchers {
   getMessage: typeof getMessage;
   getAttachment: typeof getAttachment;
@@ -352,8 +357,11 @@ export async function downloadContracts(
       const r = await attachDownloaded(row.id, await fetchers.getAttachment(accessToken, row.gmailMessageId!, part.attachmentId));
       if (r === "stored") downloaded++;
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // Gmail's rate limit isn't this file's fault: stop for now, count nothing, try next check.
+      if (isRateLimited(message)) break;
       failed++;
-      await noteDownloadFailed(row.id, err instanceof Error ? err.message : String(err)).catch(() => undefined);
+      await noteDownloadFailed(row.id, message).catch(() => undefined);
     }
   }
   return { downloaded, failed };
