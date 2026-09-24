@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cmGmailAccounts, cmOutreachEvents, type CmGmailAccount } from "@/lib/db/schema";
+import { cmContracts, cmGmailAccounts, cmOutreachEvents, type CmGmailAccount } from "@/lib/db/schema";
 import { decrypt } from "@/lib/encryption";
 import { describeSyncOutcome, requireCompleteSync } from "@/lib/gmail-sync-outcome";
 import {
@@ -9,7 +9,10 @@ import {
   buildSearchQueries,
   listMessageIds,
   getMessage,
+  getAttachment,
+  header,
   normalizeMessage,
+  pdfAttachments,
   type NormalizedGmailMessage,
   type SearchWindow,
 } from "@/lib/gmail";
@@ -26,6 +29,7 @@ import {
 import { cleanEmailBody } from "@/lib/email-body";
 import { runJob } from "@/lib/job-runs";
 import { readPendingConversations } from "@/lib/email-status";
+import { MAX_CONTRACT_BYTES, attachDownloaded, contractsToDownload, looksLikeContract, noteDownloadFailed, readPendingContracts, safeFilename } from "@/lib/contracts";
 
 /**
  * The email check: connected Gmail account → search for the addresses of
@@ -203,6 +207,8 @@ export async function runGmailSync(opts: { trigger: SyncTrigger; windowDays?: nu
     const fetched = await mapLimit(toFetch, CONCURRENCY, (id) => getMessage(accessToken, id));
     const messages = fetched.ok.map(normalizeMessage).filter((m): m is NormalizedGmailMessage => m !== null);
     const ingest = await ingestEmails(messages, { roster, team });
+    // Contract PDFs attached to those messages (or waiting from an earlier check).
+    await downloadContracts(accessToken).catch(() => undefined);
 
     const summary: SyncRunResult = {
       account: account.email,
@@ -305,10 +311,100 @@ export async function runEmailCheck(
   // Then read the conversations that got new mail (summary, whose turn, and
   // any stage move the email-reading rules allow). Outside the heartbeat: the
   // job reports the mailbox check; reading has its own error counts.
+  // Contracts first: a contract's deal is filled before an email's.
   const read = opts.read ?? "inline";
-  if (read === "inline") await readPendingConversations();
-  else if (read === "later") after(() => readPendingConversations().then(() => undefined));
+  const readAll = async () => {
+    await readPendingContracts().catch(() => undefined);
+    await readPendingConversations();
+  };
+  if (read === "inline") await readAll();
+  else if (read === "later") after(() => readAll().then(() => undefined));
   return result;
+}
+
+const DOWNLOADS_PER_CHECK = 10;
+
+export interface AttachmentFetchers {
+  getMessage: typeof getMessage;
+  getAttachment: typeof getAttachment;
+}
+
+/**
+ * Download contract PDFs recorded from email. Gmail's attachment ids change
+ * with every fetch, so the message is fetched again and the part found by its
+ * stable part id. A failure is counted on the row and retried next check (up
+ * to three times); nothing here throws into the check.
+ */
+export async function downloadContracts(
+  accessToken: string,
+  limit = DOWNLOADS_PER_CHECK,
+  fetchers: AttachmentFetchers = { getMessage, getAttachment },
+  /** Only these rows (tests never touch others). */
+  ids?: string[],
+): Promise<{ downloaded: number; failed: number }> {
+  let downloaded = 0;
+  let failed = 0;
+  for (const row of await contractsToDownload(limit, ids)) {
+    try {
+      const msg = await fetchers.getMessage(accessToken, row.gmailMessageId!);
+      const part = pdfAttachments(msg.payload).find((a) => a.partId === row.gmailPartId);
+      if (!part) throw new Error("the attachment is no longer in that email");
+      const r = await attachDownloaded(row.id, await fetchers.getAttachment(accessToken, row.gmailMessageId!, part.attachmentId));
+      if (r === "stored") downloaded++;
+    } catch (err) {
+      failed++;
+      await noteDownloadFailed(row.id, err instanceof Error ? err.message : String(err)).catch(() => undefined);
+    }
+  }
+  return { downloaded, failed };
+}
+
+/**
+ * One-off: record the PDFs on email already stored (before attachments were
+ * looked at), then download a batch. Dry run unless `apply`.
+ */
+export async function recordStoredAttachments(opts: { apply: boolean; fetchers?: AttachmentFetchers }): Promise<{ messages: number; pdfs: { partnershipId: string; filename: string }[]; errors: number }> {
+  const fetchers = opts.fetchers ?? { getMessage, getAttachment };
+  const account = await getActiveGmailAccount();
+  if (!account) throw new Error("No Gmail account connected");
+  const accessToken = await refreshAccessToken(decrypt(account.refreshTokenEnc));
+  const stored = await db
+    .select({ id: cmOutreachEvents.id, externalId: cmOutreachEvents.externalId, partnershipId: cmOutreachEvents.partnershipId, senderRole: cmOutreachEvents.senderRole, occurredAt: cmOutreachEvents.occurredAt })
+    .from(cmOutreachEvents)
+    .where(and(isNotNull(cmOutreachEvents.externalId), eq(cmOutreachEvents.channel, "email")));
+  const fetched = await mapLimit(stored, CONCURRENCY, async (row) => ({ row, msg: await fetchers.getMessage(accessToken, row.externalId!) }));
+  const pdfs: { partnershipId: string; filename: string }[] = [];
+  for (const { row, msg } of fetched.ok) {
+    if (row.senderRole === "other") continue;
+    const subject = header(msg.payload, "Subject");
+    const found = pdfAttachments(msg.payload).filter((a) => (!a.size || a.size <= MAX_CONTRACT_BYTES) && (row.senderRole !== "team" || looksLikeContract(a.filename, subject)));
+    for (const a of found) pdfs.push({ partnershipId: row.partnershipId, filename: a.filename });
+    if (opts.apply && found.length) {
+      await db
+        .insert(cmContracts)
+        .values(
+          found.map((a) => ({
+            partnershipId: row.partnershipId,
+            source: "email" as const,
+            filename: safeFilename(a.filename),
+            sizeBytes: a.size || null,
+            outreachEventId: row.id,
+            gmailMessageId: row.externalId!,
+            gmailPartId: a.partId,
+            receivedAt: row.occurredAt,
+          })),
+        )
+        .onConflictDoNothing();
+    }
+  }
+  if (opts.apply) {
+    // Everything recorded, a batch at a time.
+    for (let i = 0; i < 20; i++) {
+      const r = await downloadContracts(accessToken, DOWNLOADS_PER_CHECK, fetchers);
+      if (r.downloaded + r.failed === 0) break;
+    }
+  }
+  return { messages: fetched.ok.length, pdfs, errors: fetched.failed };
 }
 
 /**

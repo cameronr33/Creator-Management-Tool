@@ -3,7 +3,7 @@
  *
  *   npm run email:assess -- --dry-run                    # every conversation with email; writes nothing
  *   npm run email:assess -- --dry-run --partnership <id> # just one
- *   npm run email:assess -- --apply                      # record summaries; move stages only if EMAIL_AUTOMOVE=on
+ *   npm run email:assess -- --apply                      # record summaries, fill blank deal fields; move stages only if EMAIL_AUTOMOVE=on
  *
  * The dry run shows what WOULD move with the switch on, so a person can check
  * the email reader's judgment on real conversations before trusting it.
@@ -48,6 +48,16 @@ async function main() {
     console.log(`  latest:   ${a.summary}`);
     console.log(`  quote:    [${a.evidence_message}] "${a.evidence_quote}"`);
     if (o.suggestedAddress) console.log(`  address found in their email: ${o.suggestedAddress.replace(/\s*\n\s*/g, ", ")}`);
+    const deal = o.dealFound;
+    if (deal && (deal.products.length || deal.fee_amount != null || deal.terms)) {
+      const parts = [
+        deal.products.length ? `products: ${deal.products.map((p) => `${p.name}${(p.quantity ?? 1) > 1 ? ` × ${p.quantity}` : ""}`).join(", ")}` : null,
+        deal.fee_amount != null ? `fee $${deal.fee_amount}` : null,
+        deal.terms ? `terms: ${deal.terms}` : null,
+      ].filter(Boolean);
+      console.log(`  deal in their email: ${parts.join(" · ")}`);
+    }
+    if (o.dealFilled?.length) console.log(`  FILLED (were blank): ${o.dealFilled.join(", ")}`);
     if (o.decision?.move) {
       console.log(`  ${apply ? (o.moved ? "MOVED" : "would move, but") : "WOULD MOVE"}: ${stageLabel(o.current)} → ${stageLabel(o.decision.move.to)}${o.decision.move.videoUrl ? ` (video ${o.decision.move.videoUrl})` : ""}${o.decision.move.markDelivered ? " (marks the shipment delivered)" : ""}`);
     } else {

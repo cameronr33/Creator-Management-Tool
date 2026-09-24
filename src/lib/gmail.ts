@@ -135,9 +135,11 @@ export async function listMessageIds(
 }
 
 export interface GmailPayload {
+  partId?: string;
   mimeType?: string;
+  filename?: string;
   headers?: { name: string; value: string }[];
-  body?: { data?: string };
+  body?: { data?: string; attachmentId?: string; size?: number };
   parts?: GmailPayload[];
 }
 
@@ -152,6 +154,12 @@ export interface GmailMessage {
 
 export async function getMessage(accessToken: string, id: string): Promise<GmailMessage> {
   return api(accessToken, `/messages/${id}?format=full`);
+}
+
+/** One attachment's bytes. Gmail's attachment ids change per fetch, so pass a fresh one. */
+export async function getAttachment(accessToken: string, messageId: string, attachmentId: string): Promise<Uint8Array> {
+  const data = await api<{ data?: string }>(accessToken, `/messages/${messageId}/attachments/${attachmentId}`);
+  return new Uint8Array(Buffer.from((data.data ?? "").replace(/-/g, "+").replace(/_/g, "/"), "base64"));
 }
 
 /** "Name <a@b.com>" | "\"Name\" <a@b.com>" | "a@b.com" → { name, email } (email lowercased). */
@@ -254,6 +262,31 @@ export function hasCalendarPart(payload: GmailPayload | undefined): boolean {
   return (payload.parts ?? []).some(hasCalendarPart);
 }
 
+export interface PdfAttachment {
+  /** The MIME part id — stable across fetches. */
+  partId: string;
+  filename: string;
+  size: number;
+  /** Valid for this fetch only. */
+  attachmentId: string;
+}
+
+/** PDF attachments in the MIME tree (by type or by a .pdf name — some mailers send octet-stream). */
+export function pdfAttachments(payload: GmailPayload | undefined): PdfAttachment[] {
+  const out: PdfAttachment[] = [];
+  const walk = (p: GmailPayload | undefined) => {
+    if (!p) return;
+    const name = (p.filename ?? "").trim();
+    const type = (p.mimeType ?? "").toLowerCase();
+    if (name && p.body?.attachmentId && p.partId && (type === "application/pdf" || /\.pdf$/i.test(name))) {
+      out.push({ partId: p.partId, filename: name, size: p.body.size ?? 0, attachmentId: p.body.attachmentId });
+    }
+    for (const c of p.parts ?? []) walk(c);
+  };
+  walk(payload);
+  return out;
+}
+
 export interface NormalizedGmailMessage {
   externalId: string;
   threadId: string | null;
@@ -272,6 +305,8 @@ export interface NormalizedGmailMessage {
   autoReplyHeader: boolean;
   precedence: string | null;
   hasCalendar: boolean;
+  /** PDFs attached — possible contracts (recorded by ingest, downloaded by the check). */
+  pdfs: PdfAttachment[];
 }
 
 /** GmailMessage → the shape ingestEmails consumes. */
@@ -296,5 +331,6 @@ export function normalizeMessage(msg: GmailMessage): NormalizedGmailMessage | nu
     autoReplyHeader: !!(header(msg.payload, "X-Autoreply") || header(msg.payload, "X-Autorespond")),
     precedence: header(msg.payload, "Precedence"),
     hasCalendar: hasCalendarPart(msg.payload),
+    pdfs: pdfAttachments(msg.payload),
   };
 }

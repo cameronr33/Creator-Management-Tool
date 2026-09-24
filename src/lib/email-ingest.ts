@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNotNull, isNull, max, or } from "drizzle-orm"
 import { db } from "@/lib/db";
 import {
   cmClientUsers,
+  cmContracts,
   cmCreators,
   cmCreatorEmails,
   cmPartnerships,
@@ -10,6 +11,7 @@ import {
   users,
   type CmStage,
 } from "@/lib/db/schema";
+import { MAX_CONTRACT_BYTES, looksLikeContract, safeFilename } from "@/lib/contracts";
 import { applyAutoStage } from "@/lib/auto-stage";
 import { cleanEmailBody } from "@/lib/email-body";
 import { isTerminal } from "@/lib/stages";
@@ -161,6 +163,8 @@ export interface IncomingEmailMessage {
   autoReplyHeader?: boolean;
   precedence?: string | null;
   hasCalendar?: boolean;
+  /** PDF attachments (partId + name) — recorded as possible contracts. */
+  pdfs?: { partId: string; filename: string; size?: number }[];
 }
 
 /** "client" = someone at the creator's own brand (their client team), kept as a note. */
@@ -300,6 +304,8 @@ export interface IngestEmailsResult {
   stageChanges: { partnershipId: string; from: string; to: string }[];
   /** Partnerships that received new mail — the ones worth re-reading. */
   touched: string[];
+  /** PDF attachments recorded as possible contracts. */
+  contracts?: number;
 }
 
 export interface IngestEmailsOptions {
@@ -379,6 +385,30 @@ export async function ingestEmails(messages: IncomingEmailMessage[], opts: Inges
       continue;
     }
     result.inserted++;
+    // PDFs from the creator, us or the brand may be the contract: recorded now,
+    // downloaded and read after the check. Never a stranger's on the thread.
+    // Ours only when it looks like a contract — not every brief or deck we send.
+    const pdfs = (msg.pdfs ?? []).filter((a) => (!a.size || a.size <= MAX_CONTRACT_BYTES) && (c.senderRole !== "team" || looksLikeContract(a.filename, msg.subject)));
+    if (pdfs.length && c.senderRole !== "other") {
+      // A failure here never costs the check the message itself.
+      await db
+        .insert(cmContracts)
+        .values(
+          pdfs.map((a) => ({
+            partnershipId,
+            source: "email" as const,
+            filename: safeFilename(a.filename),
+            sizeBytes: a.size || null,
+            outreachEventId: row!.id,
+            gmailMessageId: msg.externalId,
+            gmailPartId: a.partId,
+            receivedAt: new Date(msg.occurredAt),
+          })),
+        )
+        .onConflictDoNothing()
+        .then(() => (result.contracts = (result.contracts ?? 0) + pdfs.length))
+        .catch(() => undefined);
+    }
     if (msg.threadId && !threadOwner.has(msg.threadId)) threadOwner.set(msg.threadId, partnershipId);
     const list = fresh.get(partnershipId) ?? [];
     list.push({ id: row.id, direction: c.direction, senderRole: c.senderRole, occurredAt: new Date(msg.occurredAt), note: !!c.note });

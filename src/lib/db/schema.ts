@@ -351,6 +351,17 @@ export const cmPartnerships = pgTable(
     approvalAt: timestamp("approval_at"),
     approvalNote: text("approval_note"),
 
+    /**
+     * The deal as the latest email reading found it (product, fee, terms),
+     * verified against the messages — kept so the Deal card can show where
+     * it differs from what's recorded. See deal-facts.ts.
+     */
+    emailDeal: jsonb("email_deal"),
+    /** "field:value" pairs someone chose to keep their own over ("Keep mine") — not offered again. */
+    dealDismissed: jsonb("deal_dismissed"),
+    /** When a person last edited the deal, address or products — email fills only from mail newer than this. */
+    dealEditedAt: timestamp("deal_edited_at"),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -716,6 +727,58 @@ export const cmClientUsers = pgTable(
 );
 
 export type CmClientUser = typeof cmClientUsers.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────
+// cm_contracts — contract PDFs for a deal: uploaded on the Deal card, or
+// attached to the creator's email thread (downloaded by the email check).
+// Read by the model into deal facts that fill blank fields (deal-facts.ts).
+// Never shown in the client portal.
+// ─────────────────────────────────────────────────────────────────
+
+export const cmContractSourceEnum = pgEnum("cm_contract_source", ["upload", "email"]);
+export const cmContractReadEnum = pgEnum("cm_contract_read", ["pending", "reading", "read", "not_contract", "failed"]);
+
+export const cmContracts = pgTable(
+  "cm_contracts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    partnershipId: uuid("partnership_id")
+      .notNull()
+      .references(() => cmPartnerships.id, { onDelete: "cascade" }),
+    source: cmContractSourceEnum("source").notNull(),
+    filename: text("filename").notNull(),
+    sizeBytes: integer("size_bytes"),
+    /** Base64 of the PDF (≤ 10 MB before encoding); null until an email attachment is downloaded. */
+    data: text("data"),
+    /** sha256 of the bytes — the same file is stored once per deal. Null until downloaded. */
+    sha256: text("sha256"),
+    /** The email it came with. */
+    outreachEventId: uuid("outreach_event_id").references(() => cmOutreachEvents.id, { onDelete: "set null" }),
+    gmailMessageId: text("gmail_message_id"),
+    /** The MIME part id ("2", "1.2") — stable, unlike Gmail's attachment ids, which change per fetch. */
+    gmailPartId: text("gmail_part_id"),
+    uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
+    /** When we got it: the upload, or the email's date. */
+    receivedAt: timestamp("received_at").defaultNow().notNull(),
+    readStatus: cmContractReadEnum("read_status").default("pending").notNull(),
+    readError: text("read_error"),
+    /** The deal facts read from it (DealFacts). */
+    extracted: jsonb("extracted"),
+    /** Which fields it filled (they were blank). */
+    filled: jsonb("filled"),
+    readAt: timestamp("read_at"),
+    /** Failed downloads/reads so far — stops retrying a broken file forever. */
+    attempts: integer("attempts").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("cm_contracts_partnership_idx").on(t.partnershipId),
+    uniqueIndex("cm_contracts_partnership_sha_uq").on(t.partnershipId, t.sha256),
+    uniqueIndex("cm_contracts_gmail_part_uq").on(t.gmailMessageId, t.gmailPartId),
+  ],
+);
+
+export type CmContract = typeof cmContracts.$inferSelect;
 
 export type CmClientSettings = typeof cmClientSettings.$inferSelect;
 

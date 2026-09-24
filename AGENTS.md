@@ -43,6 +43,11 @@ them. Changing one requires a human decision and an explanation in the commit.
    address for Ready to ship, the creator's own post link for Posted, and the
    `EMAIL_AUTOMOVE` switch. A "no" only raises a flag; a person closes.
    Every move records its source, quote and evidence and is undoable.
+   (2026-09-24, owner: contracts and email fill in the deal.) Filling blank
+   deal fields from a contract or email (`deal-facts.ts`) is not a stage
+   move; its only stage effect is the existing `address_complete` rule
+   (Agreed → Ready to ship) when it fills a complete address. It never
+   replaces a filled field — `verify-deal-fill.ts` is its matrix.
    (2026-09-23, owner: "there should be a Ready to ship status" — Shipping
    split into Ready to ship → Shipped; a move to Shipped marks the shipment
    shipped. Email never moves anyone to Shipped: that is ours to mark, and it

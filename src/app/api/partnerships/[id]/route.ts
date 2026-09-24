@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { requireAgency, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
 import { httpUrl, isoDate, money } from "@/lib/validation";
 import { applyAutoStage } from "@/lib/auto-stage";
@@ -31,6 +31,8 @@ const schema = z.object({
   country: z.string().nullable().optional(),
   addressRaw: z.string().nullable().optional(),
   outreachReason: z.string().nullable().optional(),
+  /** "Keep mine" on a contract/email difference: that "field:value" isn't offered again. */
+  dismissDeal: z.string().min(1).max(200).optional(),
 });
 
 const ADDRESS_KEYS = [
@@ -43,6 +45,8 @@ const ADDRESS_KEYS = [
   "country",
   "addressRaw",
 ] as const;
+
+const DEAL_KEYS = ["agreementType", "agreedTerms", "compensationType", "feeAmount", ...ADDRESS_KEYS] as const;
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAgency();
@@ -60,11 +64,18 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const update: Record<string, unknown> = { updatedAt: new Date() };
   for (const [k, v] of Object.entries(data)) {
     if (v === undefined) continue;
+    if (k === "dismissDeal") {
+      update.dealDismissed = sql`coalesce(${cmPartnerships.dealDismissed}, '[]'::jsonb) || ${JSON.stringify([v])}::jsonb`;
+      continue;
+    }
     if (k === "feeAmount") update[k] = v === null || v === "" ? null : String(v);
     else if (k === "briefUrl") update[k] = v === "" ? null : v;
     else if (k === "briefSentAt") update[k] = v ? new Date(v as string) : null;
     else update[k] = v;
   }
+
+  // A person decided the deal: email fills only from mail newer than this (a cleared field stays cleared).
+  if (DEAL_KEYS.some((k) => data[k] !== undefined)) update.dealEditedAt = new Date();
 
   await db.update(cmPartnerships).set(update).where(eq(cmPartnerships.id, id));
 

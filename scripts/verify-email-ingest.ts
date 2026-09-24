@@ -27,6 +27,8 @@ import {
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 import { changeStage } from "../src/lib/mutations";
 import { getLastMessages } from "../src/lib/queries";
+import { pdfAttachments } from "../src/lib/gmail";
+import { downloadContracts } from "../src/lib/gmail-sync";
 
 // Pinned so the time-zone regression below fails on any machine, not only one in Pacific time.
 process.env.TZ = "America/Los_Angeles";
@@ -142,6 +144,20 @@ async function main() {
     "nothing open: the latest one (a closed creator's reply is still stored)",
     choosePartnership({ partnerships: [{ id: "X", stage: "declined", updatedAt: at("2026-01-01") }, { id: "Y", stage: "passed", updatedAt: at("2026-05-01") }] }, null) === "Y",
   );
+
+  console.log("\n── PDF attachments (pure) ──");
+  const found = pdfAttachments({
+    mimeType: "multipart/mixed",
+    parts: [
+      { partId: "0", mimeType: "text/plain", body: { data: "aGk" } },
+      { partId: "1", mimeType: "application/pdf", filename: "Agreement.pdf", body: { attachmentId: "a1", size: 10 } },
+      { partId: "2", mimeType: "image/png", filename: "logo.png", body: { attachmentId: "a2", size: 10 } },
+      { partId: "3", mimeType: "application/octet-stream", filename: "SOW.PDF", body: { attachmentId: "a3", size: 10 } },
+      { partId: "4", mimeType: "multipart/alternative", parts: [{ partId: "4.1", mimeType: "application/pdf", filename: "nested.pdf", body: { attachmentId: "a4", size: 10 } }] },
+      { partId: "5", mimeType: "application/pdf", filename: "", body: { attachmentId: "a5", size: 10 } },
+    ],
+  });
+  check("PDFs are found by type or .pdf name, nested too — not images, not unnamed parts", JSON.stringify(found.map((f) => f.partId)) === JSON.stringify(["1", "3", "4.1"]), JSON.stringify(found));
 
   console.log("\n── First message / reply / follow-up (pure) ──");
   const k = computeKinds([
@@ -269,6 +285,36 @@ async function main() {
     await reclassifyStoredEmails(clientTeam);
     const [backToOther] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_other"));
     check("…and removing them makes it someone else's message again", backToOther?.senderRole === "other" && backToOther.kind === "reply", JSON.stringify(backToOther && { r: backToOther.senderRole, k: backToOther.kind }));
+
+    // Contract PDFs attached on the thread (2026-09-24).
+    const contractsNow = () => db.select().from(schema.cmContracts).where(eq(schema.cmContracts.partnershipId, partnershipId));
+    const agreement = { partId: "2", filename: "HELLA agreement.pdf", size: 2048 };
+    const withPdf = msg({ externalId: "__verify_ei_pdf", threadId: "__verify_ei_thread", occurredAt: new Date(Date.now() + 90_000).toISOString(), from: CREATOR, to: ["sam@sentic.io"], subject: "Re: signed", pdfs: [agreement, { partId: "3", filename: "huge.pdf", size: 50 * 1024 * 1024 }] });
+    await ingestEmails([withPdf], { team: liveTeam });
+    const recorded = await contractsNow();
+    const [pdfEvent] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_pdf"));
+    check("a PDF the creator attached is recorded as a possible contract", recorded.length === 1 && recorded[0].source === "email" && recorded[0].filename === "HELLA agreement.pdf" && recorded[0].gmailPartId === "2" && recorded[0].outreachEventId === pdfEvent?.id && recorded[0].data === null);
+    check("…one over 10 MB isn't", !recorded.some((r) => r.filename === "huge.pdf"));
+    await ingestEmails([withPdf], { team: liveTeam });
+    check("…and the same message again records nothing twice", (await contractsNow()).length === 1);
+    await ingestEmails([msg({ externalId: "__verify_ei_pdf_other", occurredAt: new Date(Date.now() + 100_000).toISOString(), from: "assistant@agency-x.com", to: [CREATOR], subject: "Invoice", pdfs: [{ partId: "2", filename: "invoice.pdf", size: 900 }] })], { team: liveTeam });
+    check("a stranger's PDF on the thread is never recorded", (await contractsNow()).length === 1);
+    await ingestEmails(
+      [
+        msg({ externalId: "__verify_ei_pdf_brief", occurredAt: new Date(Date.now() + 110_000).toISOString(), from: "sam@sentic.io", to: [CREATOR], subject: "Your brief", pdfs: [{ partId: "2", filename: "Creative brief.pdf", size: 900 }] }),
+        msg({ externalId: "__verify_ei_pdf_ours", occurredAt: new Date(Date.now() + 120_000).toISOString(), from: "sam@sentic.io", to: [CREATOR], subject: "Agreement for your signature", pdfs: [{ partId: "2", filename: "HELLA x Creator.pdf", size: 900 }] }),
+      ],
+      { team: liveTeam },
+    );
+    const afterOurs = await contractsNow();
+    check("a brief we send isn't recorded; the agreement we send is", afterOurs.length === 2 && afterOurs.some((r) => r.filename === "HELLA x Creator.pdf") && !afterOurs.some((r) => r.filename === "Creative brief.pdf"));
+    const pdfBytes = new Uint8Array(Buffer.from("%PDF-1.7\nverify\n%%EOF", "latin1"));
+    const dl = await downloadContracts("token", 10, {
+      getMessage: async () => ({ id: "__verify_ei_pdf", threadId: "t", internalDate: "1", payload: { parts: [{ partId: "2", mimeType: "application/pdf", filename: "HELLA agreement.pdf", body: { attachmentId: "fresh-id", size: 2048 } }] } }),
+      getAttachment: async (_t, _m, attachmentId) => (attachmentId === "fresh-id" ? pdfBytes : new Uint8Array()),
+    }, recorded.map((r) => r.id));
+    const [downloadedRow] = (await contractsNow()).filter((r) => r.gmailMessageId === "__verify_ei_pdf");
+    check("the check downloads it by its part, with a fresh attachment id, and queues it for reading", dl.downloaded === 1 && !!downloadedRow.data && downloadedRow.readStatus === "pending" && !!downloadedRow.sha256);
 
     // Regression: max(changed_at) came back as a zone-less string and
     // new Date() read it as local time — 7 hours off in Pacific, which would

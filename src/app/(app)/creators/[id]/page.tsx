@@ -55,6 +55,9 @@ import { nextStep } from "@/lib/next-step";
 import { EST_VIEWS_NOTE, VERIFIED_VIEWS_NOTE } from "@/lib/copy";
 import { creatorSectionHref, safeCreatorReturnTo, shipmentAttentionStatus, shipmentSummary, timelineSource } from "@/lib/creator-workspace";
 import type { CmOutreachEvent } from "@/lib/db/schema";
+import { governingContract, isStaleRead, listContracts } from "@/lib/contracts";
+import { dealDifferences, type DealFacts, type EmailDeal } from "@/lib/deal-facts";
+import { Contracts, type ContractRow, type OfferedDifference } from "@/components/contracts";
 
 /** Messages shown per thread before "Show earlier". */
 const THREAD_PREVIEW = 2;
@@ -83,14 +86,43 @@ export default async function CreatorDetailPage({
 
   const { creator, partnership, campaign, socials, events, products, shipments, deliverables, outreach, otherPartnerships } =
     detail;
-  const [clients, creatorEmails, gmailAccount, undoable, photo, campaigns] = await Promise.all([
+  const [clients, creatorEmails, gmailAccount, undoable, photo, campaigns, contracts] = await Promise.all([
     getClients(),
     getCreatorEmails(creator.id),
     getActiveGmailAccount(),
     undoableMoves([partnership.id]),
     getPhotoUrl(creator.id),
     getCampaigns(creator.clientId),
+    listContracts(partnership.id),
   ]);
+
+  // Contracts and their email: where they disagree with what's recorded (blanks were filled already).
+  const contractRows: ContractRow[] = contracts.map((c) => ({
+    id: c.id,
+    source: c.source,
+    filename: c.filename,
+    sizeBytes: c.sizeBytes,
+    received: shortDate(c.receivedAt),
+    readStatus: c.readStatus,
+    readError: c.readError,
+    filled: Array.isArray(c.filled) ? (c.filled as string[]) : [],
+    downloaded: c.downloaded,
+    signed: !!(c.extracted as DealFacts | null)?.signed,
+    givenUp: c.source === "email" && !c.downloaded && c.readStatus === "pending" && c.attempts >= 3,
+    stale: isStaleRead(c),
+  }));
+  const dealNow = { ...partnership, products };
+  const dismissed = Array.isArray(partnership.dealDismissed) ? (partnership.dealDismissed as string[]) : [];
+  const governing = governingContract(contracts);
+  const emailDeal = partnership.emailDeal as EmailDeal | null;
+  const differences: OfferedDifference[] = [];
+  if (governing) {
+    const from = `The contract (${governing.filename})`;
+    for (const d of dealDifferences(dealNow, governing.extracted as DealFacts, { dismissed, terms: true })) differences.push({ ...d, from });
+  }
+  if (emailDeal?.facts) {
+    for (const d of dealDifferences(dealNow, emailDeal.facts, { dismissed })) if (!differences.some((x) => x.label === d.label && (x.key === d.key || d.label !== "Product"))) differences.push({ ...d, from: "Their email" });
+  }
   const client = clients.find((item) => item.id === creator.clientId);
 
   const hasAddress = !!(partnership.addressLine1 && partnership.city && partnership.region && partnership.postalCode);
@@ -324,8 +356,9 @@ export default async function CreatorDetailPage({
 
         {/* The deal */}
         <Card id="agreement" className="scroll-mt-4 p-4">
-          <CardHeader title="Deal" icon={<Handshake size={14} />} description="What you agreed: verbal or signed, product and fee, the videos. Payment itself is tracked in accounting." />
+          <CardHeader title="Deal" icon={<Handshake size={14} />} description="What you agreed: verbal or signed, product and fee, the videos. A contract PDF fills in whatever is blank. Payment itself is tracked in accounting." />
           <div className="mt-3 space-y-3">
+            <Contracts partnershipId={partnership.id} contracts={contractRows} differences={differences} />
             <AgreementEditor
               partnershipId={partnership.id}
               agreementType={partnership.agreementType}

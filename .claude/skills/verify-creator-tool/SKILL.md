@@ -86,6 +86,14 @@ What the scripts anchor:
   the hash is stored; approvals only for the right brand and only what's
   waiting; the portal returns exactly the agreed fields and never a planted
   private value; a client's shipment moves the stage through the same rule.
+- **deal-fill / contracts** — a contract or an email fills only blank deal
+  fields (a hand edit landing mid-fill wins), verbal → signed is the only
+  upgrade, differences are offered never applied, only an Agreed deal moves
+  to Ready to ship on a filled address; uploads are PDFs by their bytes and
+  ≤ 10 MB, stored once, read once even when two reads race, not-a-contract
+  fills nothing, email attachments are fetched by their stable part id.
+  email-status also asserts a product counts only in the creator's own words
+  and a fee only with its amount in a verbatim quote from them or us.
 - **add-creator / editors / next-step / creator-workspace / design** — link
   parsing, address parsing, the "Next:" line for every stage, section anchors,
   and the design tokens/primitives rule (frozen node 7).

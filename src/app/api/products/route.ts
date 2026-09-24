@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       notes: d.notes || null,
     })
     .returning({ id: cmProductsRequested.id });
+  await db.update(cmPartnerships).set({ dealEditedAt: new Date() }).where(eq(cmPartnerships.id, d.partnershipId));
 
   return NextResponse.json({ ok: true, id: row.id });
 }
@@ -59,7 +60,7 @@ export async function DELETE(req: NextRequest) {
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) return badRequest("No client selected");
   const [owner] = await db
-    .select({ clientId: cmCreators.clientId })
+    .select({ clientId: cmCreators.clientId, partnershipId: cmPartnerships.id })
     .from(cmProductsRequested)
     .innerJoin(cmPartnerships, eq(cmProductsRequested.partnershipId, cmPartnerships.id))
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
@@ -70,5 +71,6 @@ export async function DELETE(req: NextRequest) {
   await db
     .delete(cmProductsRequested)
     .where(and(eq(cmProductsRequested.id, parsed.data.id)));
+  await db.update(cmPartnerships).set({ dealEditedAt: new Date() }).where(eq(cmPartnerships.id, owner.partnershipId));
   return NextResponse.json({ ok: true });
 }

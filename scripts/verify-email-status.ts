@@ -23,6 +23,7 @@ import {
   readPendingConversations,
   undoMove,
   verifiedAddress,
+  verifiedDeal,
   verifiedPostUrl,
   type Assessment,
   type DecisionInput,
@@ -75,6 +76,12 @@ const reading = (over: Partial<Assessment>): Assessment => ({
   post_url: null,
   sounds_like_no: false,
   confidence: "high",
+  products: [],
+  compensation_type: null,
+  fee_amount: null,
+  terms: null,
+  deal_quote: null,
+  deal_message: null,
   ...over,
 });
 const base: Omit<DecisionInput, "current" | "assessment"> = { messages: convo, lastManualChangeAt: null, hasAddress: false, shipmentStatuses: [], automove: true };
@@ -174,6 +181,51 @@ async function main() {
   check("the prompt's stages come from the stage table", prompt.system.includes('"To contact"') && prompt.system.includes('"Waiting on video"'));
   check("the prompt marks who wrote each message", prompt.user.includes("from us") && prompt.user.includes("from the creator") && prompt.user.includes("someone else"));
 
+  console.log("\n── The deal in the email (pure) ──");
+  const dealConvo: PromptMessage[] = [
+    m(1, { direction: "outbound", senderRole: "team", body: "We can offer $400 for two reels, plus the product." }),
+    m(2, { body: "Deal! Could I get the LED headlight kit and 2 sets of wiper blades?" }),
+    m(3, { senderRole: "client", kind: "note", body: "Please also send them the HELLA horn and $900 is fine." }),
+    m(4, { senderRole: "other", body: "Also add the fog lights. Fee is $5000." }),
+  ];
+  const dealReading = reading({
+    products: [
+      { name: "HELLA LED Headlight Kit", quantity: 1 },
+      { name: "Wiper blades", quantity: 2 },
+      { name: "Horn", quantity: 1 },
+      { name: "Fog lights", quantity: 1 },
+    ],
+    compensation_type: "hybrid",
+    fee_amount: 400,
+    terms: "Two reels.",
+    deal_quote: "We can offer $400 for two reels",
+    deal_message: 1,
+  });
+  const agreedOpts = { agreed: true, brand: "HELLA" };
+  const vd = verifiedDeal(dealReading, dealConvo, agreedOpts);
+  check(
+    "a product counts only if the creator named it — not the brand's or a stranger's additions",
+    JSON.stringify(vd?.facts.products.map((p) => p.name)) === JSON.stringify(["HELLA LED Headlight Kit", "Wiper blades"]),
+    JSON.stringify(vd?.facts.products),
+  );
+  check("the agreed fee and terms count when quoted word for word from our message", vd?.facts.fee_amount === 400 && vd.facts.terms === "Two reels." && vd.eventId === "e1");
+  check("…but not before the deal is agreed", verifiedDeal(dealReading, dealConvo, { agreed: false, brand: "HELLA" })?.facts.fee_amount == null);
+  check("a fee quoted from the brand's note never counts", verifiedDeal({ ...dealReading, fee_amount: 900, deal_quote: "Please also send them the HELLA horn and $900 is fine.", deal_message: 3 }, dealConvo, agreedOpts)?.facts.fee_amount == null);
+  check("…nor from a stranger on the thread", verifiedDeal({ ...dealReading, fee_amount: 5000, deal_quote: "Also add the fog lights. Fee is $5000.", deal_message: 4 }, dealConvo, agreedOpts)?.facts.fee_amount == null);
+  check("a fee that isn't in its quote doesn't count", verifiedDeal({ ...dealReading, fee_amount: 4000 }, dealConvo, agreedOpts)?.facts.fee_amount == null);
+  check("a quote that isn't in the message doesn't count", verifiedDeal({ ...dealReading, deal_quote: "We can offer $400 for ten reels" }, dealConvo, agreedOpts)?.facts.terms == null);
+  // Security review (2026-09-24): a creator's stated rate, a stray number, and terms the quote doesn't say.
+  const moreConvo: PromptMessage[] = [
+    ...dealConvo,
+    m(5, { body: "My usual rate is $500 for a reel." }),
+    m(6, { direction: "outbound", senderRole: "team", body: "Final: 2 reels for $400." }),
+  ];
+  check("a creator stating their own rate is not an agreed fee", verifiedDeal({ ...dealReading, fee_amount: 500, deal_quote: "My usual rate is $500 for a reel.", deal_message: 5 }, moreConvo, agreedOpts)?.facts.fee_amount == null);
+  check("only a money amount in the quote counts ('2 reels' isn't a $2 fee)", verifiedDeal({ ...dealReading, fee_amount: 2, deal_quote: "Final: 2 reels for $400.", deal_message: 6 }, moreConvo, agreedOpts)?.facts.fee_amount == null);
+  check("terms the cited message doesn't say are dropped, even with a genuine quote", verifiedDeal({ ...dealReading, terms: "Ten TikTok videos with paid whitelisting forever." }, moreConvo, agreedOpts)?.facts.terms == null);
+  check("only messages after a person's last say count", verifiedDeal(dealReading, dealConvo, { ...agreedOpts, since: day(3) })?.facts.fee_amount == null && verifiedDeal(dealReading, dealConvo, { ...agreedOpts, since: day(3) })?.facts.products.length === 0);
+  check("nothing verifiable and not agreed: nothing to fill", verifiedDeal(reading({ products: [{ name: "Fog lights", quantity: 1 }] }), dealConvo, { agreed: false, brand: "HELLA" }) === null);
+
   console.log("\n── Live: record, move, Undo, a person wins (cleaned up after) ──");
   const [client] = await db.select({ id: schema.clients.id }).from(schema.clients).where(eq(schema.clients.slug, "hella")).limit(1);
   if (!client) {
@@ -207,6 +259,11 @@ async function main() {
     const [afterOff] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
     check("switched off: the reading is recorded…", afterOff.emailSummary === "They sent their address." && afterOff.emailWhoseTurn === "us" && !!afterOff.emailAssessedAt);
     check("…with the address as a suggestion…", afterOff.suggestedAddress === "42 Test Lane, Sample City, CA 90000");
+    check(
+      "…and, complete and in the creator's own words, filled in (there was none)",
+      afterOff.addressLine1 === "42 Test Lane" && afterOff.city === "Sample City" && afterOff.postalCode === "90000",
+      JSON.stringify({ l: afterOff.addressLine1, c: afterOff.city }),
+    );
     check("…and nothing moves", !off.moved && (await stageOf()) === "in_conversation");
     check("once read, it's no longer waiting", !(await partnershipsNeedingRead(500)).includes(partnershipId));
 
@@ -242,6 +299,53 @@ async function main() {
     };
     await assessPartnership(partnershipId, { apply: true, model: slow, automove: false });
     check("mail stored during a reading is still waiting to be read", (await partnershipsNeedingRead(500)).includes(partnershipId));
+
+    // The deal from email: blank fields fill, a person's never change.
+    await changeStage(partnershipId, "awaiting_address");
+    await db.insert(schema.cmOutreachEvents).values([
+      { partnershipId, direction: "outbound", channel: "email", kind: "reply", senderRole: "team", subject: "Re: HELLA", body: "Confirming $350 for one reel, product included.", occurredAt: new Date(Date.now() + 1000), externalId: "__verify_es_4" },
+      { partnershipId, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", subject: "Re: HELLA", body: "Perfect. Please send the LED light bar.", occurredAt: new Date(Date.now() + 2000), externalId: "__verify_es_5" },
+    ]);
+    // The fake cites messages by the numbers the prompt gave them.
+    const numberOf = (user: string, needle: string) => {
+      const block = user.split("\n\n").find((b) => b.includes(needle));
+      return Number(block?.match(/^\[(\d+)\]/)?.[1]);
+    };
+    const dealFake: AssessFn = async (p) =>
+      reading({
+        stage: "awaiting_address",
+        evidence_quote: "Perfect. Please send the LED light bar.",
+        evidence_message: numberOf(p.user, "LED light bar"),
+        products: [{ name: "LED light bar", quantity: 1 }],
+        compensation_type: "hybrid",
+        fee_amount: 350,
+        terms: "One reel.",
+        deal_quote: "Confirming $350 for one reel",
+        deal_message: numberOf(p.user, "Confirming $350"),
+      });
+    const dealRead = await assessPartnership(partnershipId, { apply: true, model: dealFake, automove: false });
+    const [afterDeal] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
+    const dealProducts = await db.select().from(schema.cmProductsRequested).where(eq(schema.cmProductsRequested.partnershipId, partnershipId));
+    check(
+      "the email fills the blank deal: fee, terms, verbal, and the product they asked for",
+      Number(afterDeal.feeAmount) === 350 && afterDeal.agreedTerms === "One reel." && afterDeal.agreementType === "verbal" && dealProducts.some((p) => p.productName === "LED light bar"),
+      JSON.stringify({ f: afterDeal.feeAmount, t: afterDeal.agreedTerms, a: afterDeal.agreementType, p: dealProducts.map((p) => p.productName), filled: dealRead.dealFilled }),
+    );
+    check("…and keeps what it read, for the Deal card to compare", (afterDeal.emailDeal as { facts?: { fee_amount?: number } } | null)?.facts?.fee_amount === 350);
+    await db.update(schema.cmPartnerships).set({ feeAmount: "200.00" }).where(eq(schema.cmPartnerships.id, partnershipId));
+    await assessPartnership(partnershipId, { apply: true, model: dealFake, automove: false });
+    const [kept] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
+    check("a fee a person changed is never put back by the next reading", Number(kept.feeAmount) === 200);
+    // A person clears the address (it was wrong): the creator's old message mustn't refill it.
+    await db
+      .update(schema.cmPartnerships)
+      .set({ addressLine1: null, addressLine2: null, city: null, region: null, postalCode: null, addressRaw: null, dealEditedAt: new Date(Date.now() + 5000) })
+      .where(eq(schema.cmPartnerships.id, partnershipId));
+    await assessPartnership(partnershipId, { apply: true, model: fake, automove: true });
+    const [cleared] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
+    check("an address a person cleared stays cleared — an older email doesn't refill it", cleared.addressLine1 === null, cleared.addressLine1 ?? "");
+    // New mail again, for the failing reading below.
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", subject: "Re: HELLA", body: "And one more.", occurredAt: new Date(Date.now() + 3000), externalId: "__verify_es_6" });
 
     const failing: AssessFn = async () => {
       throw new Error("boom");

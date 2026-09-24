@@ -75,6 +75,32 @@ matched ignoring case and created when missing — `src/lib/csv-import.ts`) or
 **Add creator**; their Instagram photo and followers are fetched afterwards
 (`src/lib/instagram.ts`, stored in `cm_creator_photos`).
 
+## The deal: contracts and email fill it in
+
+The Deal card on a creator takes a **contract PDF** (Upload contract, ≤ 10 MB),
+and PDFs attached to the creator's email thread — by them, us or the brand,
+never a stranger cc'd in — are recorded when the mail is stored and downloaded
+by the next email check (`cm_contracts`, `src/lib/contracts.ts`). Each file is
+read once by Claude into deal facts: signed or not, products, fee, terms, the
+creator's shipping address. The email reader reads the same facts from the
+conversation, each checked against the messages (a product only in the
+creator's own words; a fee only with its amount in a verbatim quote, once the
+deal is Agreed).
+
+One rule writes them (`src/lib/deal-facts.ts`, owner decision 2026-09-24):
+**blank fields fill, nothing filled is replaced.** The only upgrade is verbal →
+signed. Products are added only when none are listed; an address only when
+none is on file and it parses completely — which then moves an Agreed
+creator to Ready to ship through the rule table. Where the latest signed
+contract (or the email) disagrees with what's recorded, the Deal card offers
+it — **Use it** or **Keep mine** (remembered in `deal_dismissed`). Every fill
+leaves a timeline note naming its source. Contracts never reach the client
+portal.
+
+`npm run contracts:backfill` (dry run first) records PDFs on email stored
+before this existed; `npm run email:assess -- --apply` re-reads every
+conversation, filling blank deals.
+
 ## Clients in the tool
 
 People at a client (e.g. HELLA staff) live in `cm_client_users` — this app's
@@ -180,7 +206,8 @@ npm run gmail:diagnose             # anchor: do roster addresses appear in the m
 ```
 
 One-off data commands take `--dry-run` first: `email:assess`,
-`photos:backfill`, `stages:migrate`, `gmail:resync`.
+`photos:backfill`, `stages:migrate`, `gmail:resync`, `contracts:backfill`
+(dry by default; `--apply`).
 
 ## Design system
 

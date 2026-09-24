@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
@@ -14,11 +13,13 @@ import {
   cmStageTransitions,
   type CmStage,
 } from "@/lib/db/schema";
-import { STAGES, canonicalStage, isTerminal, stageLabel } from "@/lib/stages";
+import { STAGES, canonicalStage, isTerminal, stageIndex, stageLabel } from "@/lib/stages";
 import { hasCompleteAddress } from "@/lib/address";
 import { lastManualChangeAt } from "@/lib/email-ingest";
 import { moveStage, describeVideo } from "@/lib/stage-moves";
 import { displayNames } from "@/lib/email-body";
+import { READER_MODEL, anthropic, withModelFallback } from "@/lib/claude";
+import { NO_FACTS, applyDealFill, cleanFacts, type DealFacts, type EmailDeal } from "@/lib/deal-facts";
 
 /**
  * Reading the latest email (owner decision, 2026-09-22: "Claude moves it").
@@ -43,8 +44,7 @@ import { displayNames } from "@/lib/email-body";
  * Runs only after a check (in after() or the cron), never during a render.
  */
 
-export const EMAIL_STATUS_MODEL = process.env.EMAIL_STATUS_MODEL ?? "claude-opus-5-5";
-const FALLBACK_MODEL = "claude-opus-5";
+export const EMAIL_STATUS_MODEL = READER_MODEL;
 const MAX_MESSAGES = 12;
 const BODY_CHARS = 1500;
 const MAX_PER_RUN = 25;
@@ -80,6 +80,13 @@ export const AssessmentSchema = z.object({
   post_url: z.string().nullable(),
   sounds_like_no: z.boolean(),
   confidence: z.enum(["high", "medium", "low"]),
+  // The deal as the email states it (2026-09-24) — each part checked below.
+  products: z.array(z.object({ name: z.string(), quantity: z.number().int().nullable() })),
+  compensation_type: z.enum(["free_product", "flat_fee", "hybrid"]).nullable(),
+  fee_amount: z.number().nullable(),
+  terms: z.string().nullable(),
+  deal_quote: z.string().nullable(),
+  deal_message: z.number().int().nullable(),
 });
 export type Assessment = z.infer<typeof AssessmentSchema>;
 
@@ -128,7 +135,13 @@ Return:
 - address: if the creator wrote a full postal shipping address in their own message, copy it exactly as written; otherwise null.
 - post_url: if the creator shared a link to a video they posted for this partnership, copy the link exactly; otherwise null.
 - sounds_like_no: true only if the creator's latest message declines or backs out.
-- confidence: "high", "medium" or "low".`;
+- confidence: "high", "medium" or "low".
+- products: the products the creator asked for or agreed to receive, named as the creator wrote them, each with a quantity (null if not stated). Empty if none.
+- compensation_type: "free_product", "flat_fee" or "hybrid" if the creator and we agreed how they're paid; otherwise null.
+- fee_amount: the money agreed for the creator in US dollars, only if both sides agreed to it; otherwise null.
+- terms: at most 40 plain words on what the creator agreed to deliver (videos, platforms, timing), only if agreed; otherwise null.
+- deal_quote: a short quote (at most 25 words) copied exactly from one message that states the fee or terms — our message stating the fee if there is one, otherwise the creator's; null if there are none.
+- deal_message: the number of the message deal_quote comes from; null if none.`;
 
   const facts = [
     `Shipping address on file: ${ctx.hasAddress ? "yes" : "no"}`,
@@ -216,6 +229,81 @@ export function verifiedAddress(assessment: Pick<Assessment, "address">, message
   return hit ? { text: a, eventId: hit.eventId } : null;
 }
 
+/** Pure: the money amounts written in a text ("$1,500", "400 USD", "500 dollars") — not every number ("2 reels"). */
+export function amountsIn(text: string): number[] {
+  const out: number[] = [];
+  for (const m of text.matchAll(/\$\s?(\d[\d,]*(?:\.\d+)?)|(\d[\d,]*(?:\.\d+)?)\s?(?:usd|dollars?)\b/gi)) {
+    const n = Number((m[1] ?? m[2]).replace(/,/g, ""));
+    if (Number.isFinite(n)) out.push(n);
+  }
+  return out;
+}
+
+/** Pure: most of the terms' words (4+ letters) are in the cited message — the paraphrase is of that message. */
+function termsFoundIn(terms: string, m: Pick<PromptMessage, "subject" | "body">): boolean {
+  const words = [...new Set(squash(terms).split(" ").filter((w) => w.length >= 4))];
+  if (!words.length) return false;
+  const have = new Set(squash(`${m.subject ?? ""} ${m.body ?? ""}`).split(" "));
+  const hits = words.filter((w) => have.has(w) || have.has(`${w}s`) || (w.endsWith("s") && have.has(w.slice(0, -1)))).length;
+  return hits / words.length >= 0.6;
+}
+
+/** Pure: every word of a product name (bar the brand's own name) appears in one of the creator's own messages. */
+export function productInCreatorsWords(name: string, messages: PromptMessage[], brand: string): boolean {
+  const brandWords = new Set(squash(brand).split(" "));
+  const words = squash(name)
+    .split(" ")
+    .filter((w) => w.length >= 2 && !brandWords.has(w));
+  if (!words.length) return false;
+  return messages.filter(isCreatorsOwn).some((m) => {
+    const have = new Set(squash(`${m.subject ?? ""} ${m.body ?? ""}`).split(" "));
+    return words.every((w) => have.has(w) || have.has(`${w}s`) || (w.endsWith("s") && have.has(w.slice(0, -1))));
+  });
+}
+
+/**
+ * Pure: the deal the email supports, checked against the messages
+ * themselves — the model's word alone fills nothing.
+ *  - Only messages newer than `since` count: the last time a person set the
+ *    stage or edited the deal. A field someone cleared stays cleared; an old
+ *    message can't undo their decision.
+ *  - A product only if the creator named it in their own message.
+ *  - Fee and terms only once the deal is agreed (Agreed or later), and only
+ *    with a quote found word for word in the cited message, which is the
+ *    creator's or ours (never the brand's or a stranger's). The fee must be
+ *    a money amount in the quote, and in OUR message — a creator stating
+ *    their rate isn't an agreed fee. The terms must paraphrase that message.
+ *  - The address only as verifiedAddress allows (the creator's own words).
+ */
+export function verifiedDeal(
+  a: Pick<Assessment, "products" | "compensation_type" | "fee_amount" | "terms" | "deal_quote" | "deal_message" | "address">,
+  all: PromptMessage[],
+  opts: { agreed: boolean; brand: string; since?: Date | null },
+): { facts: DealFacts; eventId: string | null; verbal: boolean } | null {
+  const messages = opts.since ? all.filter((m) => m.occurredAt > opts.since!) : all;
+  const facts: DealFacts = { ...NO_FACTS };
+  facts.products = (a.products ?? []).filter((p) => productInCreatorsWords(p.name, messages, opts.brand));
+  let eventId: string | null = null;
+  if (opts.agreed && a.deal_quote && a.deal_message != null) {
+    const cited = messages.find((m) => m.n === a.deal_message);
+    const ours = !!cited && cited.direction === "outbound" && cited.senderRole === "team" && cited.kind !== "note";
+    if (cited && (ours || isCreatorsOwn(cited)) && quoteFoundIn(a.deal_quote, cited)) {
+      eventId = cited.eventId;
+      if (ours && a.fee_amount != null && amountsIn(a.deal_quote).some((n) => Math.abs(n - a.fee_amount!) < 0.01)) {
+        facts.fee_amount = a.fee_amount;
+        facts.compensation_type = a.compensation_type;
+      }
+      if (a.terms && termsFoundIn(a.terms, cited)) facts.terms = a.terms;
+    }
+  }
+  const addr = verifiedAddress(a, messages);
+  if (addr) facts.address = addr.text;
+  const clean = cleanFacts(facts);
+  const any = clean.products.length || clean.fee_amount != null || clean.terms || clean.address;
+  if (!any && !opts.agreed) return null;
+  return { facts: clean, eventId: eventId ?? addr?.eventId ?? null, verbal: opts.agreed };
+}
+
 /** Pure: a post link the creator themselves sent, or null. */
 export function verifiedPostUrl(assessment: Pick<Assessment, "post_url">, messages: PromptMessage[]): string | null {
   const u = assessment.post_url?.trim();
@@ -262,12 +350,6 @@ export function decideEmailMove(i: DecisionInput): Decision {
 
 export type AssessFn = (prompt: { system: string; user: string }) => Promise<Assessment | null>;
 
-let _client: Anthropic | null = null;
-function anthropic(): Anthropic {
-  if (!_client) _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 60_000, maxRetries: 2 });
-  return _client;
-}
-
 /** The real reader. Returns null without a key, on a refusal, or on unparseable output. */
 export const claudeAssess: AssessFn = async ({ system, user }) => {
   if (!process.env.ANTHROPIC_API_KEY) return null;
@@ -279,14 +361,7 @@ export const claudeAssess: AssessFn = async ({ system, user }) => {
       messages: [{ role: "user", content: user }],
       output_config: { format: zodOutputFormat(AssessmentSchema), effort: "low" },
     });
-  let msg;
-  try {
-    msg = await call(EMAIL_STATUS_MODEL);
-  } catch (err) {
-    const status = (err as { status?: number }).status;
-    if (status !== 404 && status !== 400) throw err;
-    msg = await call(FALLBACK_MODEL); // the configured model id isn't available on this key
-  }
+  const msg = await withModelFallback(call);
   return msg.parsed_output ?? null;
 };
 
@@ -301,9 +376,13 @@ export interface AssessmentOutcome {
   decision?: Decision;
   suggestedAddress?: string | null;
   moved?: { from: CmStage; to: CmStage; transitionId: string } | null;
+  /** What the email verifiably says about the deal. */
+  dealFound?: DealFacts | null;
+  /** Deal fields filled from the email (blank ones only). */
+  dealFilled?: string[];
 }
 
-async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentContext; hasEmail: boolean; latestAt: Date | null } | null> {
+async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentContext; hasEmail: boolean; latestAt: Date | null; dealEditedAt: Date | null } | null> {
   const [row] = await db
     .select({ partnership: cmPartnerships, creatorName: cmCreators.name, campaignName: cmCampaigns.name, clientName: clients.name })
     .from(cmPartnerships)
@@ -347,6 +426,7 @@ async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentCont
     },
     hasEmail: messages.some((m) => m.channel === "email"),
     latestAt: latest?.occurredAt ?? null,
+    dealEditedAt: p.dealEditedAt,
   };
 }
 
@@ -389,6 +469,15 @@ export async function assessPartnership(
   });
   const address = ctx.hasAddress ? null : verifiedAddress(assessment, ctx.messages);
   const outcome: AssessmentOutcome = { ...base, assessment, decision, suggestedAddress: address?.text ?? null, moved: null };
+  const automove = opts.automove ?? emailAutomoveOn();
+  // Only mail newer than a person's last say — on the stage or on the deal itself.
+  const dealSince = [since, loaded.dealEditedAt].filter((d): d is Date => !!d).sort((x, y) => y.getTime() - x.getTime())[0] ?? null;
+  const dealFor = (stage: CmStage) =>
+    assessment.confidence === "low"
+      ? null
+      : verifiedDeal(assessment, ctx.messages, { agreed: !isTerminal(stage) && stageIndex(stage) >= stageIndex("awaiting_address"), brand: ctx.clientName, since: dealSince });
+  // What the email verifiably says about the deal (the dry run shows it; nothing written yet).
+  outcome.dealFound = dealFor(decision.move?.to ?? ctx.stage)?.facts ?? null;
   if (!opts.apply) return outcome;
 
   await db
@@ -432,6 +521,16 @@ export async function assessPartnership(
         await db.update(cmShipments).set({ status: priorShipment.status as "ready", deliveredAt: priorShipment.deliveredAt ? new Date(priorShipment.deliveredAt) : null }).where(eq(cmShipments.id, priorShipment.id));
       }
     }
+  }
+
+  // The deal: blank fields filled from what the email verifiably says.
+  const deal = dealFor(outcome.moved?.to ?? ctx.stage);
+  if (deal) {
+    // With automatic moves off, an address from email fills in but moves nothing.
+    const filled = await applyDealFill(partnershipId, deal.facts, { from: `${ctx.creatorName}'s email`, verbal: deal.verbal, stageMove: automove });
+    outcome.dealFilled = filled.filled;
+    const kept: EmailDeal = { facts: deal.facts, eventId: deal.eventId, at: readAt.toISOString() };
+    await db.update(cmPartnerships).set({ emailDeal: kept }).where(eq(cmPartnerships.id, partnershipId));
   }
   return outcome;
 }
