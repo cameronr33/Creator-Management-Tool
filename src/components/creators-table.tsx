@@ -190,10 +190,14 @@ export function CreatorsTable({
                           {r.name}
                         </Link>
                         <div className="flex items-center gap-1.5 text-xs text-text-muted">
-                          <a href={r.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-accent">
-                            @{r.username}
-                            <ExternalLink size={11} />
-                          </a>
+                          {r.profileUrl ? (
+                            <a href={r.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-accent">
+                              @{r.username}
+                              <ExternalLink size={11} />
+                            </a>
+                          ) : (
+                            <span>No profile link yet</span>
+                          )}
                           {r.businessEmail && (
                             <span title={`Email tracked: ${r.businessEmail}`} aria-label="Email tracked">
                               <Mail size={11} />

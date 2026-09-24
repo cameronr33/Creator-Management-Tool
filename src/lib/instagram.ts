@@ -1,6 +1,6 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cmCreators } from "@/lib/db/schema";
+import { cmCreators, cmCreatorSocials } from "@/lib/db/schema";
 import { fetchProfiles, type ApifyProfile } from "@/lib/apify";
 import { addCreatorEmail } from "@/lib/creator-emails";
 import { savePhoto } from "@/lib/photos";
@@ -35,11 +35,24 @@ export interface RefreshResult {
 export async function refreshFromInstagram(creatorIds: string[], opts: { fetch?: typeof fetchProfiles } = {}): Promise<RefreshResult> {
   const result: RefreshResult = { looked: 0, found: 0, photos: 0, emailsFound: 0, skipped: 0, errors: [] };
   if (creatorIds.length === 0) return result;
-  const rows = await db
-    .select({ id: cmCreators.id, username: cmCreators.username, platform: cmCreators.platform, businessEmail: cmCreators.businessEmail })
-    .from(cmCreators)
-    .where(inArray(cmCreators.id, [...new Set(creatorIds)]));
-  const lookable = rows.filter((r) => r.platform === "instagram" && isInstagramHandle(r.username));
+  const ids = [...new Set(creatorIds)];
+  const [creators, socials] = await Promise.all([
+    db
+      .select({ id: cmCreators.id, username: cmCreators.username, platform: cmCreators.platform, businessEmail: cmCreators.businessEmail })
+      .from(cmCreators)
+      .where(inArray(cmCreators.id, ids)),
+    db
+      .select({ creatorId: cmCreatorSocials.creatorId, handle: cmCreatorSocials.handle, isPrimary: cmCreatorSocials.isPrimary })
+      .from(cmCreatorSocials)
+      .where(and(inArray(cmCreatorSocials.creatorId, ids), eq(cmCreatorSocials.platform, "instagram"))),
+  ]);
+  // The handle is their Instagram link's (primary first); the stored username
+  // only counts for an Instagram creator — for a name-only one it's a slug.
+  const rows = creators.map((c) => {
+    const own = socials.filter((s) => s.creatorId === c.id && isInstagramHandle(s.handle)).sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary))[0];
+    return { ...c, username: own?.handle ?? (c.platform === "instagram" ? c.username : "") };
+  });
+  const lookable = rows.filter((r) => isInstagramHandle(r.username));
   result.skipped = rows.length - lookable.length;
   const get = opts.fetch ?? fetchProfiles;
 

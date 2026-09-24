@@ -30,7 +30,7 @@ them. Changing one requires a human decision and an explanation in the commit.
 1. **Estimates never masquerade as accurate.** `viewsSource`/`metricsSource`
    `apify` is provisional; `ig_public_chrome` is authoritative. Nothing
    automated may overwrite an `ig_public_chrome` value with an `apify` one
-   (see `ingest.ts`, which the CSV import uses).
+   (see `csv-import.ts`, `writeNumbers`).
 2. **Automation moves a stage only forward and never closes a deal.**
    (Rewritten by the owner's decision of 2026-09-22 — "the status should be
    based off of the last email", and Claude may move it.) Two engines may

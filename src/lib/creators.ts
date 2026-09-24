@@ -1,4 +1,5 @@
-import { and, eq, like } from "drizzle-orm";
+import { and, eq, like, sql } from "drizzle-orm";
+import { addCreatorEmail } from "@/lib/creator-emails";
 import { db } from "@/lib/db";
 import { ensureCampaign } from "@/lib/campaigns";
 import {
@@ -22,6 +23,8 @@ export interface CreateCreatorInput {
   followers?: number | null;
   notes?: string | null;
   userId?: string;
+  /** Attach to this creator (the CSV import matched a name-only row to them). */
+  existingCreatorId?: string;
 }
 
 export interface CreateCreatorResult {
@@ -75,9 +78,14 @@ export async function createCreatorWithPartnership(
   // Match an existing creator by the primary handle so re-adding someone who is
   // already tracked attaches to them rather than duplicating.
   const [existingCreator] = await db
-    .select({ id: cmCreators.id, username: cmCreators.username })
+    .select({ id: cmCreators.id, username: cmCreators.username, businessEmail: cmCreators.businessEmail })
     .from(cmCreators)
-    .where(and(eq(cmCreators.clientId, input.clientId), eq(cmCreators.username, base)))
+    .where(
+      and(
+        eq(cmCreators.clientId, input.clientId),
+        input.existingCreatorId ? eq(cmCreators.id, input.existingCreatorId) : eq(cmCreators.username, base),
+      ),
+    )
     .limit(1);
 
   const now = new Date();
@@ -88,16 +96,21 @@ export async function createCreatorWithPartnership(
   if (existingCreator) {
     creatorId = existingCreator.id;
     username = existingCreator.username;
-    // Fill in blanks without overwriting what's already known.
+    // Fill in blanks without overwriting what's already known; a different
+    // email is kept alongside (it's tracked too), never swapped in.
     await db
       .update(cmCreators)
       .set({
-        businessEmail: input.businessEmail || undefined,
-        contentPillar: input.contentPillar || undefined,
-        followers: input.followers ?? undefined,
+        businessEmail: input.businessEmail ? sql`coalesce(${cmCreators.businessEmail}, ${input.businessEmail})` : undefined,
+        contentPillar: input.contentPillar ? sql`coalesce(${cmCreators.contentPillar}, ${input.contentPillar})` : undefined,
+        followers: input.followers != null ? sql`coalesce(${cmCreators.followers}, ${input.followers})` : undefined,
         updatedAt: now,
       })
       .where(eq(cmCreators.id, creatorId));
+    const email = input.businessEmail?.trim().toLowerCase();
+    if (email && existingCreator.businessEmail && existingCreator.businessEmail.toLowerCase() !== email) {
+      await addCreatorEmail(creatorId, email, "manual").catch(() => undefined);
+    }
   } else {
     username = await uniqueUsername(input.clientId, base);
     const primary = parsedLinks[0];
@@ -107,9 +120,10 @@ export async function createCreatorWithPartnership(
         clientId: input.clientId,
         name: name || username,
         username,
-        // Denormalized primary pointer — keeps the grid/detail header working.
-        profileUrl: primary?.url ?? `https://www.instagram.com/${username}`,
-        platform: primary?.platform ?? "instagram",
+        // Denormalized primary pointer. A creator added by name alone has no
+        // link: never a guessed Instagram URL (it would fetch a stranger's photo).
+        profileUrl: primary?.url ?? "",
+        platform: primary?.platform ?? "other",
         businessEmail: input.businessEmail ?? null,
         contentPillar: input.contentPillar ?? null,
         followers: input.followers ?? null,
@@ -194,11 +208,16 @@ export async function updateCreatorProfile(creatorId: string, input: UpdateCreat
   await db.update(cmCreators).set(update).where(eq(cmCreators.id, creatorId));
 }
 
-/** Add a social link, parsing the platform/handle out of the URL. */
+/**
+ * Add a social link, parsing the platform/handle out of the URL. A creator
+ * who had no link yet (added by name) gets it as their primary one.
+ */
 export async function addCreatorSocial(creatorId: string, rawUrl: string) {
   const link = parseSocialUrl(rawUrl);
   if (!link) throw new Error("Could not read that link");
-  await db
+  const [creator] = await db.select({ profileUrl: cmCreators.profileUrl }).from(cmCreators).where(eq(cmCreators.id, creatorId)).limit(1);
+  const first = !!creator && !creator.profileUrl;
+  const [added] = await db
     .insert(cmCreatorSocials)
     .values({
       creatorId,
@@ -207,7 +226,9 @@ export async function addCreatorSocial(creatorId: string, rawUrl: string) {
       handle: link.handle,
       isPrimary: false,
     })
-    .onConflictDoNothing();
+    .onConflictDoNothing()
+    .returning({ id: cmCreatorSocials.id });
+  if (first && added) await setPrimarySocial(creatorId, added.id);
   return link;
 }
 

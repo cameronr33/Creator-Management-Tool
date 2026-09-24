@@ -24,7 +24,7 @@ export default async function PipelinePage() {
   const cards: BoardCard[] = rows.map((r) => ({
     partnershipId: r.partnershipId,
     name: r.name,
-    username: r.username,
+    username: r.profileUrl ? r.username : null,
     followers: r.followers,
     stage: r.stage,
     campaignName: r.campaignName,

@@ -90,7 +90,7 @@ function TodayItem({ row: r }: { row: TodayRow }) {
             <Link href={href(r, "overview")} className="text-sm font-semibold text-text hover:text-accent">
               {r.name}
             </Link>
-            <span className="text-xs text-text-muted">@{r.username}</span>
+            {r.username && <span className="text-xs text-text-muted">@{r.username}</span>}
             <Badge tone="info" title="Campaign">{r.campaignName}</Badge>
             {turn && r.section !== "your_turn" && r.section !== "waiting" && r.whoseTurn === "us" && <Badge tone="warn">Your turn</Badge>}
           </div>

@@ -12,7 +12,6 @@ import {
   cmDeliverables,
   cmProductsRequested,
   cmCreatorSocials,
-  cmResearchRuns,
   cmClientSettings,
   type CmStage,
 } from "@/lib/db/schema";
@@ -361,27 +360,6 @@ export async function getPartnershipDetail(partnershipId: string) {
   };
 }
 
-/** Run history for /import — never the rawPayload blob (the whole ingest, megabytes). */
-export async function getResearchRuns(clientId: string, limit = 15) {
-  return db
-    .select({
-      id: cmResearchRuns.id,
-      clientId: cmResearchRuns.clientId,
-      campaignId: cmResearchRuns.campaignId,
-      source: cmResearchRuns.source,
-      status: cmResearchRuns.status,
-      handleCount: cmResearchRuns.handleCount,
-      createdCount: cmResearchRuns.createdCount,
-      updatedCount: cmResearchRuns.updatedCount,
-      errors: cmResearchRuns.errors,
-      startedAt: cmResearchRuns.startedAt,
-      completedAt: cmResearchRuns.completedAt,
-    })
-    .from(cmResearchRuns)
-    .where(eq(cmResearchRuns.clientId, clientId))
-    .orderBy(desc(cmResearchRuns.startedAt))
-    .limit(limit);
-}
 
 /** Creator rows per campaign (every stage) — for Settings → Campaigns. */
 export async function getCampaignCounts(clientId: string): Promise<Map<string, number>> {

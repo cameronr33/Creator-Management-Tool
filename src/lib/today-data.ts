@@ -11,7 +11,8 @@ import type { WhoseTurn } from "@/lib/activity";
 export interface TodayRow {
   partnershipId: string;
   name: string;
-  username: string;
+  /** Null for a creator added by name alone (no profile link). */
+  username: string | null;
   campaignName: string;
   stage: CmStage;
   section: TodaySection;
@@ -80,7 +81,7 @@ export async function getTodayData(clientId: string, campaignId?: string): Promi
     rows.push({
       partnershipId: c.partnershipId,
       name: c.name,
-      username: c.username,
+      username: c.profileUrl ? c.username : null,
       campaignName: c.campaignName,
       stage: c.stage,
       section: placed.section,

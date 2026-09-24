@@ -1,99 +1,48 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { requireAuth, badRequest } from "@/lib/api-helpers";
 import { resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
-import {
-  parseCsvWithHeaderAt,
-  toInt,
-  toFloat,
-  toViewCount,
-  parseDateRange,
-} from "@/lib/csv";
-import { ingestResearch, type IngestCreator, type IngestPayload } from "@/lib/ingest";
-import { viewsSourceOf } from "@/lib/csv";
+import { applyImport, parseImportFile, planImport } from "@/lib/csv-import";
+import { refreshFromInstagram } from "@/lib/instagram";
+import { checkEmailForNewAddress } from "@/lib/gmail-sync";
+
+const MAX_BYTES = 2 * 1024 * 1024;
 
 /**
- * Manual CSV upload path — accepts a creator-research skill CSV (same columns
- * the skill emits) and feeds it through the same ingest pipeline as the API.
- * Rows are grouped by their Campaign column; a form `campaign` field is the
- * fallback for rows that don't name one.
+ * POST /api/import/csv — multipart: file, defaultCampaign, mode.
+ * mode=preview reads only and returns the row-by-row plan; mode=import does
+ * it, then fetches photos and followers (and checks email for any new
+ * addresses) in the background. Always into the client selected in the sidebar.
  */
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth();
+  const { session, error } = await requireAuth();
   if (error) return error;
 
   const form = await req.formData().catch(() => null);
-  if (!form) return badRequest("Expected multipart form data");
-
+  if (!form) return badRequest("Expected a file upload");
   const file = form.get("file");
-  const client = String(form.get("client") ?? "");
-  const fallbackCampaign = String(form.get("campaign") ?? "").trim();
+  if (!(file instanceof File)) return badRequest("Choose a CSV file first");
+  if (file.size > MAX_BYTES) return badRequest("That file is over 2 MB — split it into smaller files");
+  const mode = String(form.get("mode") ?? "preview");
+  const defaultCampaign = String(form.get("defaultCampaign") ?? "").trim();
 
-  if (!client) return badRequest("Missing client");
-  const selected = await resolveClient(await getSelectedClientSlug());
-  if (!selected || selected.slug !== client) return badRequest("That client isn't the one selected — reload the page");
-  if (!(file instanceof File)) return badRequest("Missing CSV file");
+  const client = await resolveClient(await getSelectedClientSlug());
+  if (!client) return badRequest("Pick a client in the sidebar first");
 
-  const text = await file.text();
-  let parsed;
-  try {
-    parsed = parseCsvWithHeaderAt(text, ["Username", "Followers"]);
-  } catch (e) {
-    return badRequest(`Could not parse CSV: ${(e as Error).message}`);
+  const parsed = parseImportFile(await file.text(), defaultCampaign);
+  if (parsed.rows.length === 0) {
+    return badRequest(parsed.problems[0]?.message ?? "No creators found in that file", { problems: parsed.problems });
   }
 
-  const rows = parsed.rows.filter((r) => (r["Username"] ?? "").trim() !== "");
-  if (rows.length === 0) return badRequest("No creator rows found in CSV");
-
-  // Group rows by campaign.
-  const byCampaign = new Map<string, IngestCreator[]>();
-  for (const r of rows) {
-    const campaign = (r["Campaign"] || fallbackCampaign || "Imported").trim();
-    const creator: IngestCreator = {
-      name: (r["Name"] || r["Username"]).trim(),
-      username: r["Username"].trim(),
-      profileUrl: (r["Instagram Link"] || "").trim() || undefined,
-      businessEmail: (r["Business Email"] || "").trim() || null,
-      contentPillar: (r["Content Pillar"] || "").trim() || null,
-      followers: toInt(r["Followers"]),
-      reelsPulled: toInt(r["Reels Pulled"]),
-      cadencePerWeek: toFloat(r["Posting Cadence (reels/wk)"]),
-      dateRangeStart: parseDateRange(r["Date Range"]).start,
-      dateRangeEnd: parseDateRange(r["Date Range"]).end,
-      avgViews: toInt(r["Avg Views (IG)"]),
-      medianViews: toInt(r["Median Views (IG)"]),
-      maxViews: toInt(r["Max Views (IG)"]),
-      viewsSource: viewsSourceOf(r["Views Source"] ?? ""),
-      contentTypeSummary: (r["Content Type Summary"] || "").trim() || null,
-      reels: [1, 2, 3]
-        .map((rank) => {
-          const url = (r[`Top Reel #${rank} Link`] || "").trim();
-          if (!url) return null;
-          return {
-            rank,
-            url,
-            views: toViewCount(r[`Top Reel #${rank} Views`]),
-            description: (r[`Top Reel #${rank} Description`] || "").trim() || null,
-          };
-        })
-        .filter((x): x is NonNullable<typeof x> => x !== null),
-    };
-    const arr = byCampaign.get(campaign) ?? [];
-    arr.push(creator);
-    byCampaign.set(campaign, arr);
+  if (mode !== "import") {
+    const plan = await planImport(client.id, parsed);
+    return NextResponse.json({ ok: true, client: client.name, ...plan });
   }
 
-  const results = [];
-  try {
-    for (const [campaign, creators] of byCampaign) {
-      const payload: IngestPayload = { client, campaign, creators };
-      results.push(await ingestResearch(payload, "csv_upload"));
-    }
-  } catch (e) {
-    return badRequest((e as Error).message);
-  }
-
-  const created = results.reduce((s, r) => s + r.created, 0);
-  const updated = results.reduce((s, r) => s + r.updated, 0);
-  return NextResponse.json({ ok: true, campaigns: results.length, created, updated });
+  const result = await applyImport(client.id, parsed, session.user.id);
+  after(async () => {
+    if (result.touchedCreatorIds.length) await refreshFromInstagram(result.touchedCreatorIds).catch(() => undefined);
+    if (result.withEmail) await checkEmailForNewAddress();
+  });
+  return NextResponse.json({ ok: true, client: client.name, problems: parsed.problems, ...result });
 }

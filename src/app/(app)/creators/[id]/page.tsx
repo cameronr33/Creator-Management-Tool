@@ -142,9 +142,13 @@ export default async function CreatorDetailPage({
                 {creator.contentPillar && <Badge tone="accent">{creator.contentPillar}</Badge>}
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
-                <a href={creator.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-accent">
-                  @{creator.username} <ExternalLink size={12} />
-                </a>
+                {creator.profileUrl ? (
+                  <a href={creator.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-accent">
+                    @{creator.username} <ExternalLink size={12} />
+                  </a>
+                ) : (
+                  <span>No profile link yet — add one under Profile</span>
+                )}
                 {creator.businessEmail && (
                   <a href={`mailto:${creator.businessEmail}`} className="inline-flex min-w-0 items-center gap-1 break-all hover:text-accent">
                     <Mail size={12} /> {creator.businessEmail}

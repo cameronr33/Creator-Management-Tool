@@ -15,7 +15,8 @@ import { QuickStage } from "@/components/quick-stage";
 export interface BoardCard {
   partnershipId: string;
   name: string;
-  username: string;
+  /** Null for a creator added by name alone (no profile link). */
+  username: string | null;
   followers: number | null;
   stage: CmStage;
   campaignName: string;
@@ -211,7 +212,7 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                         {c.name}
                       </Link>
                       <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
-                        <span className="truncate">@{c.username}</span>
+                        <span className="truncate">{c.username ? `@${c.username}` : "No profile link yet"}</span>
                         <span className="tabular" title="Followers">
                           {compactNumber(c.followers)}
                         </span>
