@@ -68,7 +68,7 @@ export default function HelpPage() {
         <Card id="stages" className="p-5">
           <CardHeader
             title="Stages — what is this creator waiting on?"
-            description="A stage answers exactly one question. Shipping status, contract status and posted videos live on the record itself, not in the stage."
+            description="A stage answers exactly one question: what is this creator waiting on? Tracking numbers, contract status and posted videos live on the record itself, not in the stage."
           />
           <div className="mt-4 space-y-5">
             {stagesByGroup().map((g) => (

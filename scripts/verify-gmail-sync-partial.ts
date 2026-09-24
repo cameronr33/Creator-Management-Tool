@@ -50,8 +50,11 @@ async function main() {
       if (url.hostname === "oauth2.googleapis.com") return Response.json({ access_token: "synthetic-access" });
       if (url.hostname === "gmail.googleapis.com") {
         if (url.pathname.endsWith("/messages")) {
+          // Two pages: the failing message is only reachable by following nextPageToken,
+          // so the partial below also proves the listing pages to the end.
+          if (url.searchParams.get("pageToken") === "page2") return Response.json({ messages: fail ? [{ id: `${prefix}_bad` }] : [] });
           queries.push(url.searchParams.get("q") ?? "");
-          return Response.json({ messages: [{ id: `${prefix}_good` }, ...(fail ? [{ id: `${prefix}_bad` }] : [])] });
+          return Response.json({ messages: [{ id: `${prefix}_good` }], nextPageToken: "page2" });
         }
         downloads.push(url.pathname.split("/").pop() ?? "");
         if (url.pathname.endsWith(`${prefix}_bad`)) return new Response("synthetic failed message", { status: 503 });

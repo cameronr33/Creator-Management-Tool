@@ -40,9 +40,12 @@ them. Changing one requires a human decision and an explanation in the commit.
    Talking on the creator's own message sent after the close. The email
    reader also requires a verbatim quote from the cited message, that
    message newer than the last manual change, not-low confidence, an
-   address for Shipping, the creator's own post link for Posted, and the
+   address for Ready to ship, the creator's own post link for Posted, and the
    `EMAIL_AUTOMOVE` switch. A "no" only raises a flag; a person closes.
    Every move records its source, quote and evidence and is undoable.
+   (2026-09-23, owner: "there should be a Ready to ship status" — Shipping
+   split into Ready to ship → Shipped; a move to Shipped marks the shipment
+   shipped. Email never moves anyone to Shipped: that is ours to mark.)
    Matrices: `verify-auto-stage.ts` and `verify-email-status.ts`; edit the
    code and its matrix together, or neither.
 3. **Verification leaves nothing behind.** Every live check cleans up in

@@ -57,6 +57,10 @@ function main() {
     /mark delivered/i.test(nextStep({ ...base, stage: "fulfilling", shipmentStatus: "shipped" }).text),
   );
   check(
+    "Shipped says to mark it delivered when it lands",
+    /mark delivered/i.test(nextStep({ ...base, stage: "shipped", shipmentStatus: "shipped" }).text),
+  );
+  check(
     "fulfilling + delivered + brief not sent says to send the brief",
     /send the brief/i.test(nextStep({ ...base, stage: "fulfilling", shipmentStatus: "delivered" }).text),
   );
@@ -69,8 +73,8 @@ function main() {
     /imported/i.test(nextStep({ ...base, stage: "contacted", totalOutbound: 1, datesAreMigrated: true, daysSinceLastOutbound: 400 }).text),
   );
   check(
-    "Agreed with an address points to Shipping, not the address",
-    /shipping/i.test(nextStep({ ...base, stage: "awaiting_address", hasAddress: true }).text),
+    "Agreed with an address points to Ready to ship, not the address",
+    /ready to ship/i.test(nextStep({ ...base, stage: "awaiting_address", hasAddress: true }).text),
   );
   check(
     "Agreed without an address asks for it",

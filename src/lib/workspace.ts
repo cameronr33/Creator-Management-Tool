@@ -70,6 +70,7 @@ export function deriveWorkspaceItem(f: WorkspaceFacts): WorkspaceItem {
       action = f.hasAddress ? "Review address & stage" : "Waiting for an address";
       lane = f.hasAddress ? "action" : "waiting"; waitingOn = f.hasAddress ? "Our team" : "Creator"; break;
     case "fulfilling":
+    case "shipped":
       if (statuses[0] === "shipped") { action = "Track delivery"; lane = "waiting"; waitingOn = "Carrier"; }
       else if (statuses[0] === "returned") action = "Resolve returned shipment";
       else if (statuses[0] === "delivered") {

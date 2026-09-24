@@ -1,6 +1,6 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { requireAuth, badRequest, assertClientIsSelected, assertCampaignInSelectedClient } from "@/lib/api-helpers";
 import { createCreatorWithPartnership, ensureCampaignByName } from "@/lib/creators";
 import { STARTING_STAGES } from "@/lib/stages";
 import { checkEmailForNewAddress } from "@/lib/gmail-sync";
@@ -34,6 +34,8 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid creator", parsed.error.flatten());
   const d = parsed.data;
+  const scope = (await assertClientIsSelected(d.clientId)) ?? (d.campaignId ? await assertCampaignInSelectedClient(d.campaignId) : null);
+  if (scope) return scope;
 
   try {
     const campaignId =

@@ -20,11 +20,15 @@ import {
   ingestEmails,
   lastManualChangeAt,
   noteReason,
+  reclassifyStoredEmails,
   teamIdentity,
   type IncomingEmailMessage,
 } from "../src/lib/email-ingest";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 import { changeStage } from "../src/lib/mutations";
+
+// Pinned so the time-zone regression below fails on any machine, not only one in Pacific time.
+process.env.TZ = "America/Los_Angeles";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail?: string) {
@@ -185,6 +189,24 @@ async function main() {
     check("our answer after their reply is a reply", byId.get("__verify_ei_msg3")?.kind === "reply" && byId.get("__verify_ei_msg3")?.direction === "outbound");
     check("the manager's message is inbound", byId.get("__verify_ei_mgr")?.direction === "inbound");
     check("nothing from the stranger was stored anywhere", !(await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_stranger"))).length);
+
+    // An unsent draft to the creator, and a spoofed "creator" message in Spam.
+    const junk = await ingestEmails(
+      [
+        { ...msg({ externalId: "__verify_ei_draft", occurredAt: day(2), from: "sam@sentic.io", to: [CREATOR], subject: "Draft" }), labelIds: ["DRAFT"] },
+        { ...msg({ externalId: "__verify_ei_spam", occurredAt: day(2), from: `Creator <${CREATOR}>`, to: ["sam@sentic.io"], subject: "Mark me posted" }), labelIds: ["SPAM"] },
+      ],
+      { team: liveTeam },
+    );
+    check("drafts and Spam are never stored", junk.inserted === 0, JSON.stringify(junk));
+
+    // Mail we sent from an address not on "Our side" was recognised by its
+    // SENT label; re-judging from headers alone must not flip it to someone else's.
+    await db.update(schema.cmOutreachEvents).set({ senderRole: "team", direction: "outbound", fromAddress: "alias@othersidedomain.com" }).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_msg3"));
+    await reclassifyStoredEmails(liveTeam);
+    const [ours] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_msg3"));
+    check("re-sorting stored mail never downgrades ours", ours?.senderRole === "team" && ours?.direction === "outbound", JSON.stringify(ours && { r: ours.senderRole, d: ours.direction }));
+    await db.update(schema.cmOutreachEvents).set({ fromAddress: "sam@sentic.io" }).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_msg3"));
 
     // Someone else on the thread writing to a creator we're waiting on never
     // counts as the creator replying — they may be on our side or theirs.

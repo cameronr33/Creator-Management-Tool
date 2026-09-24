@@ -32,9 +32,11 @@ export function deriveOutreachState(
   >[],
   now: Date = new Date(),
 ): OutreachState {
-  const sorted = [...events].sort(
-    (a, b) => a.occurredAt.getTime() - b.occurredAt.getTime(),
-  );
+  // Notes aren't messages: a hand-written note, a calendar invite or an
+  // out-of-office reply never counts as contact, a reply, or a follow-up.
+  const sorted = events
+    .filter((e) => e.kind !== "note")
+    .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
 
   const outbound = sorted.filter((e) => e.direction === "outbound");
   const inbound = sorted.filter((e) => e.direction === "inbound");

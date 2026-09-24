@@ -1,16 +1,12 @@
 import { resolveClient, getCreatorRows } from "@/lib/queries";
+import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
-import { scheduleEmailCheck } from "@/lib/gmail-sync";
+import { resolveCampaign } from "@/lib/campaigns";
 import { PageHeader, EmptyState, Button } from "@/components/ui";
 import { PipelineBoard, type BoardCard } from "@/components/pipeline-board";
 
-export default async function PipelinePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ campaign?: string }>;
-}) {
-  scheduleEmailCheck();
-  const sp = await searchParams;
+export default async function PipelinePage() {
+  await scheduleEmailCheckForVisitor();
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) {
     return (
@@ -23,7 +19,8 @@ export default async function PipelinePage({
     );
   }
 
-  const rows = await getCreatorRows(client.id, { campaignId: sp.campaign || undefined, withOutreach: false });
+  const campaign = await resolveCampaign(client.id);
+  const rows = await getCreatorRows(client.id, { campaignId: campaign?.id, withOutreach: false });
   const cards: BoardCard[] = rows.map((r) => ({
     partnershipId: r.partnershipId,
     name: r.name,
@@ -38,16 +35,17 @@ export default async function PipelinePage({
       <PageHeader
         title="Pipeline"
         client={client.name}
-        subtitle={`${cards.length} creators`}
+        campaign={campaign?.name ?? null}
+        subtitle={`${cards.length} creator${cards.length === 1 ? "" : "s"}`}
         help="One column per stage. Drag a card to move it, or use the arrow on the card. Hover a column name to see what that stage means; closing a deal asks who ended it and why."
         helpAnchor="stages"
       />
       <div className="p-6">
         {cards.length === 0 ? (
           <EmptyState
-            title="No creators yet"
-            hint="Add a creator by pasting their profile link, or import a research run."
-            action={<Button href="/creators/new" variant="primary">Add creator</Button>}
+            title={campaign ? `No creators in ${campaign.name} yet` : "No creators yet"}
+            hint="Import a CSV of creators, or add one by pasting their profile link."
+            action={<div className="flex gap-2"><Button href="/import">Import CSV</Button><Button href="/creators/new" variant="primary">Add creator</Button></div>}
           />
         ) : (
           <PipelineBoard cards={cards} />

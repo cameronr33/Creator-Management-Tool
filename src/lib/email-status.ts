@@ -62,8 +62,8 @@ export const EMAIL_STAGE_RULES: Partial<Record<CmStage, { from: CmStage[]; requi
   in_conversation: { from: ["contacted"], requires: "nothing" },
   awaiting_address: { from: ["contacted", "in_conversation"], requires: "nothing" },
   fulfilling: { from: ["contacted", "in_conversation", "awaiting_address"], requires: "address" },
-  content_pending: { from: ["fulfilling"], requires: "shipped_or_receipt" },
-  posted: { from: ["fulfilling", "content_pending"], requires: "post_link" },
+  content_pending: { from: ["fulfilling", "shipped"], requires: "shipped_or_receipt" },
+  posted: { from: ["fulfilling", "shipped", "content_pending"], requires: "post_link" },
 };
 
 /* ── What the model returns ─────────────────────────────────────── */
@@ -120,9 +120,9 @@ Return:
 - stage: where the deal stands now, judged from the whole conversation with the most weight on the latest messages. If nothing has changed, return the current stage.
 - whose_turn: "us" if the latest message needs a reply or an action from us; "them" if we are waiting on the creator; "none" if nothing is pending (for example a simple thank-you).
 - summary: at most 20 plain words saying what the latest message says or what happens next. No names of software.
-- evidence_quote: a short quote (at most 25 words) copied exactly, character for character, from one message, that best supports the stage.
+- evidence_quote: a short quote (at most 25 words) copied exactly, character for character, from one message the creator wrote themselves, that best supports the stage.
 - evidence_message: the number of the message the quote comes from.
-- address: if the creator wrote a full postal shipping address, copy it exactly as written; otherwise null.
+- address: if the creator wrote a full postal shipping address in their own message, copy it exactly as written; otherwise null.
 - post_url: if the creator shared a link to a video they posted for this partnership, copy the link exactly; otherwise null.
 - sounds_like_no: true only if the creator's latest message declines or backs out.
 - confidence: "high", "medium" or "low".`;
@@ -189,16 +189,21 @@ export type Decision =
   | { move: null; why: string }
   | { move: { to: CmStage; reason: string; evidenceEventId: string; videoUrl: string | null; markDelivered: boolean } };
 
-/** Pure: messages written on the creator's side (the creator, or someone else on their thread). */
-function inboundMessages(messages: PromptMessage[]): PromptMessage[] {
-  return messages.filter((m) => m.direction === "inbound" && m.senderRole !== "team");
+/**
+ * Pure: a real message the creator themselves wrote. Only these can move a
+ * stage or supply an address or post link — not our own mail, not someone
+ * else on the thread (anyone can cc themselves in), not an invite or an
+ * automatic reply.
+ */
+export function isCreatorsOwn(m: Pick<PromptMessage, "direction" | "senderRole" | "kind">): boolean {
+  return m.direction === "inbound" && (m.senderRole === "creator" || m.senderRole === null) && m.kind !== "note";
 }
 
-/** Pure: an address written on the creator's side (a parent may send it), or null. */
+/** Pure: an address the creator wrote in their own message, or null. */
 export function verifiedAddress(assessment: Pick<Assessment, "address">, messages: PromptMessage[]): { text: string; eventId: string } | null {
   const a = assessment.address?.trim();
   if (!a || squash(a).split(" ").length < 4) return null;
-  const hit = inboundMessages(messages).find((m) => squash(m.body ?? "").includes(squash(a)));
+  const hit = messages.filter(isCreatorsOwn).find((m) => squash(m.body ?? "").includes(squash(a)));
   return hit ? { text: a, eventId: hit.eventId } : null;
 }
 
@@ -207,9 +212,7 @@ export function verifiedPostUrl(assessment: Pick<Assessment, "post_url">, messag
   const u = assessment.post_url?.trim();
   if (!u || !/^https?:\/\//i.test(u)) return null;
   if (describeVideo(u).platform === "other") return null;
-  return messages.some((m) => m.direction === "inbound" && (m.senderRole === "creator" || m.senderRole === null) && (m.body ?? "").toLowerCase().includes(u.toLowerCase()))
-    ? u
-    : null;
+  return messages.some((m) => isCreatorsOwn(m) && (m.body ?? "").toLowerCase().includes(u.toLowerCase())) ? u : null;
 }
 
 export function decideEmailMove(i: DecisionInput): Decision {
@@ -218,6 +221,7 @@ export function decideEmailMove(i: DecisionInput): Decision {
   if (a.confidence === "low") return { move: null, why: "low confidence" };
   const evidence = i.messages.find((m) => m.n === a.evidence_message);
   if (!evidence) return { move: null, why: "cited message doesn't exist" };
+  if (!isCreatorsOwn(evidence)) return { move: null, why: "only the creator's own message can move the stage" };
   if (!quoteFoundIn(a.evidence_quote, evidence)) return { move: null, why: "quote not found in the cited message" };
   if (i.lastManualChangeAt && evidence.occurredAt <= i.lastManualChangeAt) {
     return { move: null, why: "a person set the stage after that message" };
@@ -235,9 +239,8 @@ export function decideEmailMove(i: DecisionInput): Decision {
     return { move: null, why: "Shipping needs an address on file or one the creator wrote" };
   }
   if (rule.requires === "shipped_or_receipt") {
-    const shipped = i.shipmentStatuses.some((s) => s === "shipped" || s === "delivered");
-    const receipt = evidence.direction === "inbound" && evidence.senderRole === "creator";
-    if (!shipped && !receipt) return { move: null, why: "nothing shipped and the creator didn't confirm receipt" };
+    // Either it was marked shipped, or the evidence — always the creator's own
+    // message (checked above) — is them saying it arrived; mark it delivered.
     markDelivered = !i.shipmentStatuses.includes("delivered");
   }
   if (rule.requires === "post_link") {
@@ -348,15 +351,22 @@ export async function assessPartnership(
   partnershipId: string,
   opts: { apply: boolean; model?: AssessFn; automove?: boolean },
 ): Promise<AssessmentOutcome> {
+  // Stamped with the moment the messages were loaded, not when the (slow)
+  // model answered: mail stored while it was thinking still counts as unread.
+  const readAt = new Date();
   const loaded = await loadContext(partnershipId);
   if (!loaded) return { partnershipId, creatorName: "?", current: "shortlisted", skipped: "not found" };
   const { ctx } = loaded;
   const base = { partnershipId, creatorName: ctx.creatorName, current: ctx.stage };
-  if (!loaded.hasEmail) return { ...base, skipped: "no email in this conversation" };
+  const markRead = () => db.update(cmPartnerships).set({ emailAssessedAt: readAt }).where(eq(cmPartnerships.id, partnershipId));
+  if (!loaded.hasEmail) {
+    if (opts.apply) await markRead();
+    return { ...base, skipped: "no email in this conversation" };
+  }
 
   const assessment = await (opts.model ?? claudeAssess)(buildPrompt(ctx));
   if (!assessment) {
-    if (opts.apply) await db.update(cmPartnerships).set({ emailAssessedAt: new Date() }).where(eq(cmPartnerships.id, partnershipId));
+    if (opts.apply) await markRead();
     return { ...base, skipped: "no reading (no key, refusal, or unreadable answer)" };
   }
   const since = (await lastManualChangeAt([partnershipId])).get(partnershipId) ?? null;
@@ -379,7 +389,7 @@ export async function assessPartnership(
       emailSummary: assessment.summary.trim().slice(0, 240) || null,
       emailSummaryAt: loaded.latestAt,
       emailWhoseTurn: assessment.whose_turn,
-      emailAssessedAt: new Date(),
+      emailAssessedAt: readAt,
       emailSoundsLikeNo: assessment.sounds_like_no && !isTerminal(ctx.stage),
       ...(address ? { suggestedAddress: address.text, suggestedAddressEventId: address.eventId } : {}),
     })
@@ -395,20 +405,24 @@ export async function assessPartnership(
         await db.update(cmShipments).set({ status: "delivered", deliveredAt: s.deliveredAt ?? new Date(), updatedAt: new Date() }).where(eq(cmShipments.id, s.id));
       }
     }
-    const r = await moveStage({
-      partnershipId,
-      to: m.to,
-      source: "email",
-      expectFrom: ctx.stage,
-      reason: m.reason,
-      evidenceEventId: m.evidenceEventId,
-      videoUrl: m.videoUrl,
-      meta: { confidence: assessment.confidence, summary: assessment.summary, model: EMAIL_STATUS_MODEL, ...(priorShipment ? { priorShipment } : {}) },
-    });
-    if (r.status === "moved") outcome.moved = { from: r.from, to: r.to, transitionId: r.transitionId };
-    else if (priorShipment) {
-      // The move didn't happen (someone moved it first): put the shipment back.
-      await db.update(cmShipments).set({ status: priorShipment.status as "ready", deliveredAt: priorShipment.deliveredAt ? new Date(priorShipment.deliveredAt) : null }).where(eq(cmShipments.id, priorShipment.id));
+    let r: Awaited<ReturnType<typeof moveStage>> | null = null;
+    try {
+      r = await moveStage({
+        partnershipId,
+        to: m.to,
+        source: "email",
+        expectFrom: ctx.stage,
+        reason: m.reason,
+        evidenceEventId: m.evidenceEventId,
+        videoUrl: m.videoUrl,
+        meta: { confidence: assessment.confidence, summary: assessment.summary, model: EMAIL_STATUS_MODEL, ...(priorShipment ? { priorShipment } : {}) },
+      });
+    } finally {
+      if (r?.status === "moved") outcome.moved = { from: r.from, to: r.to, transitionId: r.transitionId };
+      else if (priorShipment) {
+        // The move didn't happen (someone moved it first, or it failed): put the shipment back.
+        await db.update(cmShipments).set({ status: priorShipment.status as "ready", deliveredAt: priorShipment.deliveredAt ? new Date(priorShipment.deliveredAt) : null }).where(eq(cmShipments.id, priorShipment.id));
+      }
     }
   }
   return outcome;
@@ -445,8 +459,11 @@ export async function readPendingConversations(opts: { model?: AssessFn } = {}):
           const o = await assessPartnership(id, { apply: true, model: opts.model });
           read++;
           if (o.moved) moved++;
-        } catch {
+        } catch (err) {
           errors++;
+          console.error(`[email-status] reading ${id} failed:`, err instanceof Error ? err.message : err);
+          // Marked read so one failing conversation can't hold the queue; its next email retries it.
+          await db.update(cmPartnerships).set({ emailAssessedAt: new Date() }).where(eq(cmPartnerships.id, id)).catch(() => {});
         }
       }
     }),
@@ -466,6 +483,7 @@ export async function undoMove(transitionId: string, userId: string | null): Pro
   const [t] = await db.select().from(cmStageTransitions).where(eq(cmStageTransitions.id, transitionId)).limit(1);
   if (!t) return { ok: false, error: "That move no longer exists." };
   if (t.undoneAt) return { ok: false, error: "That move was already undone." };
+  if (t.source !== "email") return { ok: false, error: "Only a move made from their email can be undone — change it by hand instead." };
   if (!t.fromStage) return { ok: false, error: "The first stage can't be undone." };
   const [latest] = await db
     .select({ id: cmStageTransitions.id })
@@ -487,11 +505,14 @@ export async function undoMove(transitionId: string, userId: string | null): Pro
   });
   if (r.status !== "moved") return { ok: false, error: "The stage has changed since — change it by hand instead." };
 
-  const meta = (t.meta ?? {}) as { createdShipmentId?: string; createdDeliverableId?: string; priorShipment?: { id: string; status: string; deliveredAt: string | null } };
+  const meta = (t.meta ?? {}) as { createdShipmentId?: string; markedShippedId?: string; createdDeliverableId?: string; priorShipment?: { id: string; status: string; deliveredAt: string | null } };
   if (meta.createdDeliverableId) await db.delete(cmDeliverables).where(eq(cmDeliverables.id, meta.createdDeliverableId));
   if (meta.createdShipmentId) {
     // Only an untouched placeholder goes: once someone added tracking, it's theirs.
     await db.execute(sql`delete from ${cmShipments} where id = ${meta.createdShipmentId} and status = 'ready' and carrier is null and tracking_number is null`);
+  }
+  if (meta.markedShippedId) {
+    await db.update(cmShipments).set({ status: "ready", shippedAt: null, updatedAt: new Date() }).where(eq(cmShipments.id, meta.markedShippedId));
   }
   if (meta.priorShipment) {
     await db

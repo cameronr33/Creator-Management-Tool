@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { resolveClient, getClientsWithSettings, getCampaigns } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
-import { PageHeader, Card, CardHeader, EmptyState, Badge, Callout, Button } from "@/components/ui";
+import { PageHeader, Card, CardHeader, EmptyState, Callout, Button } from "@/components/ui";
 import {
   CampaignAdder,
+  CampaignManager,
   GmailConnectCard,
   GmailSyncStatus,
   TeamAddressesEditor,
@@ -13,6 +14,7 @@ import { ClientVisibility, FollowUpCadence } from "@/components/client-settings"
 import { gmailConfigured } from "@/lib/gmail";
 import { getActiveGmailAccount, getEmailCoverage } from "@/lib/gmail-sync";
 import { emailAutomoveOn, emailMoveStats } from "@/lib/email-status";
+import { getCampaignCounts } from "@/lib/queries";
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 import { summarizeGmailHealth } from "@/lib/gmail-health";
 
@@ -64,6 +66,7 @@ export default async function SettingsPage({
     getEmailCoverage(),
     emailMoveStats(monthStart),
   ]);
+  const counts = await getCampaignCounts(client.id);
   const readingOn = !!process.env.ANTHROPIC_API_KEY;
   const automove = emailAutomoveOn();
   const currentSettings = clients.find((c) => c.id === client.id) ?? null;
@@ -165,18 +168,17 @@ export default async function SettingsPage({
         </Card>
 
         <Card id="campaigns" className="scroll-mt-4 p-5">
-          <CardHeader title="Campaigns" description="A campaign is what creators are recruited for. Research runs create theirs automatically." />
-          <ul className="mt-3 mb-4 flex flex-wrap gap-2">
+          <CardHeader
+            title="Campaigns"
+            description="What creators are recruited for. Pick one in the sidebar to work in it. A CSV import creates the campaigns named in its Campaign column."
+          />
+          <div className="mt-3 mb-4">
             {campaigns.length === 0 ? (
               <span className="text-sm text-text-muted">No campaigns yet.</span>
             ) : (
-              campaigns.map((c) => (
-                <li key={c.id}>
-                  <Badge>{c.name}</Badge>
-                </li>
-              ))
+              <CampaignManager campaigns={campaigns.map((c) => ({ id: c.id, name: c.name, creators: counts.get(c.id) ?? 0 }))} />
             )}
-          </ul>
+          </div>
           <CampaignAdder clientId={client.id} />
         </Card>
 

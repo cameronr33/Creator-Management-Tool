@@ -37,9 +37,9 @@ export const AUTO_STAGE_RULES: Record<AutoStageTrigger, { from: CmStage[]; to: C
   outbound_message: { from: ["shortlisted"], to: "contacted" },
   inbound_message: { from: ["contacted", "no_response"], to: "in_conversation" },
   address_complete: { from: ["awaiting_address"], to: "fulfilling" },
-  shipment_shipped: { from: ["awaiting_address"], to: "fulfilling" },
-  shipment_delivered: { from: ["awaiting_address", "fulfilling"], to: "content_pending" },
-  deliverable_added: { from: ["fulfilling", "content_pending"], to: "posted" },
+  shipment_shipped: { from: ["awaiting_address", "fulfilling"], to: "shipped" },
+  shipment_delivered: { from: ["awaiting_address", "fulfilling", "shipped"], to: "content_pending" },
+  deliverable_added: { from: ["fulfilling", "shipped", "content_pending"], to: "posted" },
 };
 
 /** Pure rule lookup: the stage this trigger advances `current` to, or null. */

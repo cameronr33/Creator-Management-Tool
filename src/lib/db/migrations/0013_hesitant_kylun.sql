@@ -1,0 +1,1 @@
+ALTER TYPE "public"."cm_stage" ADD VALUE 'shipped' BEFORE 'content_pending';

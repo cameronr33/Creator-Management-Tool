@@ -1,6 +1,6 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { requireAuth, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
 import { addCreatorEmail, removeCreatorEmail } from "@/lib/creator-emails";
 import { checkEmailForNewAddress } from "@/lib/gmail-sync";
 
@@ -12,6 +12,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (error) return error;
 
   const { id } = await ctx.params;
+  const scope = await assertCreatorInSelectedClient(id);
+  if (scope) return scope;
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid email", parsed.error.flatten());
@@ -32,6 +34,8 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   if (error) return error;
 
   const { id } = await ctx.params;
+  const scope = await assertCreatorInSelectedClient(id);
+  if (scope) return scope;
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return badRequest("Invalid email");

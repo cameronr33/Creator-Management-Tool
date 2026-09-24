@@ -1,7 +1,7 @@
 import { and, eq, like } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { ensureCampaign } from "@/lib/campaigns";
 import {
-  cmCampaigns,
   cmCreators,
   cmCreatorSocials,
   cmPartnerships,
@@ -241,17 +241,7 @@ export async function setPrimarySocial(creatorId: string, socialId: string) {
     .where(eq(cmCreators.id, creatorId));
 }
 
-/** Campaign lookup/creation shared with the add form. */
+/** Campaign lookup/creation shared with the add form — names match ignoring case. */
 export async function ensureCampaignByName(clientId: string, name: string): Promise<string> {
-  const [existing] = await db
-    .select({ id: cmCampaigns.id })
-    .from(cmCampaigns)
-    .where(and(eq(cmCampaigns.clientId, clientId), eq(cmCampaigns.name, name)))
-    .limit(1);
-  if (existing) return existing.id;
-  const [row] = await db
-    .insert(cmCampaigns)
-    .values({ clientId, name })
-    .returning({ id: cmCampaigns.id });
-  return row.id;
+  return (await ensureCampaign(clientId, name)).id;
 }

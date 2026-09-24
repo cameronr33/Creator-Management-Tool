@@ -5,14 +5,20 @@ import { Search, X } from "lucide-react";
 import { useCallback, useEffect, useReducer } from "react";
 import { stagesByGroup } from "@/lib/stages";
 import { Field, Input, Select, Button } from "@/components/ui";
-import { clearCreatorFilters } from "@/lib/workspace";
 import { searchDraft } from "@/lib/search-draft";
 
-export function CreatorsFilterBar({
-  campaigns,
-}: {
-  campaigns: { id: string; name: string }[];
-}) {
+/** Drop the list filters from a query string, keeping anything else. */
+export function clearListFilters(query: string): string {
+  const next = new URLSearchParams(query);
+  for (const key of ["q", "stage"]) next.delete(key);
+  return next.toString();
+}
+
+/**
+ * Search and stage filter for the Creators list. The campaign is not here:
+ * it's the sidebar's campaign scope, shared by every page.
+ */
+export function CreatorsFilterBar() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -35,7 +41,6 @@ export function CreatorsFilterBar({
   );
 
   const stage = params.get("stage") ?? "";
-  const campaign = params.get("campaign") ?? "";
 
   // Typing updates the box immediately; the URL (and the server round-trip)
   // follows 300ms after the last keystroke instead of on every key.
@@ -46,42 +51,37 @@ export function CreatorsFilterBar({
     return () => clearTimeout(t);
   }, [q, urlQ, setParam]);
 
-  const hasFilters = urlQ || stage || campaign;
+  const hasFilters = urlQ || stage;
 
   return (
     <div className="flex flex-wrap items-end gap-2">
-      <Field label="Find a creator"><div className="relative">
-        <Search size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-faint" />
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name, handle, content type…"
-          aria-label="Search creators"
-          className="w-64 pl-8"
-        />
-      </div></Field>
+      <Field label="Find a creator">
+        <div className="relative">
+          <Search size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-faint" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search name, handle, content type…"
+            aria-label="Search creators"
+            className="w-64 pl-8"
+          />
+        </div>
+      </Field>
 
-      <Field label="Campaign"><Select value={campaign} onChange={(e) => setParam("campaign", e.target.value)} aria-label="Campaign" className="w-44">
-        <option value="">All campaigns</option>
-        {campaigns.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </Select></Field>
-
-      <Field label="Stage"><Select value={stage} onChange={(e) => setParam("stage", e.target.value)} aria-label="Stage" className="w-44">
-        <option value="">All stages</option>
-        {stagesByGroup().map((g) => (
-          <optgroup key={g.group} label={g.label}>
-            {g.stages.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </Select></Field>
+      <Field label="Stage">
+        <Select value={stage} onChange={(e) => setParam("stage", e.target.value)} aria-label="Stage" className="w-44">
+          <option value="">All stages</option>
+          {stagesByGroup().map((g) => (
+            <optgroup key={g.group} label={g.label}>
+              {g.stages.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </Select>
+      </Field>
 
       {hasFilters && (
         <Button
@@ -90,7 +90,7 @@ export function CreatorsFilterBar({
           onClick={() => {
             setQ("");
             updateSearch({ type: "submit", value: "" });
-            const query = clearCreatorFilters(params.toString());
+            const query = clearListFilters(params.toString());
             router.push(query ? `${pathname}?${query}` : pathname);
           }}
         >

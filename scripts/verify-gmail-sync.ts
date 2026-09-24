@@ -23,7 +23,7 @@ import {
   normalizeMessage,
   type GmailMessage,
 } from "../src/lib/gmail";
-import { planSearches } from "../src/lib/gmail-sync";
+import { coverageAfter, planSearches } from "../src/lib/gmail-sync";
 import { encrypt, decrypt } from "../src/lib/encryption";
 
 let failures = 0;
@@ -42,6 +42,7 @@ async function main() {
   check("one query for two addresses", qs.length === 1);
   check("query includes quoted from/to/cc per address", qs[0].includes('from:"a@x.com" OR to:"a@x.com" OR cc:"a@x.com"'), qs[0]);
   check("day window applied", qs[0].endsWith("newer_than:14d"));
+  check("unsent drafts are never searched", qs.every((q) => q.includes("-in:draft")), qs[0]);
   check("instant window applied", buildSearchQueries(["a@x.com"], { afterEpochSeconds: 1790000000.7 })[0].endsWith("after:1790000000"));
   const many = buildSearchQueries(Array.from({ length: 20 }, (_, i) => `u${i}@x.com`), { newerThanDays: 14 }, 8);
   check("20 addresses batch into 3 queries at size 8", many.length === 3, `got ${many.length}`);
@@ -57,6 +58,19 @@ async function main() {
   check("without a completed check nothing counts as covered", first.fresh.join() === "old@x.com" && first.queries[0].endsWith("newer_than:180d"));
   const resync = planSearches({ addresses: ["a@x.com"], backfilled: ["a@x.com"], syncedThrough: through, windowDays: 365 });
   check("an explicit window searches everything over it", resync.queries[0].endsWith("newer_than:365d"));
+
+  console.log("\n── What a finished check records as covered ──");
+  const now = new Date("2026-09-22T12:00:00Z");
+  const cov = (over: Partial<Parameters<typeof coverageAfter>[0]>) =>
+    coverageAfter({ complete: true, startedAt: now, syncedThrough: through, backfilled: ["old@x.com", "gone@x.com"], addresses: ["old@x.com", "new@y.com"], fresh: ["new@y.com"], ...over });
+  check("a partial check records nothing", cov({ complete: false }) === null);
+  check("a complete check advances the cursor and adds the new address", cov({})?.syncedThrough === now && cov({})?.backfilledAddresses.join() === "old@x.com,new@y.com");
+  check("an address no longer on any creator drops out", !cov({})?.backfilledAddresses.includes("gone@x.com"));
+  const short = cov({ windowDays: 1, fresh: ["old@x.com", "new@y.com"] });
+  check("a 1-day resync after a 2-day gap doesn't move the cursor", short?.syncedThrough === through, JSON.stringify(short));
+  check("…nor mark a new address's 180 days as searched", !short?.backfilledAddresses.includes("new@y.com"));
+  check("a 14-day resync that reaches back past the cursor advances it", cov({ windowDays: 14, fresh: ["old@x.com", "new@y.com"] })?.syncedThrough === now);
+  check("a 180-day resync counts as the full backfill", cov({ windowDays: 180, fresh: ["old@x.com", "new@y.com"] })?.backfilledAddresses.includes("new@y.com") === true);
 
   console.log("\n── header / splitAddresses / extractPlainText ──");
   const msg: GmailMessage = {
@@ -188,7 +202,10 @@ async function main() {
 main()
   .then(() => {
     console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`}`);
-    process.exit(failures === 0 ? 0 : 1);
+    // Let open HTTP handles finish closing first: exiting mid-close trips a
+    // libuv assertion on Windows (exit 127), which stopped the preview suite here.
+    process.exitCode = failures === 0 ? 0 : 1;
+    setTimeout(() => process.exit(), 200).unref();
   })
   .catch((err) => {
     console.error(err);

@@ -35,9 +35,9 @@ const EXPECTED: Record<AutoStageTrigger, { from: CmStage[]; to: CmStage }> = {
   // no_response is the one closed stage a creator's OWN reply reopens.
   inbound_message: { from: ["contacted", "no_response"], to: "in_conversation" },
   address_complete: { from: ["awaiting_address"], to: "fulfilling" },
-  shipment_shipped: { from: ["awaiting_address"], to: "fulfilling" },
-  shipment_delivered: { from: ["awaiting_address", "fulfilling"], to: "content_pending" },
-  deliverable_added: { from: ["fulfilling", "content_pending"], to: "posted" },
+  shipment_shipped: { from: ["awaiting_address", "fulfilling"], to: "shipped" },
+  shipment_delivered: { from: ["awaiting_address", "fulfilling", "shipped"], to: "content_pending" },
+  deliverable_added: { from: ["fulfilling", "shipped", "content_pending"], to: "posted" },
 };
 
 async function main() {
@@ -73,14 +73,15 @@ async function main() {
     "no rule moves an ACTIVE stage backward",
     TRIGGERS.every((t) => AUTO_STAGE_RULES[t].from.filter((f) => !isTerminal(f)).every((f) => stageIndex(AUTO_STAGE_RULES[t].to) > stageIndex(f))),
   );
-  check("canonical stages are exactly 7 active + 3 closed", STAGE_VALUES.length === 10 && STAGE_VALUES.filter((s) => !isTerminal(s)).length === 7);
+  // Owner decisions: 7 active on 2026-09-22; Shipping split into Ready to ship → Shipped on 2026-09-23.
+  check("canonical stages are exactly 8 active + 3 closed", STAGE_VALUES.length === 11 && STAGE_VALUES.filter((s) => !isTerminal(s)).length === 8);
   check(
     "every retired value maps to a current stage",
     Object.entries(RETIRED_STAGES).every(([, to]) => STAGE_VALUES.includes(to as CmStage)) && canonicalStage("negotiating") === "in_conversation",
   );
 
   console.log("\n── Pure: where a move lands ──");
-  check("Agreed with a complete address continues to Shipping", JSON.stringify(resolveTarget("awaiting_address", { addressComplete: true })) === JSON.stringify({ to: "fulfilling", continued: true }));
+  check("Agreed with a complete address continues to Ready to ship", JSON.stringify(resolveTarget("awaiting_address", { addressComplete: true })) === JSON.stringify({ to: "fulfilling", continued: true }));
   check("Agreed without an address stays Agreed", resolveTarget("awaiting_address", { addressComplete: false }).to === "awaiting_address");
   check("a retired target is canonicalised", resolveTarget("negotiating", { addressComplete: false }).to === "in_conversation");
   check("video platform from the link", describeVideo("https://www.instagram.com/reel/ABC123/").platform === "instagram" && describeVideo("https://www.tiktok.com/@a/video/1").platform === "tiktok" && describeVideo("https://youtu.be/x").platform === "youtube");
@@ -117,15 +118,17 @@ async function main() {
 
     const agreed = await changeStage(pid, "awaiting_address");
     check("a person moves Talking → Agreed", agreed.status === "moved" && agreed.to === "awaiting_address");
-    check("no shipment is created before Shipping", (await shipments(pid)).length === 0);
+    check("no shipment is created before Ready to ship", (await shipments(pid)).length === 0);
 
     const r5 = await applyAutoStage(pid, "address_complete");
-    check("address_complete: Agreed → Shipping", r5?.to === "fulfilling");
+    check("address_complete: Agreed → Ready to ship", r5?.to === "fulfilling");
     const created = await shipments(pid);
-    check("entering Shipping created exactly one ready shipment", created.length === 1 && created[0].status === "ready");
+    check("entering Ready to ship created exactly one ready shipment", created.length === 1 && created[0].status === "ready");
 
+    const r5b = await applyAutoStage(pid, "shipment_shipped");
+    check("shipment_shipped: Ready to ship → Shipped", r5b?.to === "shipped");
     const r6 = await applyAutoStage(pid, "shipment_delivered");
-    check("shipment_delivered: Shipping → Waiting on video", r6?.to === "content_pending");
+    check("shipment_delivered: Shipped → Waiting on video", r6?.to === "content_pending");
     check("the existing shipment is reused, not duplicated", (await shipments(pid)).length === 1);
 
     const noVideo = await changeStage(pid, "posted");
@@ -141,7 +144,7 @@ async function main() {
       .where(eq(schema.cmStageTransitions.partnershipId, pid))
       .orderBy(asc(schema.cmStageTransitions.changedAt));
     const bySource = (s: string) => transitions.filter((t) => t.source === s).map((t) => t.toStage);
-    check("rule moves are recorded as source=rule with the trigger", JSON.stringify(bySource("rule")) === JSON.stringify(["contacted", "in_conversation", "fulfilling", "content_pending"]), JSON.stringify(transitions.map((t) => [t.source, t.toStage])));
+    check("rule moves are recorded as source=rule with the trigger", JSON.stringify(bySource("rule")) === JSON.stringify(["contacted", "in_conversation", "fulfilling", "shipped", "content_pending"]), JSON.stringify(transitions.map((t) => [t.source, t.toStage])));
     check("person moves are recorded as source=manual", JSON.stringify(bySource("manual")) === JSON.stringify(["shortlisted", "awaiting_address", "posted"]));
     const shipMove = transitions.find((t) => t.toStage === "fulfilling");
     check("the move that created a shipment remembers it (for Undo)", (shipMove?.meta as { createdShipmentId?: string } | null)?.createdShipmentId === created[0].id);
@@ -151,18 +154,24 @@ async function main() {
     const pid2 = await add("__verify_as_dupes__");
     await db.insert(schema.cmShipments).values([{ partnershipId: pid2, status: "ready" }, { partnershipId: pid2, status: "shipped" }]);
     const toShip = await changeStage(pid2, "fulfilling");
-    check("moving to Shipping with shipments already there adds none", toShip.status === "moved" && !toShip.createdShipmentId && (await shipments(pid2)).length === 2);
+    check("moving to Ready to ship with shipments already there adds none", toShip.status === "moved" && !toShip.createdShipmentId && (await shipments(pid2)).length === 2);
 
-    // Agreed with the address already on file continues to Shipping.
+    // Agreed with the address already on file continues to Ready to ship.
     const pid3 = await add("__verify_as_address__");
     await db.update(schema.cmPartnerships).set({ addressLine1: "1 Test St", city: "Testville", region: "CA", postalCode: "90000" }).where(eq(schema.cmPartnerships.id, pid3));
     const cont = await changeStage(pid3, "awaiting_address");
-    check("Agreed with an address on file lands on Shipping", cont.status === "moved" && cont.to === "fulfilling" && cont.continued);
+    check("Agreed with an address on file lands on Ready to ship", cont.status === "moved" && cont.to === "fulfilling" && cont.continued);
     check("…and has its shipment", (await shipments(pid3)).length === 1);
 
     // Compare-and-set: an engine that evaluated a stale stage does nothing.
     const stale = await moveStage({ partnershipId: pid3, to: "content_pending", source: "rule", expectFrom: "contacted" });
     check("a stale engine move is refused", stale.status === "stale" && (await stageOf(pid3)) === "fulfilling");
+
+    // A person moving a card to Shipped means it went out: the ready shipment follows.
+    const sent = await changeStage(pid3, "shipped");
+    const [afterSent] = await shipments(pid3);
+    check("a person's move to Shipped marks the ready shipment shipped", sent.status === "moved" && afterSent?.status === "shipped" && !!afterSent.shippedAt, JSON.stringify(afterSent));
+    check("…and still adds no second shipment", (await shipments(pid3)).length === 1);
 
     // Closing records why; reopening to an active stage clears it.
     await changeStage(pid3, "declined", undefined, { exitReason: "not_interested" });

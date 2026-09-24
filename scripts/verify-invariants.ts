@@ -41,7 +41,7 @@ async function main() {
       .leftJoin(schema.cmShipments, eq(schema.cmShipments.partnershipId, schema.cmPartnerships.id))
       .where(
         and(
-          inArray(schema.cmPartnerships.stage, ["fulfilling", "content_pending", "posted", "completed"]),
+          inArray(schema.cmPartnerships.stage, ["fulfilling", "shipped", "content_pending", "posted", "completed"]),
           sql`${schema.cmShipments.id} is null`,
         ),
       ),

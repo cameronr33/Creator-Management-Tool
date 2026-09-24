@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   clients,
@@ -134,6 +134,9 @@ export interface CreatorRow {
   campaignName: string;
   feeAmount: string | null;
   outreachReason: string | null;
+  emailSummary: string | null;
+  emailSummaryAt: Date | null;
+  emailWhoseTurn: string | null;
   lastOutboundAt: Date | null;
   repliedAt: Date | null;
   followUpCount: number;
@@ -172,6 +175,9 @@ export async function getCreatorRows(
       campaignName: cmCampaigns.name,
       feeAmount: cmPartnerships.feeAmount,
       outreachReason: cmPartnerships.outreachReason,
+      emailSummary: cmPartnerships.emailSummary,
+      emailSummaryAt: cmPartnerships.emailSummaryAt,
+      emailWhoseTurn: cmPartnerships.emailWhoseTurn,
     })
     .from(cmPartnerships)
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
@@ -226,7 +232,9 @@ export async function getOutreachStates(
       allOutboundMigrated: sql<boolean | null>`bool_and(${cmOutreachEvents.isMigrated}) filter (where ${cmOutreachEvents.direction} = 'outbound')`,
     })
     .from(cmOutreachEvents)
-    .where(inArray(cmOutreachEvents.partnershipId, partnershipIds))
+    // Same rule as deriveOutreachState: notes (invites, auto-replies, hand
+    // notes) are not messages. Checked for equivalence in verify-email-ingest.
+    .where(and(inArray(cmOutreachEvents.partnershipId, partnershipIds), ne(cmOutreachEvents.kind, "note")))
     .groupBy(cmOutreachEvents.partnershipId);
 
   // Raw sql`` results come back as strings; `timestamp` (no tz) columns are
@@ -321,4 +329,15 @@ export async function getResearchRuns(clientId: string, limit = 15) {
     .where(eq(cmResearchRuns.clientId, clientId))
     .orderBy(desc(cmResearchRuns.startedAt))
     .limit(limit);
+}
+
+/** Creator rows per campaign (every stage) — for Settings → Campaigns. */
+export async function getCampaignCounts(clientId: string): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ campaignId: cmPartnerships.campaignId, n: sql<number>`count(*)::int` })
+    .from(cmPartnerships)
+    .innerJoin(cmCampaigns, eq(cmCampaigns.id, cmPartnerships.campaignId))
+    .where(eq(cmCampaigns.clientId, clientId))
+    .groupBy(cmPartnerships.campaignId);
+  return new Map(rows.map((r) => [r.campaignId, r.n]));
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
 import { notFound } from "next/navigation";
 import {
   ExternalLink,
@@ -14,7 +15,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { getPartnershipDetail, getClients } from "@/lib/queries";
-import { getActiveGmailAccount, scheduleEmailCheck } from "@/lib/gmail-sync";
+import { getActiveGmailAccount } from "@/lib/gmail-sync";
 import { Card, CardHeader, StagePill, Avatar, Badge, Callout } from "@/components/ui";
 import {
   StageControl,
@@ -58,7 +59,7 @@ export default async function CreatorDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string | string[]; returnTo?: string | string[] }>;
 }) {
-  scheduleEmailCheck();
+  await scheduleEmailCheckForVisitor();
   const { id } = await params;
   const query = await searchParams;
   const section = creatorSection(query.tab);

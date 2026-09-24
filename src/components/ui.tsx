@@ -23,6 +23,7 @@ export function PageHeader({
   help,
   helpAnchor,
   client,
+  campaign,
   back,
   actions,
   children,
@@ -36,6 +37,11 @@ export function PageHeader({
   helpAnchor?: string;
   /** Active client name, always visible so nobody edits the wrong client's data. */
   client?: string | null;
+  /**
+   * The sidebar's campaign scope: a name when the page shows one campaign,
+   * null for "All campaigns", undefined on pages the scope doesn't touch.
+   */
+  campaign?: string | null;
   back?: { href: string; label: string };
   actions?: ReactNode;
   /** A second row under the title — filter bars, tabs. */
@@ -56,6 +62,11 @@ export function PageHeader({
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight text-text">{title}</h1>
             {client && <Badge tone="accent">{client}</Badge>}
+            {campaign !== undefined && (
+              <Badge tone={campaign ? "info" : "muted"} title="Change it in the sidebar, under Campaign">
+                {campaign ?? "All campaigns"}
+              </Badge>
+            )}
             {helpAnchor && (
               <Link
                 href={`/help#${helpAnchor}`}
@@ -590,4 +601,38 @@ export function Field({
 /** Visually-hidden text for screen readers. */
 export function SrOnly({ children }: { children: ReactNode }) {
   return <span className="sr-only">{children}</span>;
+}
+
+/**
+ * A checkbox for row selection. `indeterminate` shows "some selected" on a
+ * select-all box. Use it inside client components (the indeterminate state
+ * is set through a ref on the DOM node).
+ */
+export function Checkbox({
+  checked,
+  indeterminate = false,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: (checked: boolean) => void;
+  /** Screen-reader label — required, the box has no visible text. */
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <input
+      type="checkbox"
+      ref={(el) => {
+        if (el) el.indeterminate = indeterminate && !checked;
+      }}
+      checked={checked}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.checked)}
+      aria-label={label}
+      className="h-4 w-4 cursor-pointer rounded border-border-strong accent-accent disabled:cursor-not-allowed"
+    />
+  );
 }

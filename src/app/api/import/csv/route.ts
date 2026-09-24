@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { resolveClient } from "@/lib/queries";
+import { getSelectedClientSlug } from "@/lib/client-cookie";
 import {
   parseCsvWithHeaderAt,
   toInt,
@@ -28,6 +30,8 @@ export async function POST(req: NextRequest) {
   const fallbackCampaign = String(form.get("campaign") ?? "").trim();
 
   if (!client) return badRequest("Missing client");
+  const selected = await resolveClient(await getSelectedClientSlug());
+  if (!selected || selected.slug !== client) return badRequest("That client isn't the one selected — reload the page");
   if (!(file instanceof File)) return badRequest("Missing CSV file");
 
   const text = await file.text();

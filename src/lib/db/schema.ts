@@ -13,6 +13,7 @@ import {
   date,
   index,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // ─────────────────────────────────────────────────────────────────
@@ -75,7 +76,8 @@ export const cmStageEnum = pgEnum("cm_stage", [
   "negotiating", // retired
   "agreed", // retired
   "awaiting_address", // "Agreed"
-  "fulfilling", // "Shipping"
+  "fulfilling", // "Ready to ship"
+  "shipped", // "Shipped" (added 2026-09-23)
   "content_pending", // "Waiting on video"
   "posted",
   "completed", // retired
@@ -214,7 +216,12 @@ export const cmCampaigns = pgTable(
     isActive: boolean("is_active").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [unique("cm_campaigns_client_name_uq").on(t.clientId, t.name)],
+  (t) => [
+    unique("cm_campaigns_client_name_uq").on(t.clientId, t.name),
+    // "Summer" and "summer " are one campaign: imports and the add form match
+    // names ignoring case, and this makes a racing duplicate impossible.
+    uniqueIndex("cm_campaigns_client_lower_name_uq").on(t.clientId, sql`lower(${t.name})`),
+  ],
 );
 
 // ─────────────────────────────────────────────────────────────────

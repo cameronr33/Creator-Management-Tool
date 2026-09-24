@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { getClients, resolveClient } from "@/lib/queries";
+import { getClients, resolveClient, getCampaigns } from "@/lib/queries";
+import { resolveCampaign } from "@/lib/campaigns";
+import { CampaignSwitcher } from "@/components/campaign-switcher";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { Nav, HelpNavLink } from "@/components/nav";
 import { ClientSwitcher } from "@/components/client-switcher";
@@ -20,11 +22,13 @@ export default async function AppLayout({
   if (!session?.user) redirect("/login");
 
   const [clients, active] = await Promise.all([getClients(), resolveClient(await getSelectedClientSlug())]);
+  const [campaigns, campaign] = active ? await Promise.all([getCampaigns(active.id), resolveCampaign(active.id)]) : [[], null];
+  const campaignPicker = active ? <CampaignSwitcher campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))} activeId={campaign?.id ?? null} /> : null;
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <header className="border-b border-sidebar-line bg-sidebar-bg p-3 md:hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3"><BrandLockup inverted /><div className="max-w-44"><ClientSwitcher clients={clients} activeSlug={active?.slug ?? ""} /></div></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><BrandLockup inverted /><div className="max-w-44 space-y-2"><ClientSwitcher clients={clients} activeSlug={active?.slug ?? ""} />{campaignPicker}</div></div>
         <MobileNavigation><Nav /><div className="mt-3"><HelpNavLink /></div><form action={signOutAction} className="mt-3"><Button type="submit" size="sm" icon={<LogOut size={14} />}>Sign out</Button></form></MobileNavigation>
       </header>
       <aside className="sidebar-scroll sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-sidebar-line bg-sidebar-bg md:flex">
@@ -37,6 +41,12 @@ export default async function AppLayout({
             Client
           </div>
           <ClientSwitcher clients={clients} activeSlug={active?.slug ?? ""} />
+          {campaignPicker && (
+            <>
+              <div className="px-1 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">Campaign</div>
+              {campaignPicker}
+            </>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-5">

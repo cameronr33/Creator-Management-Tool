@@ -190,3 +190,53 @@ export function TeamAddressesEditor({ entries }: { entries: string[] }) {
     </div>
   );
 }
+
+/**
+ * Settings → Campaigns: rename, or delete (the campaign and everyone's row in
+ * it; creators in no other campaign are removed completely — the confirm
+ * says how many).
+ */
+export function CampaignManager({ campaigns }: { campaigns: { id: string; name: string; creators: number }[] }) {
+  return (
+    <ul className="divide-y divide-border rounded-lg border border-border">
+      {campaigns.map((c) => (
+        <CampaignRow key={c.id} campaign={c} />
+      ))}
+    </ul>
+  );
+}
+
+function CampaignRow({ campaign }: { campaign: { id: string; name: string; creators: number } }) {
+  const { pending, run } = useSave();
+  const [name, setName] = useState(campaign.name);
+  const dirty = name.trim() !== campaign.name && name.trim() !== "";
+  return (
+    <li className="flex flex-wrap items-end gap-2 px-3 py-2.5">
+      <Field label={`${campaign.creators} creator${campaign.creators === 1 ? "" : "s"}`} className="min-w-56 flex-1">
+        <Input compact value={name} onChange={(e) => setName(e.target.value)} aria-label={`Rename ${campaign.name}`} />
+      </Field>
+      {dirty && (
+        <Button
+          size="sm"
+          variant="primary"
+          pending={pending}
+          onClick={() => run(() => api(`/api/campaigns/${campaign.id}`, { name: name.trim() }, "PATCH"), { success: "Campaign renamed" })}
+        >
+          Rename
+        </Button>
+      )}
+      <ConfirmButton
+        label="Delete"
+        icon={<Unplug size={13} />}
+        question={
+          campaign.creators
+            ? `Delete ${campaign.name} and its ${campaign.creators} creator row${campaign.creators === 1 ? "" : "s"}? Creators in no other campaign are removed completely. This can't be undone.`
+            : `Delete ${campaign.name}?`
+        }
+        confirmLabel="Delete"
+        pending={pending}
+        onConfirm={() => run(() => api(`/api/campaigns/${campaign.id}`, undefined, "DELETE"), { success: `${campaign.name} deleted` })}
+      />
+    </li>
+  );
+}

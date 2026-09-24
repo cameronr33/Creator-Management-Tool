@@ -308,6 +308,11 @@ export async function ingestEmails(messages: IncomingEmailMessage[], opts: Inges
   const fresh = new Map<string, { id: string; direction: "inbound" | "outbound"; senderRole: SenderRole; occurredAt: Date; note: boolean }[]>();
 
   for (const msg of ordered) {
+    // Never stored: drafts (not sent) and Spam (a spoofed "creator" address lands there).
+    if (msg.labelIds?.includes("DRAFT") || msg.labelIds?.includes("SPAM")) {
+      result.unmatched++;
+      continue;
+    }
     const c = classifyMessage(msg, creatorsByAddress, opts.team);
     const creator = c ? creatorById.get(c.creatorId) : undefined;
     const partnershipId = creator ? choosePartnership(creator, msg.threadId ? threadOwner.get(msg.threadId) ?? null : null) : null;
@@ -493,6 +498,9 @@ export async function reclassifyStoredEmails(team: TeamIdentity): Promise<{ chan
       team,
     );
     if (!c || (c.direction === r.direction && c.senderRole === r.senderRole)) continue;
+    // Mail we sent was recognised by its SENT label, which isn't stored — the
+    // headers alone can't overrule it, so ours stays ours.
+    if (r.senderRole === "team" && c.senderRole !== "team") continue;
     await db.update(cmOutreachEvents).set({ direction: c.direction, senderRole: c.senderRole }).where(eq(cmOutreachEvents.id, r.id));
     touched.add(r.partnershipId);
     changed++;

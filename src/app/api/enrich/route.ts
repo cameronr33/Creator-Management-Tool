@@ -1,7 +1,7 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { requireAuth, badRequest } from "@/lib/api-helpers";
+import { requireAuth, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
 import { db } from "@/lib/db";
 import { cmCreators } from "@/lib/db/schema";
 import { fetchProfiles } from "@/lib/apify";
@@ -49,6 +49,8 @@ export async function POST(req: NextRequest) {
     handle = link?.handle ?? null;
     platform = link?.platform ?? null;
   } else {
+    const scope = await assertCreatorInSelectedClient(d.creatorId!);
+    if (scope) return scope;
     const [creator] = await db
       .select({ username: cmCreators.username, platform: cmCreators.platform })
       .from(cmCreators)

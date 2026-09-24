@@ -66,7 +66,7 @@ function main() {
 
   console.log("\n── primitives exist ──");
   const ui = readFileSync(join(ROOT, "components", "ui.tsx"), "utf8");
-  for (const name of ["Button", "IconButton", "Input", "Select", "Textarea", "Field", "Callout", "Badge", "StagePill", "PageHeader", "Card", "CardHeader", "EmptyState", "Segmented"]) {
+  for (const name of ["Button", "IconButton", "Input", "Select", "Textarea", "Field", "Callout", "Badge", "StagePill", "PageHeader", "Card", "CardHeader", "EmptyState", "Segmented", "Checkbox"]) {
     check(`ui.tsx exports ${name}`, new RegExp(`export function ${name}\\b`).test(ui));
   }
   const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8");

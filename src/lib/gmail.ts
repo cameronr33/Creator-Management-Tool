@@ -101,16 +101,24 @@ export async function getProfile(accessToken: string): Promise<{ emailAddress: s
   return api(accessToken, "/profile");
 }
 
+/**
+ * Every message id a search matches, paging to the end (up to `max`). Gmail
+ * lists newest first, so stopping early would return the same newest page
+ * forever and older mail would never be reached; the caller filters out
+ * what's already stored, so paging to the end is what lets a big backfill
+ * converge over a few checks.
+ */
 export async function listMessageIds(
   accessToken: string,
   query: string,
-  max = 500,
+  max = 5000,
 ): Promise<{ ids: string[]; truncated: boolean }> {
   const ids: string[] = [];
   let pageToken: string | undefined;
   let more = false;
   while (ids.length < max) {
-    // Spam/Trash included: a creator's reply that landed in Spam is still their reply.
+    // Trash included: a deleted thread is still the history. Spam is listed too
+    // but never stored (email-ingest drops it — a spoofed "creator" lands there).
     const params = new URLSearchParams({ q: query, maxResults: "100", includeSpamTrash: "true" });
     if (pageToken) params.set("pageToken", pageToken);
     const data = await api<{ messages?: { id: string }[]; nextPageToken?: string }>(
@@ -180,7 +188,8 @@ export function buildSearchQueries(addresses: string[], window: SearchWindow, ba
   for (let i = 0; i < addresses.length; i += batchSize) {
     const batch = addresses.slice(i, i + batchSize);
     const clause = batch.map((a) => `from:"${a}" OR to:"${a}" OR cc:"${a}"`).join(" OR ");
-    queries.push(`(${clause}) ${suffix}`);
+    // Drafts aren't sent mail: an unsent draft must never count as "we messaged them".
+    queries.push(`(${clause}) -in:draft ${suffix}`);
   }
   return queries;
 }

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "cm_campaigns_client_lower_name_uq" ON "cm_campaigns" USING btree ("client_id",lower("name"));

@@ -1,20 +1,23 @@
-import Link from "next/link";
-import { ExternalLink, Mail, Plus, Upload } from "lucide-react";
+import type { Metadata } from "next";
+import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
+import { Plus, Upload } from "lucide-react";
 import { resolveClient, getCampaigns, getCreatorRows } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
-import { scheduleEmailCheck } from "@/lib/gmail-sync";
-import { PageHeader, EmptyState, StagePill, Avatar, Badge, Button } from "@/components/ui";
+import { resolveCampaign } from "@/lib/campaigns";
+import { PageHeader, EmptyState, Button } from "@/components/ui";
 import { CreatorsFilterBar } from "@/components/creators-filter-bar";
-import { compactNumber, relativeDays } from "@/lib/format";
+import { CreatorsTable } from "@/components/creators-table";
 import type { CmStage } from "@/lib/db/schema";
 import { STAGES } from "@/lib/stages";
+
+export const metadata: Metadata = { title: "Creators" };
 
 export default async function CreatorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; stage?: string; campaign?: string }>;
+  searchParams: Promise<{ q?: string; stage?: string }>;
 }) {
-  scheduleEmailCheck();
+  await scheduleEmailCheckForVisitor();
   const sp = await searchParams;
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) {
@@ -28,19 +31,20 @@ export default async function CreatorsPage({
     );
   }
 
-  const campaigns = await getCampaigns(client.id);
+  const [campaigns, campaign] = await Promise.all([getCampaigns(client.id), resolveCampaign(client.id)]);
   let rows = await getCreatorRows(client.id, {
-    campaignId: sp.campaign || undefined,
-    stage: STAGES.some(s => s.value === sp.stage) ? sp.stage as CmStage : undefined,
+    campaignId: campaign?.id,
+    stage: STAGES.some((s) => s.value === sp.stage) ? (sp.stage as CmStage) : undefined,
   });
-
+  const total = rows.length;
   const q = (sp.q ?? "").trim().toLowerCase();
   if (q) {
     rows = rows.filter(
       (r) =>
         r.name.toLowerCase().includes(q) ||
         r.username.toLowerCase().includes(q) ||
-        (r.contentPillar ?? "").toLowerCase().includes(q),
+        (r.contentPillar ?? "").toLowerCase().includes(q) ||
+        (r.businessEmail ?? "").toLowerCase().includes(q),
     );
   }
 
@@ -60,91 +64,54 @@ export default async function CreatorsPage({
       <PageHeader
         title="Creators"
         client={client.name}
-        subtitle={`${rows.length} shown`}
-        help="Everyone tracked for this client. Search by name, handle or content type, filter by campaign or stage, and open a row for the full record."
-        actions={<>{importButton}{addButton}</>}
+        campaign={campaign?.name ?? null}
+        subtitle={rows.length === total ? `${total} creator${total === 1 ? "" : "s"}` : `${rows.length} of ${total} shown`}
+        help="Everyone you're tracking. Tick creators to move them to a stage or another campaign, or to delete them. Open a creator for their conversation, deal, shipping and videos."
+        actions={
+          <>
+            {importButton}
+            {addButton}
+          </>
+        }
       >
-        <CreatorsFilterBar campaigns={campaigns} />
+        <CreatorsFilterBar />
       </PageHeader>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {rows.length === 0 ? (
           <EmptyState
-            title="No creators match"
-            hint="Try clearing the filters, import a CSV of creators, or add one by pasting their profile link."
-            action={<div className="flex gap-2">{importButton}{addButton}</div>}
+            title={total === 0 ? (campaign ? `No creators in ${campaign.name} yet` : "No creators yet") : "No creators match"}
+            hint={
+              total === 0
+                ? "Import a CSV with their names and a Campaign column, or add one by pasting their profile link."
+                : "Try clearing the search or the stage filter."
+            }
+            action={
+              total === 0 ? (
+                <div className="flex gap-2">
+                  {importButton}
+                  {addButton}
+                </div>
+              ) : undefined
+            }
           />
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-card">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs font-semibold text-text-muted">
-                  <th className="px-4 py-2.5 font-semibold">Creator</th>
-                  <th className="px-4 py-2.5 font-semibold">Content type</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Followers</th>
-                  <th className="px-4 py-2.5 font-semibold">Stage</th>
-                  <th className="px-4 py-2.5 font-semibold">Last contact</th>
-                  <th className="px-4 py-2.5 font-semibold">Campaign</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {rows.map((r) => (
-                  <tr key={r.partnershipId} className="group transition hover:bg-surface-2/60">
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar name={r.name} />
-                        <div className="min-w-0">
-                          <Link
-                            href={`/creators/${r.partnershipId}`}
-                            className="font-medium text-text hover:text-accent"
-                          >
-                            {r.name}
-                          </Link>
-                          <div className="flex items-center gap-1.5 text-xs text-text-muted">
-                            <a
-                              href={r.profileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-0.5 hover:text-accent"
-                            >
-                              @{r.username}
-                              <ExternalLink size={11} />
-                            </a>
-                            {r.businessEmail && (
-                              <a
-                                href={`mailto:${r.businessEmail}`}
-                                className="hover:text-accent"
-                                title={r.businessEmail}
-                                aria-label={`Email ${r.businessEmail}`}
-                              >
-                                <Mail size={11} />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-text-muted">{r.contentPillar ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-right tabular">{compactNumber(r.followers)}</td>
-                    <td className="px-4 py-2.5">
-                      <StagePill stage={r.stage} />
-                    </td>
-                    <td className="px-4 py-2.5 text-text-muted">
-                      {r.repliedAt ? (
-                        <Badge tone="good" title={`Replied ${relativeDays(r.repliedAt)}`}>
-                          replied
-                        </Badge>
-                      ) : r.lastOutboundAt ? (
-                        <span title={`${r.followUpCount} follow-up(s) sent`}>{relativeDays(r.lastOutboundAt)}</span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-text-muted">{r.campaignName}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CreatorsTable
+            rows={rows.map((r) => ({
+              partnershipId: r.partnershipId,
+              name: r.name,
+              username: r.username,
+              profileUrl: r.profileUrl,
+              businessEmail: r.businessEmail,
+              followers: r.followers,
+              stage: r.stage,
+              campaignName: r.campaignName,
+              emailWhoseTurn: r.emailWhoseTurn,
+              lastOutboundAt: r.lastOutboundAt ? r.lastOutboundAt.toISOString() : null,
+              repliedAt: r.repliedAt ? r.repliedAt.toISOString() : null,
+            }))}
+            campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))}
+            scopeName={campaign?.name ?? null}
+          />
         )}
       </div>
     </>

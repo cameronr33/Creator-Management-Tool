@@ -4,10 +4,10 @@
 
 import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { cmCreators, cmPartnerships } from "@/lib/db/schema";
+import { cmCampaigns, cmCreators, cmPartnerships } from "@/lib/db/schema";
 import { resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 
@@ -86,5 +86,40 @@ export async function assertCreatorInSelectedClient(creatorId: string) {
     .limit(1);
   if (!row) return notFound("Creator not found");
   if (row.clientId !== client.id) return notFound("Creator belongs to a different client");
+  return null;
+}
+
+/** The body names a client: it must be the one selected in the sidebar. */
+export async function assertClientIsSelected(clientId: string) {
+  const client = await resolveClient(await getSelectedClientSlug());
+  if (!client) return notFound("No client selected");
+  if (client.id !== clientId) return notFound("That client isn't the one selected — reload the page");
+  return null;
+}
+
+/** Many partnerships at once (bulk actions): every one must be in the selected client. */
+export async function assertPartnershipsInSelectedClient(ids: string[]) {
+  if (ids.length === 0) return badRequest("Nothing selected");
+  if (!ids.every(isUuid)) return badRequest("Invalid partnership id");
+  const client = await resolveClient(await getSelectedClientSlug());
+  if (!client) return notFound("No client selected");
+  const rows = await db
+    .select({ id: cmPartnerships.id, clientId: cmCreators.clientId })
+    .from(cmPartnerships)
+    .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
+    .where(inArray(cmPartnerships.id, ids));
+  if (rows.length !== new Set(ids).size) return notFound("Some of those creators no longer exist — reload the page");
+  if (rows.some((r) => r.clientId !== client.id)) return notFound("Some of those belong to a different client");
+  return null;
+}
+
+/** A campaign id from the body must belong to the selected client. */
+export async function assertCampaignInSelectedClient(campaignId: string) {
+  if (!isUuid(campaignId)) return badRequest("Invalid campaign id");
+  const client = await resolveClient(await getSelectedClientSlug());
+  if (!client) return notFound("No client selected");
+  const [row] = await db.select({ clientId: cmCampaigns.clientId }).from(cmCampaigns).where(eq(cmCampaigns.id, campaignId)).limit(1);
+  if (!row) return notFound("Campaign not found");
+  if (row.clientId !== client.id) return notFound("That campaign belongs to a different client");
   return null;
 }

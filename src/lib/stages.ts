@@ -6,8 +6,9 @@ import type { AutoStageTrigger } from "@/lib/auto-stage";
  * The stage answers one question — what is this partnership waiting on right
  * now — so shipping/post/contract facts are deliberately absent from it.
  *
- * Seven active stages and three closed ones (owner decision, 2026-09-22 —
- * "simplify the pipeline"). The Postgres enum still carries four retired
+ * Eight active stages and three closed ones (owner decisions: 2026-09-22 —
+ * "simplify the pipeline"; 2026-09-23 — "there should be a Ready to ship
+ * status", so Shipping split into Ready to ship → Shipped). The Postgres enum still carries four retired
  * values (researched, negotiating, agreed, completed); nothing writes them,
  * `canonicalStage()` maps any straggler on read, and verify:invariants
  * asserts none remain. Labels are written for a teammate on day one, and
@@ -59,15 +60,23 @@ export const STAGES: StageMeta[] = [
     label: "Agreed",
     group: "deal",
     hint: "They're in. Verbal or signed is recorded under Deal. Waiting on their shipping address.",
-    action: "Get their shipping address. Saving it moves them to Shipping.",
+    action: "Get their shipping address. Saving it moves them to Ready to ship.",
     terminal: false,
   },
   {
     value: "fulfilling",
-    label: "Shipping",
+    label: "Ready to ship",
     group: "fulfilment",
-    hint: "Address in hand. The product is being packed, shipped or delivered.",
-    action: "Ship the product and add the tracking number, then mark it delivered.",
+    hint: "Agreed and the address is in hand. The product hasn't gone out yet.",
+    action: "Get the product sent, then mark it shipped with the tracking number.",
+    terminal: false,
+  },
+  {
+    value: "shipped",
+    label: "Shipped",
+    group: "fulfilment",
+    hint: "The product is on its way to them.",
+    action: "Wait for it to arrive. Mark it delivered, or it moves on when they say it arrived.",
     terminal: false,
   },
   {

@@ -11,11 +11,12 @@ import type { cmExitReasonEnum } from "@/lib/db/schema";
  * control, bulk), the rule table (auto-stage.ts) and email reading all come
  * through here, so the stage can never drift from the records it summarises:
  *
- *  - Shipping or later always has a shipment row (one is created at "ready"
- *    only when none exists — existing records, duplicates included, are never
- *    touched).
+ *  - Ready to ship or later always has a shipment row (one is created at
+ *    "ready" only when none exists — existing records, duplicates included,
+ *    are never touched), and Shipped means it went out: moving there marks
+ *    the latest shipment shipped if it was still "ready" (Undo puts it back).
  *  - Posted always has a video: a move to Posted without one needs the link.
- *  - Agreed with a complete address on file continues straight to Shipping.
+ *  - Agreed with a complete address on file continues straight to Ready to ship.
  *  - Every move writes a cm_stage_transitions row saying who moved it
  *    (manual / rule / email / migration), why, and what it created, so Undo
  *    can take it back.
@@ -44,7 +45,7 @@ export interface StageMoveInput {
   expectFrom?: CmStage;
   /** Extra facts to keep with the transition (e.g. which trigger fired). */
   meta?: Record<string, unknown>;
-  /** Land exactly on `to` (Undo): no Agreed → Shipping continuation. */
+  /** Land exactly on `to` (Undo): no Agreed → Ready to ship continuation. */
   exact?: boolean;
 }
 
@@ -56,7 +57,7 @@ export type StageMoveResult =
       transitionId: string;
       createdShipmentId: string | null;
       createdDeliverableId: string | null;
-      /** True when an Agreed move continued to Shipping because the address was on file. */
+      /** True when an Agreed move continued to Ready to ship because the address was on file. */
       continued: boolean;
     }
   | { status: "unchanged"; stage: CmStage }
@@ -110,6 +111,7 @@ export async function moveStage(input: StageMoveInput): Promise<StageMoveResult>
   const video = needVideo && videoUrl ? describeVideo(videoUrl) : null;
 
   const needShipment = requiresShipment(to);
+  const markShipped = to === "shipped";
   const setExit = input.exitReason !== undefined;
   const clearExit = !isTerminal(to);
   const meta = {
@@ -130,10 +132,18 @@ export async function moveStage(input: StageMoveInput): Promise<StageMoveResult>
       where id = ${input.partnershipId} and stage = ${from}::cm_stage
       returning id
     ), ship as (
-      insert into ${cmShipments} (partnership_id, status)
-      select id, 'ready' from moved
+      insert into ${cmShipments} (partnership_id, status, shipped_at)
+      select id, (case when ${markShipped} then 'shipped' else 'ready' end)::cm_shipment_status,
+             case when ${markShipped} then now() end
+      from moved
       where ${needShipment}
         and not exists (select 1 from ${cmShipments} s where s.partnership_id = ${input.partnershipId})
+      returning id
+    ), marked as (
+      update ${cmShipments}
+      set status = 'shipped', shipped_at = coalesce(shipped_at, now()), updated_at = now()
+      where ${markShipped} and exists (select 1 from moved) and status = 'ready'
+        and id = (select s.id from ${cmShipments} s where s.partnership_id = ${input.partnershipId} order by s.created_at desc limit 1)
       returning id
     ), vid as (
       insert into ${cmDeliverables} (partnership_id, platform, url, shortcode, posted_at)
@@ -148,6 +158,7 @@ export async function moveStage(input: StageMoveInput): Promise<StageMoveResult>
              ${JSON.stringify(meta)}::jsonb
                || jsonb_strip_nulls(jsonb_build_object(
                     'createdShipmentId', (select id from ship),
+                    'markedShippedId', (select id from marked),
                     'createdDeliverableId', (select id from vid)))
       from moved
       returning id

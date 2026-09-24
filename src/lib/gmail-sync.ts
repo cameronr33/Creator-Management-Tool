@@ -119,17 +119,47 @@ export function planSearches(opts: {
   };
 }
 
-async function acquireLease(accountId: string): Promise<boolean> {
-  const got = await db
-    .update(cmGmailAccounts)
-    .set({ syncLeaseUntil: new Date(Date.now() + LEASE_MS) })
-    .where(and(eq(cmGmailAccounts.id, accountId), or(isNull(cmGmailAccounts.syncLeaseUntil), lt(cmGmailAccounts.syncLeaseUntil, new Date()))))
-    .returning({ id: cmGmailAccounts.id });
-  return got.length > 0;
+/**
+ * Pure: what a finished check may record as covered. Only a complete check
+ * advances anything. A resync over a short window doesn't cover a new
+ * address's 180 days, and only moves the cursor when its window reaches back
+ * past the old one — otherwise the gap between them would count as searched.
+ */
+export function coverageAfter(opts: {
+  complete: boolean;
+  startedAt: Date;
+  windowDays?: number;
+  syncedThrough: Date | null;
+  backfilled: string[];
+  addresses: string[];
+  fresh: string[];
+}): { syncedThrough: Date | null; backfilledAddresses: string[] } | null {
+  if (!opts.complete) return null;
+  const kept = opts.backfilled.filter((a) => opts.addresses.includes(a));
+  const full = !opts.windowDays || opts.windowDays >= BACKFILL_DAYS;
+  if (full) return { syncedThrough: opts.startedAt, backfilledAddresses: [...new Set([...kept, ...opts.fresh])] };
+  const windowStart = opts.startedAt.getTime() - opts.windowDays! * 86_400_000;
+  const reachesBack = !!opts.syncedThrough && windowStart <= opts.syncedThrough.getTime();
+  return { syncedThrough: reachesBack ? opts.startedAt : opts.syncedThrough, backfilledAddresses: kept };
 }
 
-async function releaseLease(accountId: string): Promise<void> {
-  await db.update(cmGmailAccounts).set({ syncLeaseUntil: null }).where(eq(cmGmailAccounts.id, accountId));
+/** Take the lease; returns its expiry (our token) or null when another check holds it. */
+async function acquireLease(accountId: string): Promise<Date | null> {
+  const until = new Date(Date.now() + LEASE_MS);
+  const got = await db
+    .update(cmGmailAccounts)
+    .set({ syncLeaseUntil: until })
+    .where(and(eq(cmGmailAccounts.id, accountId), or(isNull(cmGmailAccounts.syncLeaseUntil), lt(cmGmailAccounts.syncLeaseUntil, new Date()))))
+    .returning({ id: cmGmailAccounts.id });
+  return got.length > 0 ? until : null;
+}
+
+/** Release only our own lease: a check that overran it mustn't free a newer check's. */
+async function releaseLease(accountId: string, mine: Date): Promise<void> {
+  await db
+    .update(cmGmailAccounts)
+    .set({ syncLeaseUntil: null })
+    .where(and(eq(cmGmailAccounts.id, accountId), eq(cmGmailAccounts.syncLeaseUntil, mine)));
 }
 
 /** Thrown when another check holds the lease — callers treat it as "already running". */
@@ -146,7 +176,8 @@ export class SyncBusyError extends Error {
 export async function runGmailSync(opts: { trigger: SyncTrigger; windowDays?: number }): Promise<SyncRunResult> {
   const account = await getActiveGmailAccount();
   if (!account) throw new Error("No Gmail account connected — connect one in Settings.");
-  if (!(await acquireLease(account.id))) throw new SyncBusyError();
+  const lease = await acquireLease(account.id);
+  if (!lease) throw new SyncBusyError();
 
   const startedAt = new Date();
   try {
@@ -183,7 +214,15 @@ export async function runGmailSync(opts: { trigger: SyncTrigger; windowDays?: nu
       truncated,
       ...ingest,
     };
-    const complete = summary.fetchErrors === 0 && !truncated;
+    const coverage = coverageAfter({
+      complete: summary.fetchErrors === 0 && !truncated,
+      startedAt,
+      windowDays: opts.windowDays,
+      syncedThrough: account.syncedThrough,
+      backfilled: account.backfilledAddresses ?? [],
+      addresses,
+      fresh: plan.fresh,
+    });
     await db
       .update(cmGmailAccounts)
       .set({
@@ -203,14 +242,7 @@ export async function runGmailSync(opts: { trigger: SyncTrigger; windowDays?: nu
         },
         // Coverage only advances on a complete check. Addresses no longer on
         // any creator drop out, so re-adding one later earns a fresh backfill.
-        ...(complete
-          ? {
-              syncedThrough: startedAt,
-              backfilledAddresses: [
-                ...new Set([...(account.backfilledAddresses ?? []).filter((a) => addresses.includes(a)), ...plan.fresh]),
-              ],
-            }
-          : {}),
+        ...(coverage ?? {}),
       })
       .where(eq(cmGmailAccounts.id, account.id));
     return summary;
@@ -222,7 +254,7 @@ export async function runGmailSync(opts: { trigger: SyncTrigger; windowDays?: nu
       .where(eq(cmGmailAccounts.id, account.id));
     throw err;
   } finally {
-    await releaseLease(account.id);
+    await releaseLease(account.id, lease);
   }
 }
 
@@ -424,7 +456,8 @@ export async function countStoredEmails(): Promise<number> {
 /**
  * For page components: once the page has been sent, check email if the last
  * check is older than FRESH_FOR_MS. Pages (not the layout) call this, because
- * a layout isn't re-rendered on every navigation.
+ * a layout isn't re-rendered on every navigation — through
+ * scheduleEmailCheckForVisitor (page-email-check.ts), so only signed in.
  */
 export function scheduleEmailCheck(): void {
   after(() => ensureFreshEmail());

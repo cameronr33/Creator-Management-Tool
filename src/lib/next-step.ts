@@ -67,9 +67,10 @@ export function nextStep(i: NextStepInput): NextStep {
       };
     case "awaiting_address":
       return i.hasAddress
-        ? { text: "Their address is on file — move them to Shipping and set up the shipment.", anchor: "shipping" }
+        ? { text: "Their address is on file — move them to Ready to ship.", anchor: "shipping" }
         : { text: "Get their shipping address and paste it under Shipping — the stage moves on its own.", anchor: "shipping" };
     case "fulfilling":
+    case "shipped":
       switch (i.shipmentStatus) {
         case null:
           return { text: "Create the shipment: pick Ready under Shipping.", anchor: "shipping" };
