@@ -1,7 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-/** The model that reads email and contracts. */
-export const READER_MODEL = process.env.EMAIL_STATUS_MODEL ?? "claude-opus-5-5";
+/**
+ * The model that reads email and contracts. Sonnet (owner, 2026-09-24: "done
+ * efficiently"): every quote, address and fee it returns is checked against
+ * the messages, so a cheaper reader can only fill less — never wrongly.
+ * EMAIL_STATUS_MODEL overrides it.
+ */
+export const READER_MODEL = process.env.EMAIL_STATUS_MODEL ?? "claude-sonnet-5";
 const FALLBACK_MODEL = "claude-opus-5";
 
 let _client: Anthropic | null = null;
