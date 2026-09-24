@@ -1,9 +1,9 @@
 # Creator Manager
 
 Multi-client creator relationship management for the agency. Every creator across
-every client has one record — research, outreach history, agreement, product,
-shipping, and posted content — fed by the `creator-research` skill and surfaced
-through scheduled loops.
+every client has one record — photo, conversation, agreement, shipping and
+posted videos — and moves through one A-to-Z pipeline per campaign. Email with
+the creators you've entered is read automatically and keeps their stage current.
 
 Sibling to `social-analytics-dashboard`; shares its Neon instance (`cm_*` tables)
 and `users` login. Next.js 16 · React 19 · Drizzle · NextAuth v5 · Tailwind 4.
@@ -15,8 +15,6 @@ npm install
 cp .env.local.example .env.local   # then fill in real values — see the comments in that file
 npm run db:apply                   # create cm_* tables in Neon (NOT db:push — see Gotchas)
 npm run db:seed                    # create/promote the admin user
-npm run import:hella -- --dry-run  # preview the HELLA migration + conflict report (owner only)
-npm run import:hella               # apply it
 npm run dev                        # http://localhost:3002
 ```
 
@@ -57,50 +55,44 @@ npm run dev   # http://localhost:3002 — log in with the admin login you just c
 
 ## Model
 
-A **creator** is an identity + research snapshot, reusable across campaigns. A
-**partnership** is one creator × one campaign — the pipeline row. Its `stage`
-answers exactly one question — *what is this deal waiting on right now* — while
-shipping lives in `cm_shipments`, posts in `cm_deliverables`, and contract status
-in `agreementType`. Nothing is stored in two places, which is what let the two
-original spreadsheets drift apart.
+A **creator** is a person (name, profile links, photo, email addresses, numbers),
+reusable across campaigns. A **partnership** is one creator × one campaign — the
+pipeline row. Its `stage` answers exactly one question — *what is this deal
+waiting on right now* — while shipping lives in `cm_shipments`, posts in
+`cm_deliverables`, and contract status in `agreementType`.
 
-Stages: `researched → shortlisted → contacted → in_conversation → negotiating →
-agreed → awaiting_address → fulfilling → content_pending → posted → completed`,
-plus terminal `passed` / `declined` / `no_response` (split by who ended it).
+Stages (`src/lib/stages.ts`, labels in quotes): `shortlisted` "To contact" →
+`contacted` → `in_conversation` "Talking" → `awaiting_address` "Agreed" →
+`fulfilling` "Ready to ship" → `shipped` → `content_pending` "Waiting on
+video" → `posted`, plus closed `passed` / `declined` / `no_response` (split
+by who ended it). The enum still holds four retired values (`researched`,
+`negotiating`, `agreed`, `completed`); nothing writes them and
+`verify:invariants` asserts none remain.
+
+Every page is scoped by the sidebar's **client** and **campaign**. Creators
+arrive by **Import CSV** (a Name column and a Campaign column; campaigns are
+matched ignoring case and created when missing — `src/lib/csv-import.ts`) or
+**Add creator**; their Instagram photo and followers are fetched afterwards
+(`src/lib/instagram.ts`, stored in `cm_creator_photos`).
 
 ## Loops
 
-- **Follow-up sweep** (`/api/cron/follow-ups`, daily) — opens alerts for overdue
-  outreach. After two unanswered follow-ups, Today asks a teammate to review the
-  conversation before closing as no response. The sweep does not automatically
-  close partnerships: shared-mailbox and off-channel coverage cannot prove silence.
-- **Tier-1 metric refresh** (`/api/cron/refresh-metrics`, weekly) — refreshes
-  followers via Apify REST. Deliberately does **not** touch view counts: accurate
-  public Views require the Chrome-grid scrape in the `creator-research` skill
-  (Tier 2, run locally), which pushes back via `/api/ingest/research`.
-
-Both are driven by `scripts/cron-worker.ts` on a Railway worker service.
-
-- **Email sync** (`/api/cron/email-sync`, 12:30 & 21:30 UTC daily) — built
-  into the app itself, no Claude involved. Reads the Gmail mailbox connected
-  in Settings → Email sync (read-only OAuth grant), matches threads to
-  creators by **every address they're known to use** (the Apify public email
-  plus `cm_creator_emails`), logs touchpoints to their timelines, and
-  auto-advances stages (reply → `in_conversation`, including reopening
-  `no_response`). A second **discovery** pass scans the cc'd threads
-  themselves and lists every external address that matches no creator as an
-  *unmatched sender* with a suggested creator — one click links it and pulls
-  that creator's threads immediately. Also runnable on demand via **Sync
-  now**. **Tracking only** — the app never sends mail. Coverage limit: only
-  threads where the connected mailbox is on To/Cc are visible; the worklist's
-  `mailto:` links pre-fill that cc. (The `.claude/skills/email-sync` skill
-  remains as a manual fallback through `/api/emails/ingest`.)
-- **Automation health** (Settings) — every loop above writes a `cm_job_runs`
-  heartbeat (`ok` / `idle` / `error`); a loop overdue by 1.5× its interval is
-  flagged, so a dead cron worker is visible instead of silent.
-- **Per-client settings** (Settings → Clients) — which shared-roster clients
-  this tool shows, and each client's follow-up cadence (the thresholds the
-  follow-up loop controls toward, with an owner instead of a constant).
+- **Email check** (`src/lib/gmail-sync.ts`) — reads the Gmail mailbox connected
+  in Settings (read-only) and searches it **only** for the addresses saved on
+  creators; nothing else is read or stored. A new address gets a 180-day
+  search; after that only mail since the last complete check. Runs on page
+  visits (at most every 15 minutes, signed-in only), when an address is added,
+  on **Check now**, and on the Railway cron (`/api/cron/email-sync`). Drafts
+  and Spam are never stored; invites and auto-replies are kept as notes.
+- **Email reading** (`src/lib/email-status.ts`) — after new mail, the
+  conversation is read (Claude, `EMAIL_STATUS_MODEL`) for a one-line summary,
+  whose turn it is, and an address the creator wrote. With `EMAIL_AUTOMOVE=on`
+  it may also move the stage — see Automatic moves.
+- **Heartbeats** — every check writes a `cm_job_runs` row (`ok` / `idle` /
+  `error`) and Today shows when email was last checked, so a dead loop is
+  visible instead of silent.
+- **Per-client settings** (Settings → Clients) — which clients this tool shows
+  and each client's follow-up timing, which Today's Follow up list uses.
 
 ### Email sync setup (one-time, Google Cloud)
 
@@ -125,34 +117,37 @@ The refresh token is stored AES-256-GCM-encrypted using
 `TOKEN_ENCRYPTION_KEY` — that variable is now load-bearing; changing it means
 reconnecting Gmail.
 
-## Auto-stage
+## Automatic moves
 
-Routes advance the pipeline automatically on unambiguous events
-(`src/lib/auto-stage.ts`): first outbound message → `contacted`, a reply →
-`in_conversation`, a complete address → `fulfilling`, shipped/delivered →
-`fulfilling`/`content_pending`, a posted video → `posted`. Rules are a strict
-from-stage allowlist — they never move a stage backward and never touch the
-judgment stages (`negotiating`, `agreed`, `completed`) or terminals. Every
-change lands in `cm_stage_transitions` like a manual move.
+Two engines may move a stage, both forward only, neither ever closing a deal
+(AGENTS.md frozen node 2):
+
+- **The rule table** (`src/lib/auto-stage.ts`): first message → Contacted, a
+  reply → Talking, a complete address → Ready to ship, marked shipped →
+  Shipped, delivered → Waiting on video, a video link → Posted.
+- **Email reading** (`EMAIL_STAGE_RULES` in `src/lib/email-status.ts`): only
+  from the creator's own message, quoted word for word, newer than the last
+  manual change, not low confidence — Ready to ship also needs an address,
+  Posted the creator's own post link. Every such move shows its quote with Undo.
+
+A "no" is only flagged (Today and the creator page offer to close it). Every
+move lands in `cm_stage_transitions` with its source and reason.
 
 ## Verifying changes
 
 Run the `verify-creator-tool` skill, or manually:
 
 ```bash
-npx tsc --noEmit && npm run lint && npm run build
-npm run verify:import          # offline migration-fidelity assertions
-npm run verify:add-creator     # link-parser + manual-add assertions (hits the DB, self-cleans)
-npm run verify:auto-stage      # auto-stage rule matrix + live lifecycle (self-cleans)
-npm run verify:outreach-flow   # send-flow rendering/logging assertions (self-cleans)
-npm run verify:editors         # address parser, metric labeling, shipment path (self-cleans)
-npm run verify:email-ingest    # Gmail matcher + idempotent ingest (self-cleans)
-npm run verify:gmail-sync      # Gmail helpers, address discovery heuristics, encrypted account round-trip (self-cleans)
-npm run verify:design          # brand tokens/primitives only — no raw palette classes, nothing under 11px (pure)
-npm run verify:next-step       # every stage has a "Next:" line; stage vocabulary + Help page are complete (pure)
-npm run verify:invariants      # FROZEN rules, read-only against live data — the audit loop (see AGENTS.md)
-npm run gmail:diagnose         # anchor: do roster addresses appear in the mailbox at all?
+npx tsc --noEmit && npm run lint
+npm run preview:db &               # isolated synthetic database on 127.0.0.1:5544
+npm run preview:verify             # every verify script, network mocked (restart preview:db after a new migration)
+npm run preview:build              # production build, isolated
+npm run verify:invariants          # FROZEN rules, read-only against live data — the audit loop (see AGENTS.md)
+npm run gmail:diagnose             # anchor: do roster addresses appear in the mailbox at all?
 ```
+
+One-off data commands take `--dry-run` first: `email:assess`,
+`photos:backfill`, `stages:migrate`, `gmail:resync`.
 
 ## Design system
 

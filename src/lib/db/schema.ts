@@ -163,43 +163,6 @@ export const cmMetricsSourceEnum = pgEnum("cm_metrics_source", [
   "apify",
 ]);
 
-export const cmAlertTypeEnum = pgEnum("cm_alert_type", [
-  "initial_outreach_due",
-  "follow_up_1_due",
-  "follow_up_2_due",
-]);
-
-export const cmAlertStatusEnum = pgEnum("cm_alert_status", [
-  "open",
-  "snoozed",
-  "done",
-]);
-
-export const cmResearchSourceEnum = pgEnum("cm_research_source", [
-  "skill_api",
-  "csv_upload",
-]);
-
-export const cmResearchStatusEnum = pgEnum("cm_research_status", [
-  "running",
-  "completed",
-  "failed",
-]);
-
-/**
- * Lifecycle of a "Full Analysis" request. `completed`/`quickPassAt` on
- * cm_research_requests distinguishes the instant Apify-only pass from this
- * status, which tracks the ACCURATE pass a local machine must run — see the
- * cm_research_requests comment below.
- */
-export const cmResearchRequestStatusEnum = pgEnum("cm_research_request_status", [
-  "queued",
-  "running",
-  "completed",
-  "failed",
-  "cancelled",
-]);
-
 // ─────────────────────────────────────────────────────────────────
 // cm_campaigns
 // ─────────────────────────────────────────────────────────────────
@@ -304,26 +267,6 @@ export const cmCreatorSocials = pgTable(
 // ─────────────────────────────────────────────────────────────────
 // cm_creator_reels — normalizes the 9 flat "Top Reel #N" sheet columns
 // ─────────────────────────────────────────────────────────────────
-
-export const cmCreatorReels = pgTable(
-  "cm_creator_reels",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    creatorId: uuid("creator_id")
-      .notNull()
-      .references(() => cmCreators.id, { onDelete: "cascade" }),
-    rank: integer("rank").notNull(),
-    shortcode: text("shortcode"),
-    url: text("url").notNull(),
-    views: bigint("views", { mode: "number" }),
-    description: text("description"),
-    capturedAt: timestamp("captured_at").defaultNow().notNull(),
-  },
-  (t) => [
-    unique("cm_creator_reels_creator_rank_uq").on(t.creatorId, t.rank),
-    index("cm_creator_reels_creator_idx").on(t.creatorId),
-  ],
-);
 
 // ─────────────────────────────────────────────────────────────────
 // cm_partnerships — one creator x one campaign. The pipeline row.
@@ -552,81 +495,14 @@ export const cmDeliverables = pgTable(
 // cm_alerts — output of the follow-up loop
 // ─────────────────────────────────────────────────────────────────
 
-export const cmAlerts = pgTable(
-  "cm_alerts",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    partnershipId: uuid("partnership_id")
-      .notNull()
-      .references(() => cmPartnerships.id, { onDelete: "cascade" }),
-    type: cmAlertTypeEnum("type").notNull(),
-    dueAt: timestamp("due_at").defaultNow().notNull(),
-    status: cmAlertStatusEnum("status").default("open").notNull(),
-    snoozedUntil: timestamp("snoozed_until"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (t) => [
-    // One open alert of a given type per partnership — the cron is idempotent.
-    unique("cm_alerts_partnership_type_uq").on(t.partnershipId, t.type),
-    index("cm_alerts_status_idx").on(t.status),
-  ],
-);
-
 // ─────────────────────────────────────────────────────────────────
 // cm_message_templates — the outreach copy that currently lives in a
 // spreadsheet header cell
 // ─────────────────────────────────────────────────────────────────
 
-export const cmMessageTemplates = pgTable(
-  "cm_message_templates",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    clientId: uuid("client_id")
-      .notNull()
-      .references(() => clients.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    channel: cmOutreachChannelEnum("channel").default("ig_dm").notNull(),
-    /** Email subject line (placeholders supported); null for DM templates. */
-    subject: text("subject"),
-    /** Supports {{name}}, {{content_descriptor}}, {{reason}} placeholders. */
-    body: text("body").notNull(),
-    isDefault: boolean("is_default").default(false).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (t) => [index("cm_templates_client_idx").on(t.clientId)],
-);
-
 // ─────────────────────────────────────────────────────────────────
 // cm_research_runs — ingestion audit trail
 // ─────────────────────────────────────────────────────────────────
-
-export const cmResearchRuns = pgTable(
-  "cm_research_runs",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    clientId: uuid("client_id")
-      .notNull()
-      .references(() => clients.id, { onDelete: "cascade" }),
-    campaignId: uuid("campaign_id").references(() => cmCampaigns.id, {
-      onDelete: "set null",
-    }),
-    source: cmResearchSourceEnum("source").notNull(),
-    status: cmResearchStatusEnum("status").default("running").notNull(),
-    handleCount: integer("handle_count").default(0).notNull(),
-    createdCount: integer("created_count").default(0).notNull(),
-    updatedCount: integer("updated_count").default(0).notNull(),
-    rawPayload: jsonb("raw_payload"),
-    errors: jsonb("errors"),
-    startedAt: timestamp("started_at").defaultNow().notNull(),
-    completedAt: timestamp("completed_at"),
-  },
-  (t) => [
-    index("cm_research_runs_client_idx").on(t.clientId),
-    index("cm_research_runs_client_started_idx").on(t.clientId, t.startedAt.desc()),
-  ],
-);
 
 // ─────────────────────────────────────────────────────────────────
 // cm_job_runs — heartbeat for every background loop.
@@ -666,37 +542,6 @@ export type CmJobRun = typeof cmJobRuns.$inferSelect;
 // `completed`/`failed` once it has pushed real data via /api/ingest/research
 // (linked back here as researchRunId).
 // ─────────────────────────────────────────────────────────────────
-
-export const cmResearchRequests = pgTable(
-  "cm_research_requests",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    creatorId: uuid("creator_id")
-      .notNull()
-      .references(() => cmCreators.id, { onDelete: "cascade" }),
-    clientId: uuid("client_id")
-      .notNull()
-      .references(() => clients.id, { onDelete: "cascade" }),
-    campaignId: uuid("campaign_id")
-      .notNull()
-      .references(() => cmCampaigns.id, { onDelete: "cascade" }),
-    status: cmResearchRequestStatusEnum("status").default("queued").notNull(),
-    requestedBy: uuid("requested_by").references(() => users.id),
-    requestedAt: timestamp("requested_at").defaultNow().notNull(),
-    /** Stamped when the instant Apify-only pass finishes (usually seconds after requestedAt). */
-    quickPassAt: timestamp("quick_pass_at"),
-    startedAt: timestamp("started_at"),
-    completedAt: timestamp("completed_at"),
-    error: text("error"),
-    researchRunId: uuid("research_run_id").references(() => cmResearchRuns.id, {
-      onDelete: "set null",
-    }),
-  },
-  (t) => [
-    index("cm_research_requests_status_idx").on(t.status),
-    index("cm_research_requests_creator_idx").on(t.creatorId),
-  ],
-);
 
 // ─────────────────────────────────────────────────────────────────
 // cm_gmail_accounts — the app's own Gmail connection for the email sync.
@@ -806,41 +651,6 @@ export const cmCreatorPhotos = pgTable("cm_creator_photos", {
 // a creator (→ cm_creator_emails) or ignores it.
 // ─────────────────────────────────────────────────────────────────
 
-export const cmEmailSuggestionStatusEnum = pgEnum("cm_email_suggestion_status", [
-  "open",
-  "linked",
-  "ignored",
-]);
-
-export const cmEmailSuggestions = pgTable(
-  "cm_email_suggestions",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    email: text("email").notNull(),
-    displayName: text("display_name"),
-    messageCount: integer("message_count").default(0).notNull(),
-    firstSeenAt: timestamp("first_seen_at"),
-    lastSeenAt: timestamp("last_seen_at"),
-    sampleSubject: text("sample_subject"),
-    /** Best-guess creator from name/handle similarity; the operator confirms. */
-    suggestedCreatorId: uuid("suggested_creator_id").references(() => cmCreators.id, {
-      onDelete: "set null",
-    }),
-    linkedCreatorId: uuid("linked_creator_id").references(() => cmCreators.id, {
-      onDelete: "set null",
-    }),
-    status: cmEmailSuggestionStatusEnum("status").default("open").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (t) => [
-    unique("cm_email_suggestions_email_uq").on(t.email),
-    index("cm_email_suggestions_status_idx").on(t.status),
-  ],
-);
-
-export type CmEmailSuggestion = typeof cmEmailSuggestions.$inferSelect;
-
 // ─────────────────────────────────────────────────────────────────
 // cm_client_settings — per-client knobs owned by THIS app.
 //
@@ -868,18 +678,6 @@ export type CmClientSettings = typeof cmClientSettings.$inferSelect;
 // ─────────────────────────────────────────────────────────────────
 // cm_api_keys — lets the creator-research skill push results in
 // ─────────────────────────────────────────────────────────────────
-
-export const cmApiKeys = pgTable("cm_api_keys", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  /** SHA-256 of the raw key. The raw key is shown once at creation. */
-  keyHash: text("key_hash").notNull().unique(),
-  keyPrefix: text("key_prefix").notNull(),
-  lastUsedAt: timestamp("last_used_at"),
-  revokedAt: timestamp("revoked_at"),
-  createdBy: uuid("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
 
 // ─────────────────────────────────────────────────────────────────
 // cm_stage_transitions — makes "when did this become signed" answerable
@@ -922,19 +720,12 @@ export const cmStageTransitions = pgTable(
 export type Client = typeof clients.$inferSelect;
 export type CmCampaign = typeof cmCampaigns.$inferSelect;
 export type CmCreator = typeof cmCreators.$inferSelect;
-export type CmCreatorReel = typeof cmCreatorReels.$inferSelect;
 export type CmCreatorSocial = typeof cmCreatorSocials.$inferSelect;
 export type CmPartnership = typeof cmPartnerships.$inferSelect;
 export type CmOutreachEvent = typeof cmOutreachEvents.$inferSelect;
 export type CmProductRequested = typeof cmProductsRequested.$inferSelect;
 export type CmShipment = typeof cmShipments.$inferSelect;
 export type CmDeliverable = typeof cmDeliverables.$inferSelect;
-export type CmAlert = typeof cmAlerts.$inferSelect;
-export type CmMessageTemplate = typeof cmMessageTemplates.$inferSelect;
-export type CmResearchRun = typeof cmResearchRuns.$inferSelect;
-export type CmResearchRequest = typeof cmResearchRequests.$inferSelect;
-export type CmResearchRequestStatus = (typeof cmResearchRequestStatusEnum.enumValues)[number];
 export type CmStage = (typeof cmStageEnum.enumValues)[number];
-export type CmAlertType = (typeof cmAlertTypeEnum.enumValues)[number];
 
 export type CmStageTransition = typeof cmStageTransitions.$inferSelect;

@@ -8,6 +8,12 @@
  * shared `users` and `sa_clients` tables — those already exist and are owned by
  * other apps. FK constraints that reference them are still applied.
  *
+ * Each migration file runs once: cm_schema_migrations records the ones done
+ * and later runs skip them. That's what makes a DROP safe — without it, every
+ * deploy replayed the original CREATE TABLE and brought a dropped table back.
+ * A database that predates the journal replays everything once (every
+ * statement tolerates "already exists") and is recorded from then on.
+ *
  *   npm run db:apply
  */
 import { readFileSync, readdirSync } from "fs";
@@ -52,11 +58,17 @@ async function main() {
     process.exit(1);
   }
 
+  await db.execute(sql`create table if not exists cm_schema_migrations (name text primary key, applied_at timestamp not null default now())`);
+  const done = new Set(((await db.execute(sql`select name from cm_schema_migrations`)).rows as { name: string }[]).map((r) => r.name));
+
   let applied = 0;
   let skipped = 0;
   let existed = 0;
+  let filesRun = 0;
 
   for (const file of files) {
+    if (done.has(file)) continue;
+    filesRun++;
     const raw = readFileSync(resolve(MIGRATIONS_DIR, file), "utf8");
     const statements = raw
       .split("--> statement-breakpoint")
@@ -76,13 +88,16 @@ async function main() {
           existed++;
           continue;
         }
-        console.error(`\nFailed on statement:\n${stmt.slice(0, 200)}\n`);
+        console.error(`\nFailed on statement in ${file}:\n${stmt.slice(0, 200)}\n`);
         throw err;
       }
     }
+    await db.execute(sql`insert into cm_schema_migrations (name) values (${file}) on conflict (name) do nothing`);
   }
 
-  console.log(`Schema applied: ${applied} new, ${existed} already existed, ${skipped} shared-table creates skipped.`);
+  console.log(
+    `Schema applied: ${filesRun} migration file(s) run (${files.length - filesRun} already recorded) · ${applied} new, ${existed} already existed, ${skipped} shared-table creates skipped.`,
+  );
 }
 
 main()

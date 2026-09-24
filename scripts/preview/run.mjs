@@ -37,7 +37,7 @@ const suite = [
   "verify-add-creator", "verify-auto-stage",
   "verify-editors", "verify-email-ingest", "verify-email-status", "verify-gmail-sync", "verify-email-body",
   "verify-next-step", "verify-today", "verify-photos", "verify-csv-import", "verify-bulk", "verify-design", "verify-creator-workspace",
-  "verify-gmail-health", "verify-gmail-sync-outcome", "verify-gmail-sync-partial", "verify-preview-cookies", "verify-invariants",
+  "verify-gmail-health", "verify-gmail-sync-outcome", "verify-gmail-sync-partial", "verify-preview-cookies", "verify-schema-journal", "verify-invariants",
 ];
 const commands = mode === "db" ? [[resolve(root, "scripts/preview/server.mjs")]]
   : mode === "dev" ? [[next, "dev", "--hostname", "127.0.0.1", "--port", "3003"]]

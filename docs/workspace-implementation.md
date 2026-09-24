@@ -1,5 +1,7 @@
 # Creator workspace implementation — September 17, 2026
 
+> **Superseded (2026-09-23).** Today is now sections of work (`src/lib/today.ts`), the creator page is one scrolling page, and the workspace lanes described below were removed. See README.md for the current model.
+
 This implementation applies the simplified workspace to the existing Next.js application. The separately published Sites concept remains the earlier sample-data mockup.
 
 ## Implemented
