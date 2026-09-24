@@ -18,7 +18,7 @@ import { hasCompleteAddress } from "@/lib/address";
 import { lastManualChangeAt } from "@/lib/email-ingest";
 import { moveStage, describeVideo } from "@/lib/stage-moves";
 import { displayNames } from "@/lib/email-body";
-import { READER_MODEL, anthropic, withModelFallback } from "@/lib/claude";
+import { READER_MODEL, anthropic, serviceUnavailable, withModelFallback } from "@/lib/claude";
 import { NO_FACTS, applyDealFill, cleanFacts, type DealFacts, type EmailDeal } from "@/lib/deal-facts";
 
 /**
@@ -558,9 +558,10 @@ export async function readPendingConversations(opts: { model?: AssessFn } = {}):
   let moved = 0;
   let errors = 0;
   let next = 0;
+  let unavailable = false;
   await Promise.all(
     Array.from({ length: Math.min(CONCURRENCY, ids.length) }, async () => {
-      while (next < ids.length) {
+      while (next < ids.length && !unavailable) {
         const id = ids[next++];
         try {
           const o = await assessPartnership(id, { apply: true, model: opts.model });
@@ -569,6 +570,12 @@ export async function readPendingConversations(opts: { model?: AssessFn } = {}):
         } catch (err) {
           errors++;
           console.error(`[email-status] reading ${id} failed:`, err instanceof Error ? err.message : err);
+          // The service is down (no credit, rate limit): stop, and leave everything
+          // unread so it's all read once it's back — nothing is skipped for good.
+          if (serviceUnavailable(err)) {
+            unavailable = true;
+            continue;
+          }
           // Marked read so one failing conversation can't hold the queue; its next email retries it.
           await db.update(cmPartnerships).set({ emailAssessedAt: new Date() }).where(eq(cmPartnerships.id, id)).catch(() => {});
         }

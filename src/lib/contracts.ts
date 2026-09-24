@@ -3,7 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { and, asc, desc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { clients, cmCampaigns, cmContracts, cmCreators, cmPartnerships, type CmContract } from "@/lib/db/schema";
-import { anthropic, withModelFallback } from "@/lib/claude";
+import { anthropic, serviceUnavailable, withModelFallback } from "@/lib/claude";
 import { DealFactsSchema, applyDealFill, cleanFacts, type DealFacts } from "@/lib/deal-facts";
 
 /**
@@ -202,7 +202,7 @@ export type ReadOutcome =
   | { status: "read"; filled: string[] }
   | { status: "not_contract"; why?: string }
   | { status: "failed"; error: string }
-  | { status: "skipped"; why: string };
+  | { status: "skipped"; why: string; unavailable?: boolean };
 
 /**
  * Read one contract and fill the deal's blanks. Claimed first (pending or
@@ -271,6 +271,15 @@ export async function readContract(id: string, opts: { reader?: ContractReader }
       .where(eq(cmContracts.id, id));
     return { status: "read", filled: r.filled };
   } catch (err) {
+    // The service is down (no credit, rate limit): not this file's fault — back
+    // in the queue with its attempts untouched, read automatically once it's back.
+    if (serviceUnavailable(err)) {
+      await db
+        .update(cmContracts)
+        .set({ readStatus: "pending", readError: "Reading is unavailable right now — it will be read automatically." })
+        .where(eq(cmContracts.id, id));
+      return { status: "skipped", why: "reading is unavailable", unavailable: true };
+    }
     return fail(err instanceof Error ? err.message : String(err));
   }
 }
@@ -310,6 +319,7 @@ export async function readPendingContracts(opts: { reader?: ContractReader; limi
       const o = await readContract(w.id, { reader: opts.reader });
       if (o.status === "read" || o.status === "not_contract") read++;
       if (o.status === "failed") failed++;
+      if (o.status === "skipped" && o.unavailable) break;
     } catch {
       failed++;
     }

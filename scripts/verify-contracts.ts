@@ -139,9 +139,9 @@ async function main() {
     const p3 = await add("__verify_ct_c");
     const broken = await storeUpload(p3, { filename: "c.pdf", bytes: pdf("c") }, null);
     if (!broken.ok) return check("the third upload was stored", false);
-    const failed = await readContract(broken.id, { reader: async () => { throw new Error("overloaded"); } });
+    const failed = await readContract(broken.id, { reader: async () => { throw new Error("the document could not be processed"); } });
     const cf = await contract(broken.id);
-    check("a failed read is recorded, with why", failed.status === "failed" && cf.readStatus === "failed" && cf.attempts === 1 && /overloaded/.test(cf.readError ?? ""));
+    check("a failed read is recorded, with why", failed.status === "failed" && cf.readStatus === "failed" && cf.attempts === 1 && /could not be processed/.test(cf.readError ?? ""));
     const nothing = await readContract(broken.id, { reader: async () => null });
     check("…a reading that comes back empty counts as failed too", nothing.status === "failed" && (await contract(broken.id)).attempts === 2);
     await markForReread(broken.id);
@@ -159,6 +159,15 @@ async function main() {
     if (!throwing.ok) return check("the fifth upload was stored", false);
     // Malformed output that blows up while it's being cleaned — after the claim.
     const exploded = await readContract(throwing.id, { reader: async () => ({ ...FACTS, products: [{ name: 5 as unknown as string, quantity: 1 }] }) });
+    const p6 = await add("__verify_ct_nocredit");
+    const waiting = await storeUpload(p6, { filename: "f.pdf", bytes: pdf("f") }, null);
+    if (!waiting.ok) return check("the sixth upload was stored", false);
+    const noCredit = Object.assign(new Error('400 {"error":{"message":"Your credit balance is too low to access the Anthropic API."}}'), { status: 400 });
+    const down = await readPendingContracts({ reader: async () => { throw noCredit; }, ids: [waiting.id] });
+    const cw = await contract(waiting.id);
+    check("no API credit: the file waits, its attempts untouched, to be read once it's back", down.failed === 0 && cw.readStatus === "pending" && cw.attempts === 0 && /unavailable/.test(cw.readError ?? ""));
+    const back = await readPendingContracts({ reader: good, ids: [waiting.id] });
+    check("…and is read by the next run once it is", back.read === 1 && (await contract(waiting.id)).readStatus === "read");
     check("anything going wrong after the claim is recorded as failed, never left reading", exploded.status === "failed" && (await contract(throwing.id)).readStatus === "failed", JSON.stringify(exploded));
 
     console.log("\n── Email attachments ──");

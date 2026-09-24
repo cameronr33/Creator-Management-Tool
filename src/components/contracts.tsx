@@ -40,6 +40,8 @@ function Status({ c }: { c: ContractRow }) {
   if (c.stale) return <Badge tone="bad">Reading stopped</Badge>;
   switch (c.readStatus) {
     case "pending":
+      if (c.readError) return <Badge tone="muted">Waiting to be read</Badge>;
+    // falls through
     case "reading":
       return (
         <Badge tone="info">
@@ -62,7 +64,7 @@ export function Contracts({ partnershipId, contracts, differences }: { partnersh
   const { pending, run } = useSave();
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
-  const reading = contracts.some((c) => c.downloaded && !c.stale && (c.readStatus === "pending" || c.readStatus === "reading"));
+  const reading = contracts.some((c) => c.downloaded && !c.stale && !c.readError && (c.readStatus === "pending" || c.readStatus === "reading"));
 
   // While a file is being read, look again every few seconds (for two minutes at most).
   useEffect(() => {
@@ -146,7 +148,7 @@ export function Contracts({ partnershipId, contracts, differences }: { partnersh
                 {c.readStatus === "read" && (
                   <div className="text-xs text-text-muted">{c.filled.length ? `Filled in: ${c.filled.join(", ")}` : "Nothing was blank to fill — any differences are shown above."}</div>
                 )}
-                {(c.readStatus === "failed" || c.givenUp || c.readStatus === "not_contract") && c.readError && (
+                {(c.readStatus === "failed" || c.givenUp || c.readStatus === "not_contract" || c.readStatus === "pending") && c.readError && (
                   <div className={c.readStatus === "not_contract" ? "text-xs text-text-muted" : "text-xs text-bad"}>{c.readError}</div>
                 )}
               </div>

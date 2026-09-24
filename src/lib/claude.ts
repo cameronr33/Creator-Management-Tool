@@ -10,6 +10,19 @@ export function anthropic(): Anthropic {
   return _client;
 }
 
+/**
+ * Pure: the model service itself is unavailable — no credit, a bad key,
+ * rate-limited, overloaded — rather than something wrong with this one
+ * conversation or file. Such a failure says nothing about the item, so it
+ * must not use up its attempts or mark it read: it's tried again later.
+ */
+export function serviceUnavailable(err: unknown): boolean {
+  const status = (err as { status?: number } | null)?.status;
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  if (status === 401 || status === 403 || status === 429 || (typeof status === "number" && status >= 500)) return true;
+  return /credit balance|billing|overloaded|rate.?limit/i.test(message);
+}
+
 /** Calls with the configured model, once more with the fallback if this key doesn't have it. */
 export async function withModelFallback<T>(call: (model: string) => Promise<T>): Promise<T> {
   try {

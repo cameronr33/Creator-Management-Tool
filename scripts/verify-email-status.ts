@@ -347,6 +347,13 @@ async function main() {
     // New mail again, for the failing reading below.
     await db.insert(schema.cmOutreachEvents).values({ partnershipId, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", subject: "Re: HELLA", body: "And one more.", occurredAt: new Date(Date.now() + 3000), externalId: "__verify_es_6" });
 
+    // No API credit: every conversation stays unread, to be read once it's back (regression, 2026-09-24).
+    const noCredit: AssessFn = async () => {
+      throw Object.assign(new Error("Your credit balance is too low to access the Anthropic API."), { status: 400 });
+    };
+    const outage = await readPendingConversations({ model: noCredit });
+    check("with the reading service down, conversations stay waiting, never marked read", outage.errors >= 1 && (await partnershipsNeedingRead(500)).includes(partnershipId));
+
     const failing: AssessFn = async () => {
       throw new Error("boom");
     };

@@ -98,8 +98,14 @@ leaves a timeline note naming its source. Contracts never reach the client
 portal.
 
 `npm run contracts:backfill` (dry run first) records PDFs on email stored
-before this existed; `npm run email:assess -- --apply` re-reads every
-conversation, filling blank deals.
+before this existed. Migration 0018 marks every conversation with email
+unread once, so the deploy that ships this re-reads them all and fills blank
+deals (`npm run email:assess -- --apply` does the same by hand).
+
+When the model service is down — no API credit, rate limits, overload —
+nothing is skipped for good: conversations stay unread and contracts keep
+their attempts, and both are read once it's back (`serviceUnavailable` in
+`src/lib/claude.ts`).
 
 ## Clients in the tool
 
