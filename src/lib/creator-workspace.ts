@@ -1,17 +1,14 @@
+/** The sections of the (single, scrolling) creator page, in page order. */
 export const CREATOR_SECTIONS = [
   { value: "overview", label: "Overview" },
-  { value: "profile", label: "Profile & research" },
   { value: "conversation", label: "Conversation" },
-  { value: "agreement", label: "Agreement" },
+  { value: "agreement", label: "Deal" },
   { value: "shipping", label: "Shipping" },
   { value: "content", label: "Content" },
+  { value: "profile", label: "Profile" },
 ] as const;
 
 export type CreatorSection = (typeof CREATOR_SECTIONS)[number]["value"];
-
-export function creatorSection(value: string | string[] | undefined): CreatorSection {
-  return CREATOR_SECTIONS.find((section) => section.value === value)?.value ?? "overview";
-}
 
 export function safeCreatorReturnTo(value: string | string[] | undefined): string {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\") || /[\u0000-\u001f]/.test(value)) return "/creators";
@@ -24,10 +21,10 @@ export function safeCreatorReturnTo(value: string | string[] | undefined): strin
   }
 }
 
+/** A link to one section of a creator's page (it's one page: the section is an anchor). */
 export function creatorSectionHref(id: string, section: CreatorSection, returnTo?: string) {
-  const query = new URLSearchParams({ tab: section });
-  if (returnTo) query.set("returnTo", safeCreatorReturnTo(returnTo));
-  return `/creators/${encodeURIComponent(id)}?${query}#${section}`;
+  const query = returnTo ? `?${new URLSearchParams({ returnTo: safeCreatorReturnTo(returnTo) })}` : "";
+  return `/creators/${encodeURIComponent(id)}${query}${section === "overview" ? "" : `#${section}`}`;
 }
 
 /** A delivered parcel cannot hide another parcel that still needs attention. */

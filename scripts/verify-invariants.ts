@@ -67,6 +67,16 @@ async function main() {
   );
   check("no partnership uses a retired stage", retired === 0, `${retired} rows — run npm run stages:migrate`);
 
+  // Deleting from a campaign removes a creator left in none (campaigns.ts removePartnerships);
+  // a creator in no campaign would be invisible everywhere yet still have their email searched.
+  const orphans = await count(
+    db
+      .select({ n: N })
+      .from(schema.cmCreators)
+      .where(sql`not exists (select 1 from ${schema.cmPartnerships} p where p.creator_id = ${schema.cmCreators.id})`),
+  );
+  check("every creator is in at least one campaign", orphans === 0, `${orphans} creator(s) in no campaign`);
+
   console.log("\n── Metric provenance: estimates are never dressed as authoritative ──");
   const viewsNoSource = await count(
     db

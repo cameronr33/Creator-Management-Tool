@@ -2,16 +2,9 @@ import { Mail } from "lucide-react";
 import { Badge, Callout } from "@/components/ui";
 import { UndoMoveButton, CloseAsDeclinedButton } from "@/components/email-status";
 import { shortDate } from "@/lib/format";
+import { whoseTurnText, type WhoseTurn } from "@/lib/activity";
 import { isTerminal, stageLabel } from "@/lib/stages";
 import type { CmStage, CmStageTransition } from "@/lib/db/schema";
-
-/** Whose turn it is, as people say it. */
-export function whoseTurnLabel(t: string | null | undefined): { label: string; tone: "warn" | "muted" | "info" } | null {
-  if (t === "us") return { label: "Your turn", tone: "warn" };
-  if (t === "them") return { label: "Waiting on them", tone: "muted" };
-  if (t === "none") return { label: "Nothing pending", tone: "info" };
-  return null;
-}
 
 /**
  * Under a creator's name: what their latest email says, whose turn it is,
@@ -35,7 +28,7 @@ export function EmailStatusLines({
   soundsLikeNo: boolean;
   move: CmStageTransition | null;
 }) {
-  const turn = whoseTurnLabel(whoseTurn);
+  const turn = whoseTurnText(whoseTurn === "us" || whoseTurn === "them" || whoseTurn === "none" ? (whoseTurn as WhoseTurn) : null);
   if (!summary && !move && !soundsLikeNo) return null;
   return (
     <div className="mt-2 space-y-2 text-sm">

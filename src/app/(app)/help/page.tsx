@@ -2,16 +2,26 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { LayoutDashboard, Kanban, Users, Settings, ArrowRight } from "lucide-react";
 import { PageHeader, Card, CardHeader, StagePill, Badge } from "@/components/ui";
-import { stagesByGroup, AUTO_TRIGGER_LABELS, stageLabel, STAGES } from "@/lib/stages";
+import { stagesByGroup, AUTO_TRIGGER_LABELS, stageLabel, STAGES, ACTIVE_STAGES, TERMINAL_STAGES } from "@/lib/stages";
 import { AUTO_STAGE_RULES, type AutoStageTrigger } from "@/lib/auto-stage";
+import { EMAIL_STAGE_RULES } from "@/lib/email-status";
+import type { CmStage } from "@/lib/db/schema";
+
+/** What an email-driven move needs besides the creator's own words, in plain English. */
+const EMAIL_REQUIRES: Record<string, string> = {
+  nothing: "",
+  address: " — and there's an address on file, or they wrote one",
+  shipped_or_receipt: " — the shipment was marked shipped, or they say it arrived",
+  post_link: " — and they sent the link to the post",
+};
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 
 export const metadata: Metadata = { title: "How it works" };
 
 /**
  * The onboarding page. Everything here is generated from the same tables
- * the app runs on (STAGES, AUTO_STAGE_RULES, DEFAULT_THRESHOLDS), so the
- * explanation can't drift from the behaviour.
+ * the app runs on (STAGES, AUTO_STAGE_RULES, EMAIL_STAGE_RULES,
+ * DEFAULT_THRESHOLDS), so the explanation can't drift from the behaviour.
  */
 export default function HelpPage() {
   const triggers = Object.keys(AUTO_STAGE_RULES) as AutoStageTrigger[];
@@ -28,6 +38,43 @@ export default function HelpPage() {
         help="Everything a new teammate needs on day one: the daily loop, what each stage means, what moves by itself, and where things live."
       />
       <div className="mx-auto max-w-3xl space-y-6 p-6">
+        <Card id="a-to-z" className="p-5">
+          <CardHeader
+            title="From A to Z"
+            description="Every creator goes down this list. Each step says what you do there; most steps move on by themselves once you've done it."
+          />
+          <ol className="mt-4 space-y-3">
+            <li className="flex gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent">0</span>
+              <div className="text-sm">
+                <div className="font-medium text-text">Add creators</div>
+                <p className="text-text-muted">
+                  <Link href="/import" className="underline hover:text-accent">Import a CSV</Link> with a Name column and a Campaign column (campaigns are created for you), or{" "}
+                  <Link href="/creators/new" className="underline hover:text-accent">add one</Link> by pasting their profile link. They start in {stageLabel("shortlisted")}.
+                </p>
+              </div>
+            </li>
+            {ACTIVE_STAGES.map((s, i) => (
+              <li key={s.value} className="flex gap-3">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent">{i + 1}</span>
+                <div className="text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StagePill stage={s.value} />
+                    <span className="text-text-muted">{s.hint}</span>
+                  </div>
+                  <p className="mt-0.5 text-text">{s.action}</p>
+                </div>
+              </li>
+            ))}
+            <li className="flex gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-text-muted">×</span>
+              <div className="text-sm text-text-muted">
+                At any point a deal can close: {TERMINAL_STAGES.map((s) => s.label).join(", ")}. A person always closes it — the app never does.
+              </div>
+            </li>
+          </ol>
+        </Card>
+
         <Card id="daily-loop" className="p-5">
           <CardHeader
             title="The daily loop"
@@ -39,21 +86,21 @@ export default function HelpPage() {
               icon={<LayoutDashboard size={16} />}
               href="/"
               title="Today — what needs you?"
-              body="Who wrote back, who is due a follow-up, who still needs a first message, and what is waiting to ship. Every row has its next action built in, so most days start and end here."
+              body="Who wrote back, who is due a follow-up, who still needs a first message, whose address you need, and what is ready to ship. Every row shows the latest message, a stage menu, and the button for the next step, so most days start and end here."
             />
             <Step
               n={2}
               icon={<Kanban size={16} />}
               href="/pipeline"
               title="Pipeline — where every deal stands"
-              body="One column per stage. Drag a card to move it, or use the card's Move menu. Closing a deal asks who ended it and why, so the reason is never lost."
+              body="One column per stage. Each card shows the campaign, the latest message and whose turn it is. Change the stage from the menu on the card, or drag it. Closing a deal asks who ended it and why, so the reason is never lost."
             />
             <Step
               n={3}
               icon={<Users size={16} />}
               href="/creators"
               title="Creators — the list you manage"
-              body="Add creators one at a time or import a CSV, search and filter, and open a creator for their conversation, agreement, shipping and posted videos."
+              body="Everyone you're tracking, with photos. Tick creators to move them to a stage or another campaign, fetch their photos and followers, or delete them. Open one for their conversation, deal, shipping and videos."
             />
             <Step
               n={4}
@@ -102,9 +149,10 @@ export default function HelpPage() {
         <Card id="automatic" className="p-5">
           <CardHeader
             title="What moves by itself"
-            description="You never have to babysit the stage dropdown after doing real work. These are the only automatic moves, and they never go backwards."
+            description="You never have to babysit the stage menu after doing real work. These are the only automatic moves, and they never go backwards."
           />
-          <ul className="mt-4 space-y-2">
+          <h3 className="mt-4 text-xs font-semibold uppercase tracking-wider text-text-faint">When you do something</h3>
+          <ul className="mt-2 space-y-2">
             {triggers.map((t) => {
               const rule = AUTO_STAGE_RULES[t];
               return (
@@ -121,10 +169,27 @@ export default function HelpPage() {
               );
             })}
           </ul>
+          <h3 className="mt-5 text-xs font-semibold uppercase tracking-wider text-text-faint">When their email says so</h3>
+          <ul className="mt-2 space-y-2">
+            {(Object.entries(EMAIL_STAGE_RULES) as [CmStage, { from: CmStage[]; requires: string }][]).map(([to, rule]) => (
+              <li key={to} className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
+                <span className="flex flex-wrap items-center gap-1">
+                  {rule.from.map((f) => (
+                    <StagePill key={f} stage={f} />
+                  ))}
+                </span>
+                <ArrowRight size={14} className="shrink-0 text-text-faint" />
+                <StagePill stage={to} />
+                <span>when the creator&apos;s own latest email says so{EMAIL_REQUIRES[rule.requires]}</span>
+              </li>
+            ))}
+          </ul>
           <p className="mt-4 text-xs leading-relaxed text-text-faint">
-            These rules never decide {stageLabel("awaiting_address")} and never close a deal — agreeing and closing
-            are judgement calls you make on the creator page or the board. A creator closed as{" "}
-            {stageLabel("no_response")} is the one exception: their own reply reopens them.
+            A move from email always shows the sentence it came from, on the creator&apos;s page, with Undo. It only uses
+            their own message, never one from us or someone cc&apos;d, and never anything older than your last change to
+            the stage. Nothing automatic ever closes a deal: if an email sounds like a no, it&apos;s flagged for you to
+            close. A creator closed as {stageLabel("no_response")} is the one exception the other way — their own reply
+            reopens them.
           </p>
         </Card>
 

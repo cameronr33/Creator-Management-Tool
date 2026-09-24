@@ -25,8 +25,6 @@
     "verify:gmail-sync": "tsx --env-file=.env.local scripts/verify-gmail-sync.ts",
     "verify:email-body": "tsx scripts/verify-email-body.ts",
     "verify:next-step": "tsx scripts/verify-next-step.ts",
-    "verify:workspace": "tsx scripts/verify-workspace.ts",
-    "verify:workspace-db": "node scripts/preview/run.mjs verify scripts/verify-workspace-db.ts",
     "verify:creator-workspace": "tsx scripts/verify-creator-workspace.ts",
     "verify:gmail-health": "tsx scripts/verify-gmail-health.ts",
     "verify:gmail-sync-outcome": "tsx scripts/verify-gmail-sync-outcome.ts",

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CREATOR_SECTIONS, creatorSection, creatorSectionHref, safeCreatorReturnTo, shipmentAttentionStatus, shipmentSummary, timelineSource } from "../src/lib/creator-workspace";
+import { CREATOR_SECTIONS, creatorSectionHref, safeCreatorReturnTo, shipmentAttentionStatus, shipmentSummary, timelineSource } from "../src/lib/creator-workspace";
 
 const detailPage = readFileSync(join(__dirname, "../src/app/(app)/creators/[id]/page.tsx"), "utf8");
 
@@ -21,22 +21,22 @@ assert.equal(shipmentSummary(mixed), "1 ready · 1 delivered", "The summary must
 assert.equal(shipmentAttentionStatus([{ status: "shipped" }, { status: "returned" }]), "returned");
 assert.equal(shipmentAttentionStatus([]), null);
 assert.equal(shipmentSummary([]), "No shipment recorded");
-assert.equal(creatorSection("invalid"), "overview");
-assert.equal(creatorSection(["shipping", "profile"]), "overview");
 assert.equal(safeCreatorReturnTo("/?view=waiting"), "/?view=waiting");
 assert.equal(safeCreatorReturnTo("/creators?q=Maya&campaign=spring"), "/creators?q=Maya&campaign=spring");
 for (const unsafe of ["https://attacker.test/", "//attacker.test/", "/\\attacker.test/", "/settings", "/creators#other", "javascript:alert(1)", "/creators\n", ["/", "/settings"]]) {
   assert.equal(safeCreatorReturnTo(unsafe), "/creators", "Return link must stay within the Today or creator-list view");
 }
 assert.equal(new URL(creatorSectionHref("record", "shipping", "/creators?q=Maya"), "https://example.test").searchParams.get("returnTo"), "/creators?q=Maya", "Section changes must preserve list context");
+// The creator page is one scrolling page (2026-09-23): a section is an anchor, not a ?tab=.
 for (const section of CREATOR_SECTIONS) {
-  assert.equal(creatorSection(section.value), section.value);
   const url = new URL(creatorSectionHref("record", section.value), "https://example.test");
-  assert.equal(url.searchParams.get("tab"), section.value);
-  assert.equal(url.hash, `#${section.value}`);
+  assert.equal(url.searchParams.get("tab"), null);
+  assert.equal(url.hash, section.value === "overview" ? "" : `#${section.value}`);
+  if (section.value !== "overview") assert.ok(detailPage.includes(`id="${section.value}"`), `The page must have a #${section.value} section to land on`);
 }
+assert.equal(safeCreatorReturnTo("/pipeline"), "/pipeline", "The Pipeline is a place to come back to");
 assert.equal(timelineSource({ isMigrated: true, channel: "email", externalId: "legacy" }), "Imported from sheet");
 assert.equal(timelineSource({ isMigrated: false, channel: "email", externalId: "message" }), "Synced email");
 assert.equal(timelineSource({ isMigrated: false, channel: "email", externalId: null }), "Manually logged");
 
-console.log("PASS creator workspace regressions: multiple shipments, client context, section URLs, and evidence labels");
+console.log("PASS creator page regressions: multiple shipments, client context, section anchors, and evidence labels");
