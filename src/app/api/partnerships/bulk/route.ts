@@ -3,6 +3,9 @@ import { inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cmPartnerships } from "@/lib/db/schema";
 import { refreshFromInstagram } from "@/lib/instagram";
+import { approve } from "@/lib/approvals";
+import { resolveClient } from "@/lib/queries";
+import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { z } from "zod";
 import {
   requireAgency,
@@ -25,6 +28,7 @@ const schema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("set_campaign"), ids: z.array(z.string()).min(1).max(500), campaignId: z.string() }),
   z.object({ action: z.literal("refresh_instagram"), ids: z.array(z.string()).min(1).max(500) }),
+  z.object({ action: z.literal("approve"), ids: z.array(z.string()).min(1).max(500) }),
 ]);
 
 /**
@@ -42,6 +46,13 @@ export async function POST(req: NextRequest) {
 
   if (d.action === "delete") {
     const r = await removePartnerships(d.ids);
+    return NextResponse.json({ ok: true, ...r });
+  }
+  if (d.action === "approve") {
+    // Approving for outreach on the client's behalf, under the teammate's name.
+    const client = await resolveClient(await getSelectedClientSlug());
+    if (!client) return badRequest("Pick a client in the sidebar first");
+    const r = await approve(client.id, d.ids, { name: session.user.name ?? "A teammate", kind: "agency", userId: session.user.id });
     return NextResponse.json({ ok: true, ...r });
   }
   if (d.action === "refresh_instagram") {

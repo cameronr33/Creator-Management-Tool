@@ -46,6 +46,7 @@ export const getClients = cache(async (): Promise<ActiveClient[]> => {
 export interface ClientWithSettings extends ActiveClient {
   hidden: boolean;
   followUpThresholds: Partial<FollowUpThresholds> | null;
+  requiresApproval: boolean;
 }
 
 /** Every active client in the shared roster with this app's per-client knobs. */
@@ -57,6 +58,7 @@ export async function getClientsWithSettings(): Promise<ClientWithSettings[]> {
       slug: clients.slug,
       hidden: cmClientSettings.hidden,
       followUpThresholds: cmClientSettings.followUpThresholds,
+      requiresApproval: cmClientSettings.requiresApproval,
     })
     .from(clients)
     .leftJoin(cmClientSettings, eq(cmClientSettings.clientId, clients.id))
@@ -68,6 +70,7 @@ export async function getClientsWithSettings(): Promise<ClientWithSettings[]> {
     slug: r.slug,
     hidden: r.hidden ?? false,
     followUpThresholds: (r.followUpThresholds as Partial<FollowUpThresholds> | null) ?? null,
+    requiresApproval: r.requiresApproval ?? false,
   }));
 }
 
@@ -140,6 +143,9 @@ export interface CreatorRow {
   emailWhoseTurn: string | null;
   emailSoundsLikeNo: boolean;
   replyHandledAt: Date | null;
+  /** The client's say before outreach: pending / approved / passed, or null when not needed. */
+  clientApproval: "pending" | "approved" | "passed" | null;
+  approvalByName: string | null;
   /** The last real message and whose move it is — every card and row shows this. */
   activity: Activity;
   /** The app's URL for their stored profile picture, or null. */
@@ -187,6 +193,8 @@ export async function getCreatorRows(
       emailWhoseTurn: cmPartnerships.emailWhoseTurn,
       emailSoundsLikeNo: cmPartnerships.emailSoundsLikeNo,
       replyHandledAt: cmPartnerships.replyHandledAt,
+      clientApproval: cmPartnerships.clientApproval,
+      approvalByName: cmPartnerships.approvalByName,
       photoFetchedAt: cmCreatorPhotos.fetchedAt,
     })
     .from(cmPartnerships)

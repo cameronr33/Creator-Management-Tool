@@ -191,6 +191,8 @@ export default async function SettingsPage({
           />
           <div className="mt-3">
             <ClientTeam
+              clientId={client.id}
+              requiresApproval={!!currentSettings?.requiresApproval}
               clientName={client.name}
               people={clientPeople.map((p) => ({
                 ...p,

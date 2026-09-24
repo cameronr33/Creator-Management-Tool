@@ -9,6 +9,7 @@ import { QuickStage } from "@/components/quick-stage";
 import { MessagedButton } from "@/components/reply-button";
 import { CloseAsDeclinedButton, NoReplyNeededButton } from "@/components/email-status";
 import { VideoLinkPrompt } from "@/components/partnership-actions";
+import { ApprovalButtons } from "@/components/approval-buttons";
 import { TODAY_SECTIONS, type TodaySection } from "@/lib/today";
 import type { TodayRow } from "@/lib/today-data";
 import { whoseTurnText } from "@/lib/activity";
@@ -141,6 +142,8 @@ function NextAction({ row: r }: { row: TodayRow }) {
           )}
         </>
       );
+    case "waiting_approval":
+      return <ApprovalButtons partnershipId={r.partnershipId} name={r.name} who="agency" />;
     case "follow_up":
     case "to_contact":
       return <MessagedButton partnershipId={r.partnershipId} name={r.name} hasOutbound={r.hasOutbound} variant="primary" />;

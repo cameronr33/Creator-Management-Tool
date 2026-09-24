@@ -33,6 +33,7 @@ export default async function PipelinePage() {
     latestAt: r.activity.at?.toISOString() ?? null,
     whoseTurn: r.activity.whoseTurn,
     photoUrl: r.photoUrl,
+    clientApproval: r.clientApproval,
   }));
 
   return (

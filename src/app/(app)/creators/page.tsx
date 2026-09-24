@@ -109,6 +109,7 @@ export default async function CreatorsPage({
               lastOutboundAt: r.lastOutboundAt ? r.lastOutboundAt.toISOString() : null,
               repliedAt: r.repliedAt ? r.repliedAt.toISOString() : null,
               photoUrl: r.photoUrl,
+              clientApproval: r.clientApproval,
             }))}
             campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))}
             scopeName={campaign?.name ?? null}

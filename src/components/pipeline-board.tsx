@@ -27,6 +27,7 @@ export interface BoardCard {
   latestAt: string | null;
   whoseTurn: WhoseTurn | null;
   photoUrl: string | null;
+  clientApproval: "pending" | "approved" | "passed" | null;
 }
 
 // Active stages get their own column; the three terminal stages collapse into
@@ -221,6 +222,7 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1">
                     <Badge tone="info" title="Campaign">{c.campaignName}</Badge>
+                    {c.clientApproval === "pending" && col.key !== "closed" && <Badge tone="warn" title="The client decides before anyone reaches out">Awaiting approval</Badge>}
                     {col.key === "closed" && <StagePill stage={c.stage} />}
                     {(() => {
                       const t = whoseTurnText(c.whoseTurn);

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Copy, Eye, KeyRound, Trash2, UserPlus, UserX } from "lucide-react";
-import { Badge, Button, Callout, Field, Input } from "@/components/ui";
+import { Badge, Button, Callout, Checkbox, Field, Input } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
@@ -25,7 +25,17 @@ export interface ClientPerson {
  * us). "Invite to log in" makes a one-time link you send them yourself; they
  * choose their own password and see only this brand's portal.
  */
-export function ClientTeam({ clientName, people }: { clientName: string; people: ClientPerson[] }) {
+export function ClientTeam({
+  clientId,
+  clientName,
+  people,
+  requiresApproval,
+}: {
+  clientId: string;
+  clientName: string;
+  people: ClientPerson[];
+  requiresApproval: boolean;
+}) {
   const { pending, run } = useSave();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -46,6 +56,22 @@ export function ClientTeam({ clientName, people }: { clientName: string; people:
 
   return (
     <div className="space-y-4">
+      <label className="flex items-center gap-2 text-sm font-medium text-text">
+        <Checkbox
+          checked={requiresApproval}
+          disabled={pending}
+          onChange={(on) =>
+            run(() => api(`/api/clients/${clientId}/settings`, { requiresApproval: on }, "PATCH"), {
+              success: on ? `New creators now wait for ${clientName}'s approval` : "New creators go straight to To contact",
+            })
+          }
+          label={`${clientName} approves each creator before anyone reaches out`}
+        />
+        {clientName} approves each creator before anyone reaches out
+      </label>
+      <p className="-mt-2 text-xs text-text-muted">
+        New creators then wait in &ldquo;Waiting on client approval&rdquo; on Today. {clientName} approves or passes in their portal, or you can for them. Creators already here aren&apos;t affected.
+      </p>
       {people.length === 0 ? (
         <p className="text-sm text-text-muted">No one from {clientName} yet.</p>
       ) : (

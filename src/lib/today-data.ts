@@ -26,6 +26,8 @@ export interface TodayRow {
   suggestedAddress: string | null;
   shipmentId: string | null;
   photoUrl: string | null;
+  clientApproval: "pending" | "approved" | "passed" | null;
+  approvalByName: string | null;
 }
 
 export interface TodayData {
@@ -75,6 +77,7 @@ export async function getTodayData(clientId: string, campaignId?: string): Promi
       followUpCount: o.followUpCount,
       datesAreMigrated: o.datesAreMigrated,
       thresholds,
+      clientApproval: c.clientApproval,
     });
     if (!placed) continue;
     const d = detailById.get(c.partnershipId);
@@ -95,6 +98,8 @@ export async function getTodayData(clientId: string, campaignId?: string): Promi
       suggestedAddress: d && !hasCompleteAddress(d) ? d.suggestedAddress : null,
       shipmentId: latestShipment.get(c.partnershipId) ?? null,
       photoUrl: c.photoUrl,
+      clientApproval: c.clientApproval,
+      approvalByName: c.approvalByName,
     });
   }
   return { rows, stageCounts };

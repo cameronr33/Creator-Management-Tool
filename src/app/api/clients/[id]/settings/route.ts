@@ -22,6 +22,8 @@ const schema = z.object({
   hidden: z.boolean().optional(),
   /** null clears overrides back to DEFAULT_THRESHOLDS. */
   followUpThresholds: thresholdsSchema.nullable().optional(),
+  /** New creators wait for the client's approval before outreach. */
+  requiresApproval: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -40,6 +42,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (d.hidden !== undefined) set.hidden = d.hidden;
   if (d.followUpThresholds !== undefined) set.followUpThresholds = d.followUpThresholds;
+  if (d.requiresApproval !== undefined) set.requiresApproval = d.requiresApproval;
 
   await db
     .insert(cmClientSettings)
@@ -47,6 +50,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       clientId: id,
       hidden: d.hidden ?? false,
       followUpThresholds: d.followUpThresholds ?? null,
+      requiresApproval: d.requiresApproval ?? false,
     })
     .onConflictDoUpdate({ target: cmClientSettings.clientId, set });
 

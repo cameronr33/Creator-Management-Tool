@@ -39,6 +39,7 @@ import { ReplyButton, MessagedButton } from "@/components/reply-button";
 import { RereadEmailsButton } from "@/components/email-status";
 import { EmailStatusLines } from "@/components/email-status-lines";
 import { CampaignPicker, DangerZone } from "@/components/creator-record-actions";
+import { ApprovalButtons } from "@/components/approval-buttons";
 import { undoableMoves } from "@/lib/email-status";
 import { getCreatorEmails } from "@/lib/creator-emails";
 import { compactNumber, fullNumber, money, shortDate, relativeDays } from "@/lib/format";
@@ -217,6 +218,19 @@ export default async function CreatorDetailPage({
                 soundsLikeNo={partnership.emailSoundsLikeNo}
                 move={undoable.get(partnership.id) ?? null}
               />
+              {partnership.clientApproval === "pending" ? (
+                <div className="mt-2">
+                  <Callout tone="warn" title={`Waiting on ${client?.name ?? "the client"}'s approval`} actions={<ApprovalButtons partnershipId={partnership.id} name={creator.name} who="agency" />}>
+                    Nobody reaches out until they approve — in their portal, or you for them.
+                  </Callout>
+                </div>
+              ) : partnership.clientApproval ? (
+                <p className="mt-2 text-xs text-text-muted">
+                  {partnership.clientApproval === "approved" ? "Approved for outreach" : "Passed on"} by {partnership.approvalByName ?? "someone"}
+                  {partnership.approvalAt ? ` on ${shortDate(partnership.approvalAt)}` : ""}
+                  {partnership.approvalNote ? <>: &ldquo;{partnership.approvalNote}&rdquo;</> : null}
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="w-full space-y-3 sm:w-72">

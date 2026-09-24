@@ -43,6 +43,8 @@ check("every section has a title and an explanation", TODAY_SECTIONS.every((s) =
 check("posted and closed deals aren't on Today", (["posted", "passed", "declined", "no_response"] as CmStage[]).every((s) => place({ stage: s }) === null));
 check("every other current stage has a place", ACTIVE_STAGES.filter((s) => s.value !== "posted").every((s) => place({ stage: s.value }) !== null));
 check("To contact → To contact", place({ stage: "shortlisted", whoseTurn: null })?.section === "to_contact");
+check("To contact but waiting on the client → Waiting on client approval", place({ stage: "shortlisted", whoseTurn: null, clientApproval: "pending" })?.section === "waiting_approval");
+check("…approved by the client → To contact", place({ stage: "shortlisted", whoseTurn: null, clientApproval: "approved" })?.section === "to_contact");
 check("they wrote last → Your turn", place({ stage: "in_conversation", whoseTurn: "us" })?.section === "your_turn");
 check("Talking and waiting on them → Waiting", place({ stage: "in_conversation" })?.section === "waiting");
 check("Contacted, not yet due → Waiting", place({})?.section === "waiting");

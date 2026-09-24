@@ -29,7 +29,8 @@ import type { cmExitReasonEnum } from "@/lib/db/schema";
  */
 
 export type ExitReason = (typeof cmExitReasonEnum.enumValues)[number];
-export type StageMoveSource = "manual" | "rule" | "email" | "migration";
+/** "client": a person at the client, through the portal (their id and name are in meta). */
+export type StageMoveSource = "manual" | "rule" | "email" | "migration" | "client";
 
 export interface StageMoveInput {
   partnershipId: string;

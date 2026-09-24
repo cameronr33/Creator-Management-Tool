@@ -18,6 +18,7 @@ export type TodaySection =
   | "your_turn"
   | "follow_up"
   | "to_contact"
+  | "waiting_approval"
   | "get_address"
   | "ready_to_ship"
   | "shipped"
@@ -28,6 +29,7 @@ export const TODAY_SECTIONS: { key: TodaySection; title: string; hint: string }[
   { key: "your_turn", title: "Your turn", hint: "They wrote last. Reply, or mark it as needing no reply." },
   { key: "follow_up", title: "Follow up", hint: "We wrote and they haven't answered in a while. Nudge them, then click I messaged them for a DM (emails are tracked by themselves)." },
   { key: "to_contact", title: "To contact", hint: stageAction("shortlisted") },
+  { key: "waiting_approval", title: "Waiting on client approval", hint: "The client decides on these before anyone reaches out. Approve or pass for them if they've told you." },
   { key: "get_address", title: "Agreed — get the address", hint: stageAction("awaiting_address") },
   { key: "ready_to_ship", title: "Ready to ship", hint: stageAction("fulfilling") },
   { key: "shipped", title: "Shipped — on the way", hint: stageAction("shipped") },
@@ -42,6 +44,8 @@ export interface TodayFacts {
   followUpCount: number;
   datesAreMigrated: boolean;
   thresholds: FollowUpThresholds;
+  /** The client's say before outreach, when they give one. */
+  clientApproval?: "pending" | "approved" | "passed" | null;
   now?: Date;
 }
 
@@ -67,7 +71,7 @@ export function placeOnToday(f: TodayFacts): TodayPlacement | null {
       return { section: "get_address", note: null };
   }
   if (f.whoseTurn === "us") return { section: "your_turn", note: null };
-  if (stage === "shortlisted") return { section: "to_contact", note: null };
+  if (stage === "shortlisted") return f.clientApproval === "pending" ? { section: "waiting_approval", note: null } : { section: "to_contact", note: null };
   if (stage === "contacted") {
     if (f.datesAreMigrated) return { section: "waiting", note: "Imported from the sheet — when we last wrote is unknown." };
     if (!f.lastOutboundAt) return { section: "waiting", note: null };

@@ -2,6 +2,7 @@ import { and, eq, like, sql } from "drizzle-orm";
 import { addCreatorEmail } from "@/lib/creator-emails";
 import { db } from "@/lib/db";
 import { ensureCampaign } from "@/lib/campaigns";
+import { approvalRequired } from "@/lib/approvals";
 import {
   cmCreators,
   cmCreatorSocials,
@@ -172,9 +173,11 @@ export async function createCreatorWithPartnership(
   }
 
   const stage = input.stage ?? "shortlisted";
+  // A client that approves creators first gets new ones as "waiting for approval".
+  const clientApproval = stage === "shortlisted" && (await approvalRequired(input.clientId)) ? ("pending" as const) : null;
   const [partnership] = await db
     .insert(cmPartnerships)
-    .values({ creatorId, campaignId: input.campaignId, stage, notes: input.notes ?? null })
+    .values({ creatorId, campaignId: input.campaignId, stage, notes: input.notes ?? null, clientApproval })
     .returning({ id: cmPartnerships.id });
 
   await db.insert(cmStageTransitions).values({

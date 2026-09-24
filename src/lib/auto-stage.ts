@@ -62,7 +62,8 @@ export async function applyAutoStage(
   partnershipId: string,
   trigger: AutoStageTrigger,
   userId?: string,
-  opts: { evidenceEventId?: string | null } = {},
+  /** `meta`: who set it off when it wasn't a teammate (a person at the client, through the portal). */
+  opts: { evidenceEventId?: string | null; meta?: Record<string, unknown> } = {},
 ): Promise<AutoStageResult | null> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const [row] = await db
@@ -83,7 +84,7 @@ export async function applyAutoStage(
       expectFrom: row.stage,
       reason: trigger,
       evidenceEventId: opts.evidenceEventId ?? null,
-      meta: { trigger },
+      meta: { trigger, ...(opts.meta ?? {}) },
     });
     if (r.status === "moved") return { from: r.from, to: r.to };
     if (r.status !== "stale") return null;

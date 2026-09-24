@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ExternalLink, ImageDown, Mail, Trash2, X } from "lucide-react";
+import { Check, ExternalLink, ImageDown, Mail, Trash2, X } from "lucide-react";
 import { Avatar, Badge, Button, Checkbox, Field, Select, StagePill } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
@@ -24,6 +24,7 @@ export interface CreatorsTableRow {
   lastOutboundAt: string | null;
   repliedAt: string | null;
   photoUrl: string | null;
+  clientApproval: "pending" | "approved" | "passed" | null;
 }
 
 /**
@@ -125,6 +126,19 @@ export function CreatorsTable({
               </Select>
             </Field>
           )}
+          {rows.some((r) => chosen.includes(r.partnershipId) && r.clientApproval === "pending") && (
+            <div className="self-center">
+              <Button
+                size="sm"
+                icon={<Check size={13} />}
+                pending={pending}
+                title="Approve for outreach on the client's behalf — recorded under your name"
+                onClick={() => bulk({ action: "approve" }, (d) => `${d.approved ?? 0} approved for outreach`)}
+              >
+                Approve for outreach
+              </Button>
+            </div>
+          )}
           <div className="self-center">
             <Button
               size="sm"
@@ -209,7 +223,10 @@ export function CreatorsTable({
                   </td>
                   {!scopeName && <td className="px-4 py-2.5 text-text-muted">{r.campaignName}</td>}
                   <td className="px-4 py-2.5">
-                    <StagePill stage={r.stage} />
+                    <div className="flex flex-wrap items-center gap-1">
+                      <StagePill stage={r.stage} />
+                      {r.clientApproval === "pending" && <Badge tone="warn">Awaiting approval</Badge>}
+                    </div>
                   </td>
                   <td className="px-4 py-2.5 text-text-muted">
                     <div className="flex flex-wrap items-center gap-1.5">
