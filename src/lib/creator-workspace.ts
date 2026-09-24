@@ -17,7 +17,7 @@ export function safeCreatorReturnTo(value: string | string[] | undefined): strin
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\") || /[\u0000-\u001f]/.test(value)) return "/creators";
   try {
     const parsed = new URL(value, "https://creator-workspace.invalid");
-    if ((parsed.pathname !== "/" && parsed.pathname !== "/creators") || parsed.hash) return "/creators";
+    if (!["/", "/creators", "/pipeline"].includes(parsed.pathname) || parsed.hash) return "/creators";
     return `${parsed.pathname}${parsed.search}`;
   } catch {
     return "/creators";

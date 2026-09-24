@@ -202,10 +202,7 @@ async function main() {
 main()
   .then(() => {
     console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`}`);
-    // Let open HTTP handles finish closing first: exiting mid-close trips a
-    // libuv assertion on Windows (exit 127), which stopped the preview suite here.
-    process.exitCode = failures === 0 ? 0 : 1;
-    setTimeout(() => process.exit(), 200).unref();
+    process.exit(failures === 0 ? 0 : 1);
   })
   .catch((err) => {
     console.error(err);

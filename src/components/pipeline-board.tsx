@@ -2,21 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MoveRight, X } from "lucide-react";
-import {
-  STAGES,
-  stagesByGroup,
-  stageHint,
-  stageLabel,
-  isTerminal,
-  EXIT_REASONS_BY_STAGE,
-  STAGE_GROUP_LABELS,
-} from "@/lib/stages";
+import { Mail, MessageCircle, X } from "lucide-react";
+import { STAGES, stageHint, stageLabel, EXIT_REASONS_BY_STAGE, STAGE_GROUP_LABELS } from "@/lib/stages";
 import type { CmStage } from "@/lib/db/schema";
-import { compactNumber } from "@/lib/format";
-import { StagePill, Select, Button, IconButton, cn } from "@/components/ui";
+import { compactNumber, relativeDays } from "@/lib/format";
+import { whoseTurnText, type WhoseTurn } from "@/lib/activity";
+import { Avatar, Badge, StagePill, Button, IconButton, cn } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { VideoLinkPrompt, needsVideo } from "@/components/partnership-actions";
+import { QuickStage } from "@/components/quick-stage";
 
 export interface BoardCard {
   partnershipId: string;
@@ -24,7 +18,13 @@ export interface BoardCard {
   username: string;
   followers: number | null;
   stage: CmStage;
-  agreementType: string | null;
+  campaignName: string;
+  /** The latest message, as one line (the email summary when it's current). */
+  latest: string;
+  latestFromEmail: boolean;
+  /** ISO time of the latest message; null when unknown or none. */
+  latestAt: string | null;
+  whoseTurn: WhoseTurn | null;
 }
 
 // Active stages get their own column; the three terminal stages collapse into
@@ -48,12 +48,10 @@ const COLUMNS: { key: string; label: string; hint: string; group: string; stages
 
 const CLOSE_OPTIONS: CmStage[] = ["passed", "declined", "no_response"];
 
-/** A close in progress: which card, and (once chosen) who ended it. */
+/** A card dropped on Closed: which card, and (once chosen) who ended it. */
 interface Closing {
   id: string;
   stage: CmStage | null;
-  /** Where the prompt renders — the Closed column for a drop, the card for the Move menu. */
-  via: "drag" | "menu";
 }
 
 export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
@@ -62,7 +60,6 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
   const [closing, setClosing] = useState<Closing | null>(null);
-  const [moveMenu, setMoveMenu] = useState<string | null>(null);
   // A card moved to Posted with no video recorded: ask for the link on the card.
   const [posting, setPosting] = useState<string | null>(null);
 
@@ -93,7 +90,7 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
       return;
     }
     setPosting(null);
-    // The server can land somewhere else (Agreed continues to Shipping when the address is on file).
+    // The server can land somewhere else (Agreed continues to Ready to ship when the address is on file).
     const landed = r.data.stage;
     if (landed && landed !== toStage) {
       setItems((prev) => prev.map((c) => (c.partnershipId === partnershipId ? { ...c, stage: landed } : c)));
@@ -167,14 +164,14 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
             onDragLeave={() => setOverCol((c) => (c === col.key ? null : c))}
             onDrop={() => {
               if (dragId) {
-                if (col.key === "closed") setClosing({ id: dragId, stage: null, via: "drag" });
+                if (col.key === "closed") setClosing({ id: dragId, stage: null });
                 else move(dragId, dropStage);
               }
               setDragId(null);
               setOverCol(null);
             }}
             className={cn(
-              "flex w-60 shrink-0 flex-col rounded-xl border bg-surface-2/60 transition",
+              "flex w-64 shrink-0 flex-col rounded-xl border bg-surface-2/60 transition",
               overCol === col.key ? "border-accent-ring ring-2 ring-accent-soft" : "border-border",
             )}
           >
@@ -188,7 +185,7 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
               <div className="text-[11px] text-text-faint">{col.group}</div>
             </div>
             <div className="flex min-h-16 flex-col gap-2 px-2 pb-2">
-              {closing?.via === "drag" && col.key === "closed" && closePrompt(closing)}
+              {closing && col.key === "closed" && closePrompt(closing)}
               {colCards.map((c) => (
                 <div
                   key={c.partnershipId}
@@ -203,56 +200,51 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                     dragId === c.partnershipId && "opacity-50",
                   )}
                 >
-                  <Link
-                    href={`/creators/${c.partnershipId}`}
-                    className="block truncate text-sm font-medium text-text hover:text-accent"
-                  >
-                    {c.name}
-                  </Link>
-                  <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-text-muted">
-                    <span className="truncate">@{c.username}</span>
-                    <span className="tabular" title="Followers">
-                      {compactNumber(c.followers)}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between gap-2">
-                    {col.key === "closed" ? <StagePill stage={c.stage} /> : <span />}
-                    {moveMenu === c.partnershipId ? (
-                      <Select
-                        compact
-                        autoFocus
-                        aria-label="Move to stage"
-                        value={c.stage}
-                        onBlur={() => setMoveMenu(null)}
-                        onChange={(e) => {
-                          const to = e.target.value as CmStage;
-                          setMoveMenu(null);
-                          if (isTerminal(to)) setClosing({ id: c.partnershipId, stage: to, via: "menu" });
-                          else move(c.partnershipId, to);
-                        }}
-                        className="w-40"
+                  <div className="flex items-start gap-2">
+                    <Avatar name={c.name} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/creators/${c.partnershipId}?returnTo=/pipeline`}
+                        className="block truncate text-sm font-medium text-text hover:text-accent"
                       >
-                        {stagesByGroup().map((g) => (
-                          <optgroup key={g.group} label={g.label}>
-                            {g.stages.map((s) => (
-                              <option key={s.value} value={s.value}>
-                                {s.label}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </Select>
-                    ) : (
-                      <IconButton
-                        label="Move to another stage"
-                        icon={<MoveRight size={13} />}
-                        onClick={() => setMoveMenu(c.partnershipId)}
-                      />
-                    )}
+                        {c.name}
+                      </Link>
+                      <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
+                        <span className="truncate">@{c.username}</span>
+                        <span className="tabular" title="Followers">
+                          {compactNumber(c.followers)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  {closing?.via === "menu" && closing.id === c.partnershipId && (
-                    <div className="mt-2">{closePrompt(closing)}</div>
-                  )}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    <Badge tone="info" title="Campaign">{c.campaignName}</Badge>
+                    {col.key === "closed" && <StagePill stage={c.stage} />}
+                    {(() => {
+                      const t = whoseTurnText(c.whoseTurn);
+                      return t && col.key !== "closed" ? <Badge tone={t.tone}>{t.label}</Badge> : null;
+                    })()}
+                  </div>
+                  <p className="mt-1.5 line-clamp-3 text-xs leading-snug text-text-muted" title={c.latest}>
+                    {c.latestFromEmail ? (
+                      <Mail size={11} className="mr-1 inline align-[-1px] text-text-faint" />
+                    ) : (
+                      <MessageCircle size={11} className="mr-1 inline align-[-1px] text-text-faint" />
+                    )}
+                    {c.latest}
+                    {c.latestAt && <span className="text-text-faint"> · {relativeDays(c.latestAt)}</span>}
+                  </p>
+                  <div className="mt-2" onMouseDown={(e) => e.stopPropagation()} draggable={false}>
+                    <QuickStage
+                      partnershipId={c.partnershipId}
+                      name={c.name}
+                      stage={c.stage}
+                      className="w-full"
+                      onMoved={(landed) =>
+                        setItems((prev) => prev.map((x) => (x.partnershipId === c.partnershipId ? { ...x, stage: landed } : x)))
+                      }
+                    />
+                  </div>
                   {posting === c.partnershipId && (
                     <div className="mt-2">
                       <VideoLinkPrompt

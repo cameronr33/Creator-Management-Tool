@@ -27,7 +27,11 @@ export default async function PipelinePage() {
     username: r.username,
     followers: r.followers,
     stage: r.stage,
-    agreementType: r.agreementType,
+    campaignName: r.campaignName,
+    latest: r.activity.text,
+    latestFromEmail: r.activity.fromEmail,
+    latestAt: r.activity.at?.toISOString() ?? null,
+    whoseTurn: r.activity.whoseTurn,
   }));
 
   return (
@@ -37,7 +41,7 @@ export default async function PipelinePage() {
         client={client.name}
         campaign={campaign?.name ?? null}
         subtitle={`${cards.length} creator${cards.length === 1 ? "" : "s"}`}
-        help="One column per stage. Drag a card to move it, or use the arrow on the card. Hover a column name to see what that stage means; closing a deal asks who ended it and why."
+        help="One column per stage. Each card shows the campaign, the latest message and whose turn it is. Change the stage from the menu on the card, or drag it. Hover a column name to see what that stage means; closing a deal asks who ended it and why."
         helpAnchor="stages"
       />
       <div className="p-6">

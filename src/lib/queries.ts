@@ -16,6 +16,7 @@ import {
   type CmStage,
 } from "@/lib/db/schema";
 import { canonicalStage } from "@/lib/stages";
+import { latestActivity, type Activity, type LastMessage } from "@/lib/activity";
 import {
   deriveOutreachState,
   daysBetween,
@@ -137,6 +138,10 @@ export interface CreatorRow {
   emailSummary: string | null;
   emailSummaryAt: Date | null;
   emailWhoseTurn: string | null;
+  emailSoundsLikeNo: boolean;
+  replyHandledAt: Date | null;
+  /** The last real message and whose move it is — every card and row shows this. */
+  activity: Activity;
   lastOutboundAt: Date | null;
   repliedAt: Date | null;
   followUpCount: number;
@@ -178,6 +183,8 @@ export async function getCreatorRows(
       emailSummary: cmPartnerships.emailSummary,
       emailSummaryAt: cmPartnerships.emailSummaryAt,
       emailWhoseTurn: cmPartnerships.emailWhoseTurn,
+      emailSoundsLikeNo: cmPartnerships.emailSoundsLikeNo,
+      replyHandledAt: cmPartnerships.replyHandledAt,
     })
     .from(cmPartnerships)
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
@@ -189,22 +196,50 @@ export async function getCreatorRows(
   // A retired stage value can only appear in the window before stages:migrate
   // runs; show it as the stage it now means rather than dropping the row.
   for (const r of rows) r.stage = canonicalStage(r.stage);
-  if (opts?.withOutreach === false) {
-    return rows.map((r) => ({ ...r, lastOutboundAt: null, repliedAt: null, followUpCount: 0 }));
-  }
-
   const partnershipIds = rows.map((r) => r.partnershipId);
-  const outreachByPartnership = await getOutreachStates(partnershipIds);
+  const [lastMessages, outreachByPartnership] = await Promise.all([
+    getLastMessages(partnershipIds),
+    opts?.withOutreach === false ? Promise.resolve(new Map<string, OutreachState>()) : getOutreachStates(partnershipIds),
+  ]);
 
   return rows.map((r) => {
     const st = outreachByPartnership.get(r.partnershipId);
     return {
       ...r,
+      activity: latestActivity({
+        last: lastMessages.get(r.partnershipId) ?? null,
+        emailSummary: r.emailSummary,
+        emailSummaryAt: r.emailSummaryAt,
+        emailWhoseTurn: r.emailWhoseTurn,
+        replyHandledAt: r.replyHandledAt,
+      }),
       lastOutboundAt: st?.lastOutboundAt ?? null,
       repliedAt: st?.repliedAt ?? null,
       followUpCount: st?.followUpCount ?? 0,
     };
   });
+}
+
+/** The latest real message (never a note) per partnership, in one query. */
+export async function getLastMessages(partnershipIds: string[]): Promise<Map<string, LastMessage>> {
+  const out = new Map<string, LastMessage>();
+  if (partnershipIds.length === 0) return out;
+  const rows = await db
+    .selectDistinctOn([cmOutreachEvents.partnershipId], {
+      partnershipId: cmOutreachEvents.partnershipId,
+      at: cmOutreachEvents.occurredAt,
+      direction: cmOutreachEvents.direction,
+      channel: cmOutreachEvents.channel,
+      senderRole: cmOutreachEvents.senderRole,
+      subject: cmOutreachEvents.subject,
+      isMigrated: cmOutreachEvents.isMigrated,
+    })
+    .from(cmOutreachEvents)
+    .where(and(inArray(cmOutreachEvents.partnershipId, partnershipIds), ne(cmOutreachEvents.kind, "note")))
+    // Same instant (imported rows): their reply counts as the later one (enum order: outbound, inbound).
+    .orderBy(cmOutreachEvents.partnershipId, desc(cmOutreachEvents.occurredAt), desc(cmOutreachEvents.direction));
+  for (const { partnershipId, ...m } of rows) out.set(partnershipId, m);
+  return out;
 }
 
 /**

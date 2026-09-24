@@ -11,6 +11,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
   const { id } = await ctx.params;
   const scope = await assertPartnershipInSelectedClient(id);
   if (scope) return scope;
-  await db.update(cmPartnerships).set({ replyHandledAt: new Date(), updatedAt: new Date() }).where(eq(cmPartnerships.id, id));
+  // Not an edit to the deal, so updatedAt stays put.
+  await db.update(cmPartnerships).set({ replyHandledAt: new Date() }).where(eq(cmPartnerships.id, id));
   return NextResponse.json({ ok: true });
 }

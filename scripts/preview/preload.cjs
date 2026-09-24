@@ -26,3 +26,14 @@ globalThis.fetch = async function isolatedFetch(input, init) {
   // redirects, overriding both Request.redirect and init.redirect.
   return originalFetch(input, { ...init, redirect: 'error' });
 };
+
+// Windows + Node 24: exiting while fetch's keep-alive sockets are still closing
+// trips a libuv assertion (exit 127) *after* a script has passed, and the suite
+// stops at the first non-zero exit — silently skipping every later script. Each
+// verify script calls process.exit only as its last act, so let the handles
+// settle briefly first; the exit code is unchanged.
+const realExit = process.exit.bind(process);
+process.exit = function settledExit(code) {
+  if (code !== undefined) process.exitCode = code;
+  setTimeout(() => realExit(), 150);
+};
