@@ -81,6 +81,12 @@ function main() {
     /address/i.test(nextStep({ ...base, stage: "awaiting_address" }).text),
   );
   check(
+    "Finalizing says what's still missing — the signed contract, the address, or both",
+    /signed contract and their shipping address/.test(nextStep({ ...base, stage: "finalizing" }).text) &&
+      /Still needed: their shipping address/.test(nextStep({ ...base, stage: "finalizing", signed: true }).text) &&
+      /move them to Ready to ship/.test(nextStep({ ...base, stage: "finalizing", signed: true, hasAddress: true }).text),
+  );
+  check(
     "a retired stage is answered as the stage it now means",
     nextStep({ ...base, stage: "negotiating" }).text === nextStep({ ...base, stage: "in_conversation" }).text,
   );

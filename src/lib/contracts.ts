@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { clients, cmCampaigns, cmContracts, cmCreators, cmPartnerships, type CmContract } from "@/lib/db/schema";
 import { anthropic, serviceUnavailable, withModelFallback } from "@/lib/claude";
 import { DealFactsSchema, applyDealFill, cleanFacts, type DealFacts } from "@/lib/deal-facts";
+import { applyAutoStage } from "@/lib/auto-stage";
 
 /**
  * Contract PDFs for a deal (owner decision, 2026-09-24): uploaded on the
@@ -263,6 +264,11 @@ export async function readContract(id: string, opts: { reader?: ContractReader }
         .set({ readStatus: "not_contract", extracted: facts, readError: why, data: null, readAt: new Date() })
         .where(eq(cmContracts.id, id));
       return { status: "not_contract", ...(why ? { why } : {}) };
+    }
+    // Unsigned: the deal is still being worked out — Agreed → Finalizing first, so a
+    // complete address in the draft doesn't jump them straight to Ready to ship.
+    if (!facts.signed) {
+      await applyAutoStage(claimed.partnershipId, "contract_unsigned", claimed.uploadedBy ?? undefined, { meta: { contract: claimed.filename } });
     }
     const r = await applyDealFill(claimed.partnershipId, facts, { from: `the contract ${claimed.filename}`, userId: claimed.uploadedBy });
     await db

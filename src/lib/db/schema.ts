@@ -76,6 +76,7 @@ export const cmStageEnum = pgEnum("cm_stage", [
   "negotiating", // retired
   "agreed", // retired
   "awaiting_address", // "Agreed"
+  "finalizing", // "Finalizing" — contract or open questions (added 2026-09-25)
   "fulfilling", // "Ready to ship"
   "shipped", // "Shipped" (added 2026-09-23)
   "content_pending", // "Waiting on video"

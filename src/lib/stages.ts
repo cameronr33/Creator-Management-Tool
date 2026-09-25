@@ -6,9 +6,11 @@ import type { AutoStageTrigger } from "@/lib/auto-stage";
  * The stage answers one question — what is this partnership waiting on right
  * now — so shipping/post/contract facts are deliberately absent from it.
  *
- * Eight active stages and three closed ones (owner decisions: 2026-09-22 —
+ * Nine active stages and three closed ones (owner decisions: 2026-09-22 —
  * "simplify the pipeline"; 2026-09-23 — "there should be a Ready to ship
- * status", so Shipping split into Ready to ship → Shipped). The Postgres enum still carries four retired
+ * status", so Shipping split into Ready to ship → Shipped; 2026-09-25 — "a
+ * stage between agreed and ready to ship ... contract negotiations or
+ * questions": Finalizing). The Postgres enum still carries four retired
  * values (researched, negotiating, agreed, completed); nothing writes them,
  * `canonicalStage()` maps any straggler on read, and verify:invariants
  * asserts none remain. Labels are written for a teammate on day one, and
@@ -61,6 +63,14 @@ export const STAGES: StageMeta[] = [
     group: "deal",
     hint: "They're in. Verbal or signed is recorded under Deal. Waiting on their shipping address.",
     action: "Get their shipping address. Saving it moves them to Ready to ship.",
+    terminal: false,
+  },
+  {
+    value: "finalizing",
+    label: "Finalizing",
+    group: "deal",
+    hint: "They're in, but the contract or open questions (sizes, fitment, dates) are still being worked out.",
+    action: "Settle the contract and any questions. Once it's signed and their address is saved, they move to Ready to ship.",
     terminal: false,
   },
   {
@@ -246,6 +256,8 @@ export const AUTO_TRIGGER_LABELS: Record<AutoStageTrigger, string> = {
   outbound_message: "a first message goes out (I messaged them, or an email in the mailbox)",
   inbound_message: "they reply (They replied, or an email from them in the mailbox)",
   address_complete: "a complete shipping address is saved",
+  contract_unsigned: "a contract arrives that isn't signed yet (uploaded or in their email)",
+  deal_ready: "the deal is marked signed and a complete shipping address is on file",
   shipment_shipped: "the shipment is marked shipped",
   shipment_delivered: "the shipment is marked delivered",
   deliverable_added: "a posted video is added",

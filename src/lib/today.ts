@@ -20,6 +20,7 @@ export type TodaySection =
   | "to_contact"
   | "waiting_approval"
   | "get_address"
+  | "finalizing"
   | "ready_to_ship"
   | "shipped"
   | "waiting_video"
@@ -31,6 +32,7 @@ export const TODAY_SECTIONS: { key: TodaySection; title: string; hint: string }[
   { key: "to_contact", title: "To contact", hint: stageAction("shortlisted") },
   { key: "waiting_approval", title: "Waiting on client approval", hint: "The client decides on these before anyone reaches out. Approve or pass for them if they've told you." },
   { key: "get_address", title: "Agreed — get the address", hint: stageAction("awaiting_address") },
+  { key: "finalizing", title: "Finalizing — contract and questions", hint: stageAction("finalizing") },
   { key: "ready_to_ship", title: "Ready to ship", hint: stageAction("fulfilling") },
   { key: "shipped", title: "Shipped — on the way", hint: stageAction("shipped") },
   { key: "waiting_video", title: "Waiting on video", hint: stageAction("content_pending") },
@@ -69,6 +71,8 @@ export function placeOnToday(f: TodayFacts): TodayPlacement | null {
       return { section: "waiting_video", note: null };
     case "awaiting_address":
       return { section: "get_address", note: null };
+    case "finalizing":
+      return { section: "finalizing", note: f.whoseTurn === "us" ? "They wrote last — reply." : null };
   }
   if (f.whoseTurn === "us") return { section: "your_turn", note: null };
   if (stage === "shortlisted") return f.clientApproval === "pending" ? { section: "waiting_approval", note: null } : { section: "to_contact", note: null };

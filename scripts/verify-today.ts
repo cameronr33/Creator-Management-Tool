@@ -55,6 +55,7 @@ check(
 check("imported rows never get a follow-up clock", place({ datesAreMigrated: true, now: at(30) })?.section === "waiting");
 check("after two follow-ups, suggests closing once the wait is over", /No response/.test(place({ followUpCount: 2, now: new Date(at(20).getTime() + DEFAULT_THRESHOLDS.markNoResponseAfterDays * 86_400_000) })?.note ?? ""));
 check("Agreed → get the address", place({ stage: "awaiting_address" })?.section === "get_address");
+check("Finalizing → its own section, saying when they wrote last", place({ stage: "finalizing" })?.section === "finalizing" && place({ stage: "finalizing", whoseTurn: "us" })?.note === "They wrote last — reply.");
 check("Ready to ship stays Ready to ship even when it's our turn", place({ stage: "fulfilling", whoseTurn: "us" })?.section === "ready_to_ship");
 check("Shipped → on the way", place({ stage: "shipped" })?.section === "shipped");
 check("Waiting on video → add the link", place({ stage: "content_pending" })?.section === "waiting_video");

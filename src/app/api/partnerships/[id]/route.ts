@@ -3,7 +3,7 @@ import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { requireAgency, badRequest, assertPartnershipInSelectedClient } from "@/lib/api-helpers";
 import { httpUrl, isoDate, money } from "@/lib/validation";
-import { applyAutoStage } from "@/lib/auto-stage";
+import { advanceIfDealReady, applyAutoStage } from "@/lib/auto-stage";
 import { hasCompleteAddress } from "@/lib/address";
 import { db } from "@/lib/db";
 import {
@@ -96,6 +96,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if (row && hasCompleteAddress(row)) {
       stageChanged = await applyAutoStage(id, "address_complete", session.user.id);
     }
+  }
+  // Finalizing → Ready to ship once the deal is signed and the address is in (either may arrive last).
+  if (!stageChanged && (data.agreementType !== undefined || ADDRESS_KEYS.some((k) => data[k] !== undefined))) {
+    stageChanged = await advanceIfDealReady(id, session.user.id);
   }
 
   return NextResponse.json({ ok: true, stageChanged });

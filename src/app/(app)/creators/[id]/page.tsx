@@ -129,6 +129,7 @@ export default async function CreatorDetailPage({
   const step = nextStep({
     stage: partnership.stage,
     hasAddress,
+    signed: partnership.agreementType === "signed",
     shipmentStatus: shipmentAttentionStatus(shipments),
     hasBrief: !!partnership.briefUrl,
     briefSent: !!partnership.briefSentAt,

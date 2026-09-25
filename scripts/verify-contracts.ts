@@ -31,6 +31,7 @@ import {
 } from "../src/lib/contracts";
 import type { DealFacts } from "../src/lib/deal-facts";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
+import { changeStage } from "../src/lib/mutations";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail?: string) {
@@ -168,6 +169,20 @@ async function main() {
     check("no API credit: the file waits, its attempts untouched, to be read once it's back", down.failed === 0 && cw.readStatus === "pending" && cw.attempts === 0 && /unavailable/.test(cw.readError ?? ""));
     const back = await readPendingContracts({ reader: good, ids: [waiting.id] });
     check("…and is read by the next run once it is", back.read === 1 && (await contract(waiting.id)).readStatus === "read");
+    console.log("\n── Finalizing (2026-09-25) ──");
+    const p7 = await add("__verify_ct_final");
+    await changeStage(p7, "awaiting_address");
+    const draft = await storeUpload(p7, { filename: "draft.pdf", bytes: pdf("draft") }, null);
+    if (!draft.ok) return check("the draft was stored", false);
+    await readContract(draft.id, { reader: async () => ({ ...FACTS, signed: false }) });
+    const [afterDraft] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, p7));
+    check("an unsigned contract moves Agreed → Finalizing — even with a full address in it", afterDraft.stage === "finalizing" && afterDraft.addressLine1 === "5 Pine Ave", afterDraft.stage);
+    const signedCopy = await storeUpload(p7, { filename: "signed.pdf", bytes: pdf("signed") }, null);
+    if (!signedCopy.ok) return check("the signed copy was stored", false);
+    await readContract(signedCopy.id, { reader: good });
+    const [afterSigned] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, p7));
+    check("the signed copy arriving moves Finalizing → Ready to ship", afterSigned.stage === "fulfilling" && afterSigned.agreementType === "signed", afterSigned.stage);
+
     check("anything going wrong after the claim is recorded as failed, never left reading", exploded.status === "failed" && (await contract(throwing.id)).readStatus === "failed", JSON.stringify(exploded));
 
     console.log("\n── Email attachments ──");

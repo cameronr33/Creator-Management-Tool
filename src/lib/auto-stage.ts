@@ -25,6 +25,8 @@ export type AutoStageTrigger =
   | "outbound_message"
   | "inbound_message"
   | "address_complete"
+  | "contract_unsigned"
+  | "deal_ready"
   | "shipment_shipped"
   | "shipment_delivered"
   | "deliverable_added";
@@ -37,8 +39,12 @@ export const AUTO_STAGE_RULES: Record<AutoStageTrigger, { from: CmStage[]; to: C
   outbound_message: { from: ["shortlisted"], to: "contacted" },
   inbound_message: { from: ["contacted", "no_response"], to: "in_conversation" },
   address_complete: { from: ["awaiting_address"], to: "fulfilling" },
-  shipment_shipped: { from: ["awaiting_address", "fulfilling"], to: "shipped" },
-  shipment_delivered: { from: ["awaiting_address", "fulfilling", "shipped"], to: "content_pending" },
+  // Finalizing (2026-09-25): an unsigned contract means the deal is still being
+  // worked out; it leaves only when signed AND the address is in (dealIsReady).
+  contract_unsigned: { from: ["awaiting_address"], to: "finalizing" },
+  deal_ready: { from: ["finalizing"], to: "fulfilling" },
+  shipment_shipped: { from: ["awaiting_address", "finalizing", "fulfilling"], to: "shipped" },
+  shipment_delivered: { from: ["awaiting_address", "finalizing", "fulfilling", "shipped"], to: "content_pending" },
   deliverable_added: { from: ["fulfilling", "shipped", "content_pending"], to: "posted" },
 };
 
@@ -90,4 +96,30 @@ export async function applyAutoStage(
     if (r.status !== "stale") return null;
   }
   return null;
+}
+
+/** Pure: Finalizing is done — the deal is signed and a complete address is on file. */
+export function dealIsReady(p: { agreementType: string | null; addressLine1?: string | null; city?: string | null; region?: string | null; postalCode?: string | null }): boolean {
+  return p.agreementType === "signed" && !!(p.addressLine1?.trim() && p.city?.trim() && p.region?.trim() && p.postalCode?.trim());
+}
+
+/**
+ * After the deal or the address changed: a Finalizing partnership that's now
+ * signed with an address moves to Ready to ship (rule `deal_ready`).
+ */
+export async function advanceIfDealReady(partnershipId: string, userId?: string, meta?: Record<string, unknown>): Promise<AutoStageResult | null> {
+  const [p] = await db
+    .select({
+      stage: cmPartnerships.stage,
+      agreementType: cmPartnerships.agreementType,
+      addressLine1: cmPartnerships.addressLine1,
+      city: cmPartnerships.city,
+      region: cmPartnerships.region,
+      postalCode: cmPartnerships.postalCode,
+    })
+    .from(cmPartnerships)
+    .where(eq(cmPartnerships.id, partnershipId))
+    .limit(1);
+  if (!p || p.stage !== "finalizing" || !dealIsReady(p)) return null;
+  return applyAutoStage(partnershipId, "deal_ready", userId, { meta });
 }

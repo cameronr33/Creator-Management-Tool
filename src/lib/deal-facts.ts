@@ -3,7 +3,7 @@ import { eq, sql, type AnyColumn } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cmOutreachEvents, cmPartnerships, cmProductsRequested, type CmPartnership } from "@/lib/db/schema";
 import { hasCompleteAddress, parseAddress, type ParsedAddress } from "@/lib/address";
-import { applyAutoStage, type AutoStageResult } from "@/lib/auto-stage";
+import { advanceIfDealReady, applyAutoStage, type AutoStageResult } from "@/lib/auto-stage";
 
 /**
  * The deal as a contract or an email states it — product, fee, terms,
@@ -345,6 +345,10 @@ export async function applyDealFill(
   let stageChanged: AutoStageResult | null = null;
   if (opts.stageMove !== false && actual.address && after && hasCompleteAddress(after)) {
     stageChanged = await applyAutoStage(partnershipId, "address_complete", opts.userId ?? undefined, { meta: { from: opts.from } });
+  }
+  // Finalizing leaves once the deal is signed and the address is in — whichever this fill supplied.
+  if (opts.stageMove !== false && !stageChanged && (actual.address || actual.agreementType === "signed")) {
+    stageChanged = await advanceIfDealReady(partnershipId, opts.userId ?? undefined, { from: opts.from });
   }
   return { filled, stageChanged };
 }

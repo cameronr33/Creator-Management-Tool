@@ -48,6 +48,11 @@ them. Changing one requires a human decision and an explanation in the commit.
    move; its only stage effect is the existing `address_complete` rule
    (Agreed → Ready to ship) when it fills a complete address. It never
    replaces a filled field — `verify-deal-fill.ts` is its matrix.
+   (2026-09-25, owner: "a stage between agreed and ready to ship ... contract
+   negotiations or questions".) Finalizing: in from Agreed on an unsigned
+   contract (rule `contract_unsigned`) or the creator's own email; out to
+   Ready to ship only when the deal is signed and the address complete (rule
+   `deal_ready`) — never by email.
    (2026-09-23, owner: "there should be a Ready to ship status" — Shipping
    split into Ready to ship → Shipped; a move to Shipped marks the shipment
    shipped. Email never moves anyone to Shipped: that is ours to mark, and it

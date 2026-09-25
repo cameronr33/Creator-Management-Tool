@@ -13,7 +13,7 @@
  */
 import { eq, asc } from "drizzle-orm";
 import { db, schema } from "./db";
-import { nextStageFor, applyAutoStage, AUTO_STAGE_RULES, type AutoStageTrigger } from "../src/lib/auto-stage";
+import { nextStageFor, applyAutoStage, advanceIfDealReady, dealIsReady, AUTO_STAGE_RULES, type AutoStageTrigger } from "../src/lib/auto-stage";
 import { moveStage, resolveTarget, describeVideo } from "../src/lib/stage-moves";
 import { changeStage } from "../src/lib/mutations";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
@@ -35,8 +35,11 @@ const EXPECTED: Record<AutoStageTrigger, { from: CmStage[]; to: CmStage }> = {
   // no_response is the one closed stage a creator's OWN reply reopens.
   inbound_message: { from: ["contacted", "no_response"], to: "in_conversation" },
   address_complete: { from: ["awaiting_address"], to: "fulfilling" },
-  shipment_shipped: { from: ["awaiting_address", "fulfilling"], to: "shipped" },
-  shipment_delivered: { from: ["awaiting_address", "fulfilling", "shipped"], to: "content_pending" },
+  // Finalizing (owner, 2026-09-25): in on an unsigned contract, out when signed + address.
+  contract_unsigned: { from: ["awaiting_address"], to: "finalizing" },
+  deal_ready: { from: ["finalizing"], to: "fulfilling" },
+  shipment_shipped: { from: ["awaiting_address", "finalizing", "fulfilling"], to: "shipped" },
+  shipment_delivered: { from: ["awaiting_address", "finalizing", "fulfilling", "shipped"], to: "content_pending" },
   deliverable_added: { from: ["fulfilling", "shipped", "content_pending"], to: "posted" },
 };
 
@@ -73,8 +76,16 @@ async function main() {
     "no rule moves an ACTIVE stage backward",
     TRIGGERS.every((t) => AUTO_STAGE_RULES[t].from.filter((f) => !isTerminal(f)).every((f) => stageIndex(AUTO_STAGE_RULES[t].to) > stageIndex(f))),
   );
-  // Owner decisions: 7 active on 2026-09-22; Shipping split into Ready to ship → Shipped on 2026-09-23.
-  check("canonical stages are exactly 8 active + 3 closed", STAGE_VALUES.length === 11 && STAGE_VALUES.filter((s) => !isTerminal(s)).length === 8);
+  // Owner decisions: 7 active on 2026-09-22; Shipping split into Ready to ship → Shipped on 2026-09-23;
+  // Finalizing between Agreed and Ready to ship on 2026-09-25.
+  check("canonical stages are exactly 9 active + 3 closed", STAGE_VALUES.length === 12 && STAGE_VALUES.filter((s) => !isTerminal(s)).length === 9);
+  check("Finalizing sits between Agreed and Ready to ship", stageIndex("awaiting_address") + 1 === stageIndex("finalizing") && stageIndex("finalizing") + 1 === stageIndex("fulfilling"));
+  check(
+    "Finalizing is done only when signed AND the address is complete",
+    dealIsReady({ agreementType: "signed", addressLine1: "1 A St", city: "X", region: "CA", postalCode: "90000" }) &&
+      !dealIsReady({ agreementType: "verbal", addressLine1: "1 A St", city: "X", region: "CA", postalCode: "90000" }) &&
+      !dealIsReady({ agreementType: "signed", addressLine1: "1 A St", city: "X", region: "CA", postalCode: null }),
+  );
   check(
     "every retired value maps to a current stage",
     Object.entries(RETIRED_STAGES).every(([, to]) => STAGE_VALUES.includes(to as CmStage)) && canonicalStage("negotiating") === "in_conversation",
@@ -191,6 +202,18 @@ async function main() {
     const late = await applyAutoStage(pid3, "inbound_message");
     check("a reply reopens No response → Talking", late?.from === "no_response" && late?.to === "in_conversation");
     check("our own message never advances Talking", (await applyAutoStage(pid3, "outbound_message")) === null);
+
+    // Finalizing: nothing leaves it until the deal is signed and the address is in.
+    const pid4 = await add("__verify_as_finalizing__");
+    await changeStage(pid4, "awaiting_address");
+    const into = await applyAutoStage(pid4, "contract_unsigned");
+    check("an unsigned contract moves Agreed → Finalizing", into?.to === "finalizing" && (await stageOf(pid4)) === "finalizing");
+    await db.update(schema.cmPartnerships).set({ addressLine1: "1 Test St", city: "Testville", region: "CA", postalCode: "90000" }).where(eq(schema.cmPartnerships.id, pid4));
+    check("a complete address alone doesn't move Finalizing", (await applyAutoStage(pid4, "address_complete")) === null && (await advanceIfDealReady(pid4)) === null && (await stageOf(pid4)) === "finalizing");
+    await db.update(schema.cmPartnerships).set({ agreementType: "signed" }).where(eq(schema.cmPartnerships.id, pid4));
+    const out = await advanceIfDealReady(pid4);
+    check("signed + address: Finalizing → Ready to ship, with its shipment", out?.to === "fulfilling" && (await stageOf(pid4)) === "fulfilling" && (await shipments(pid4)).length === 1);
+    check("an unsigned contract never pulls anyone back to Finalizing", (await applyAutoStage(pid4, "contract_unsigned")) === null && (await stageOf(pid4)) === "fulfilling");
 
     check("unknown partnership returns null, not a throw", (await applyAutoStage("00000000-0000-0000-0000-000000000000", "outbound_message")) === null);
   } finally {

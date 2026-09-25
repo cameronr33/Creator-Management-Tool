@@ -134,6 +134,13 @@
       "when": 1790282849230,
       "tag": "0018_reread_deals",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790374438711,
+      "tag": "0019_finalizing_stage",
+      "breakpoints": true
     }
   ]
 }

@@ -61,6 +61,9 @@ export function emailAutomoveOn(): boolean {
 export const EMAIL_STAGE_RULES: Partial<Record<CmStage, { from: CmStage[]; requires: "nothing" | "address" | "receipt" | "post_link" }>> = {
   in_conversation: { from: ["contacted"], requires: "nothing" },
   awaiting_address: { from: ["contacted", "in_conversation"], requires: "nothing" },
+  // Finalizing (2026-09-25): contract back-and-forth or open questions after they agreed.
+  // It leaves only when signed + address (auto-stage deal_ready), never by email.
+  finalizing: { from: ["awaiting_address"], requires: "nothing" },
   fulfilling: { from: ["contacted", "in_conversation", "awaiting_address"], requires: "address" },
   // Only from Shipped: while it's still Ready to ship, "can't wait to try it!"
   // can read as "it arrived" — and would mark an unsent parcel delivered.

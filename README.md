@@ -63,7 +63,7 @@ waiting on right now* — while shipping lives in `cm_shipments`, posts in
 
 Stages (`src/lib/stages.ts`, labels in quotes): `shortlisted` "To contact" →
 `contacted` → `in_conversation` "Talking" → `awaiting_address` "Agreed" →
-`fulfilling` "Ready to ship" → `shipped` → `content_pending` "Waiting on
+`finalizing` "Finalizing" (contract or open questions) → `fulfilling` "Ready to ship" → `shipped` → `content_pending` "Waiting on
 video" → `posted`, plus closed `passed` / `declined` / `no_response` (split
 by who ended it). The enum still holds four retired values (`researched`,
 `negotiating`, `agreed`, `completed`); nothing writes them and
@@ -188,8 +188,10 @@ Two engines may move a stage, both forward only, neither ever closing a deal
 (AGENTS.md frozen node 2):
 
 - **The rule table** (`src/lib/auto-stage.ts`): first message → Contacted, a
-  reply → Talking, a complete address → Ready to ship, marked shipped →
-  Shipped, delivered → Waiting on video, a video link → Posted.
+  reply → Talking, a complete address → Ready to ship, an unsigned contract →
+  Finalizing, Finalizing → Ready to ship once the deal is signed and the
+  address is in, marked shipped → Shipped, delivered → Waiting on video, a
+  video link → Posted.
 - **Email reading** (`EMAIL_STAGE_RULES` in `src/lib/email-status.ts`): only
   from the creator's own message, quoted word for word, newer than the last
   manual change, not low confidence — Ready to ship also needs an address,

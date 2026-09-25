@@ -9,6 +9,8 @@ import { canonicalStage, exitReasonLabel, stageAction, stageLabel } from "@/lib/
 export interface NextStepInput {
   stage: CmStage;
   hasAddress: boolean;
+  /** The deal is marked signed (Finalizing needs it). */
+  signed?: boolean;
   shipmentStatus: string | null;
   hasBrief: boolean;
   briefSent: boolean;
@@ -69,6 +71,12 @@ export function nextStep(i: NextStepInput): NextStep {
       return i.hasAddress
         ? { text: "Their address is on file — move them to Ready to ship.", anchor: "shipping" }
         : { text: "Get their shipping address and paste it under Shipping — the stage moves on its own.", anchor: "shipping" };
+    case "finalizing": {
+      const missing = [i.signed ? null : "the signed contract", i.hasAddress ? null : "their shipping address"].filter(Boolean);
+      return missing.length
+        ? { text: `Settle the contract and any open questions. Still needed: ${missing.join(" and ")} — then they move to Ready to ship on their own.`, anchor: i.signed ? "shipping" : "agreement" }
+        : { text: "Signed and the address is on file — move them to Ready to ship.", anchor: "stage" };
+    }
     case "fulfilling":
     case "shipped":
       switch (i.shipmentStatus) {

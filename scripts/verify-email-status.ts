@@ -45,6 +45,7 @@ function check(label: string, cond: boolean, detail?: string) {
 const EXPECTED: Partial<Record<CmStage, CmStage[]>> = {
   in_conversation: ["contacted"],
   awaiting_address: ["contacted", "in_conversation"],
+  finalizing: ["awaiting_address"],
   fulfilling: ["contacted", "in_conversation", "awaiting_address"],
   content_pending: ["shipped"],
   posted: ["fulfilling", "shipped", "content_pending"],
