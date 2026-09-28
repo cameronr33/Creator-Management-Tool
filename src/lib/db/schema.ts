@@ -377,6 +377,17 @@ export const cmPartnerships = pgTable(
      * Changing it never touches updatedAt (the email check files mail by it).
      */
     ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    /**
+     * Snoozed off Today until this time (2026-09-28, owner: "snooze / remind me
+     * on"). It wakes early when the creator (or someone on their thread) writes
+     * after snoozedAt, or when the stage is no longer snoozeStage — worked out
+     * when the page loads, so nothing has to run to wake it.
+     */
+    snoozedUntil: timestamp("snoozed_until"),
+    snoozedAt: timestamp("snoozed_at"),
+    snoozeStage: cmStageEnum("snooze_stage"),
+    snoozeReason: text("snooze_reason"),
+    snoozedByName: text("snoozed_by_name"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -8,6 +8,7 @@ import { api, useSave } from "@/components/use-save";
 import { QuickStage } from "@/components/quick-stage";
 import { StatusNote } from "@/components/status-note";
 import { OwnerSlot } from "@/components/owner-controls";
+import { BringBackButton, SnoozeControl, SnoozeLine } from "@/components/snooze";
 import { MessagedButton, ReplyButton } from "@/components/reply-button";
 import { CloseAsDeclinedButton, NoReplyNeededButton } from "@/components/email-status";
 import { VideoLinkPrompt } from "@/components/partnership-actions";
@@ -25,7 +26,8 @@ import { relativeDays } from "@/lib/format";
  * one button for the next step. "Waiting on them" starts folded.
  */
 export function TodayList({ rows, meId, ownerLabels }: { rows: TodayRow[]; meId: string | null; ownerLabels: Record<string, string> }) {
-  const [openWaiting, setOpenWaiting] = useState(false);
+  // "Waiting on them" and "Snoozed" start folded: nothing to do there today.
+  const [open, setOpen] = useState<Set<TodaySection>>(new Set());
   const bySection = new Map<TodaySection, TodayRow[]>();
   for (const r of rows) bySection.set(r.section, [...(bySection.get(r.section) ?? []), r]);
   const shown = TODAY_SECTIONS.filter((s) => (bySection.get(s.key)?.length ?? 0) > 0);
@@ -34,15 +36,23 @@ export function TodayList({ rows, meId, ownerLabels }: { rows: TodayRow[]; meId:
     <div className="space-y-4">
       {shown.map((s) => {
         const list = bySection.get(s.key)!;
-        const folded = s.key === "waiting" && !openWaiting;
+        const foldable = s.key === "waiting" || s.key === "snoozed";
+        const folded = foldable && !open.has(s.key);
         return (
           <Card key={s.key} className="overflow-hidden" id={`today-${s.key}`}>
-            {s.key === "waiting" ? (
+            {foldable ? (
               <button
                 type="button"
                 className="w-full border-b border-border px-4 py-3 text-left hover:bg-surface-2/60"
-                onClick={() => setOpenWaiting((v) => !v)}
-                aria-expanded={openWaiting}
+                onClick={() =>
+                  setOpen((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(s.key)) next.delete(s.key);
+                    else next.add(s.key);
+                    return next;
+                  })
+                }
+                aria-expanded={!folded}
               >
                 <SectionHeading title={s.title} hint={s.hint} count={list.length} folded={folded} />
               </button>
@@ -121,8 +131,20 @@ function TodayItem({ row: r, meId, ownerLabels }: { row: TodayRow; meId: string 
               Found in their email: <span className="font-medium text-text">{r.suggestedAddress}</span>
             </p>
           )}
+          {r.snooze && (
+            <p className="mt-1 text-xs text-text-muted">
+              <SnoozeLine until={r.snooze.until} by={r.snooze.by} reason={r.snooze.reason} />
+            </p>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <NextAction row={r} />
+            {r.section === "snoozed" ? (
+              <BringBackButton partnershipId={r.partnershipId} name={r.name} />
+            ) : (
+              <>
+                <NextAction row={r} />
+                <SnoozeControl partnershipId={r.partnershipId} name={r.name} />
+              </>
+            )}
           </div>
         </div>
       </div>

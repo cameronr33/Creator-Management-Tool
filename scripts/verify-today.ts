@@ -7,6 +7,7 @@
 import { latestActivity, type LastMessage } from "../src/lib/activity";
 import { placeOnToday, sortToday, TODAY_SECTIONS, type TodayFacts } from "../src/lib/today";
 import { THRESHOLD_FIELDS, THRESHOLDS_SCHEMA } from "../src/lib/thresholds";
+import { SNOOZE_MAX_DAYS, parseSnoozeUntil, snoozeActive } from "../src/lib/snooze-rules";
 import { DEFAULT_THRESHOLDS } from "../src/lib/outreach";
 import { ACTIVE_STAGES, STAGE_VALUES, isTerminal } from "../src/lib/stages";
 import type { CmStage } from "../src/lib/db/schema";
@@ -100,6 +101,20 @@ const sorted = sortToday([
   { name: "Ab", since: at(12).toISOString() },
 ]);
 check("whoever has waited longest comes first; unknown dates last; ties by name", sorted.map((r) => r.name).join(",") === "Bo,Ab,Cy,Al", sorted.map((r) => r.name).join(","));
+
+console.log("\n── Snooze (2026-09-28) ──");
+const snoozed = { snoozedUntil: at(25), snoozedAt: at(20), snoozeStage: "in_conversation" as CmStage, stage: "in_conversation" as CmStage, lastInboundStoredAt: null, now: at(22) };
+check("asleep before the date", snoozeActive(snoozed));
+check("awake on the date", !snoozeActive({ ...snoozed, now: at(25) }));
+check("a message from them stored after the snooze wakes it", !snoozeActive({ ...snoozed, lastInboundStoredAt: at(21) }));
+check("…one stored before it doesn't", snoozeActive({ ...snoozed, lastInboundStoredAt: at(19) }));
+check("a stage change wakes it", !snoozeActive({ ...snoozed, stage: "awaiting_address" }));
+check("never snoozed: never asleep", !snoozeActive({ ...snoozed, snoozedUntil: null }));
+const now22 = at(22);
+check("a date in the past or today is refused", !parseSnoozeUntil(at(21).toISOString(), now22).ok && !parseSnoozeUntil(now22.toISOString(), now22).ok);
+check(`at most ${SNOOZE_MAX_DAYS} days away`, parseSnoozeUntil(daysAfter(now22, SNOOZE_MAX_DAYS).toISOString(), now22).ok && !parseSnoozeUntil(daysAfter(now22, SNOOZE_MAX_DAYS + 1).toISOString(), now22).ok);
+check("nonsense is refused", !parseSnoozeUntil("soon", now22).ok);
+check("Snoozed is the last section", TODAY_SECTIONS[TODAY_SECTIONS.length - 1].key === "snoozed");
 
 console.log("\n── The timing table ──");
 check("the field table, the defaults and the settings schema have the same keys", JSON.stringify(THRESHOLD_FIELDS.map((f) => f.key).sort()) === JSON.stringify(Object.keys(DEFAULT_THRESHOLDS).sort()));

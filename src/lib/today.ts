@@ -27,7 +27,8 @@ export type TodaySection =
   | "ready_to_ship"
   | "shipped"
   | "waiting_video"
-  | "waiting";
+  | "waiting"
+  | "snoozed";
 
 export const TODAY_SECTIONS: { key: TodaySection; title: string; hint: string }[] = [
   { key: "your_turn", title: "Your turn", hint: "They wrote last. Reply, or mark it as needing no reply." },
@@ -44,6 +45,7 @@ export const TODAY_SECTIONS: { key: TodaySection; title: string; hint: string }[
   { key: "shipped", title: "Shipped — on the way", hint: stageAction("shipped") },
   { key: "waiting_video", title: "Waiting on video", hint: stageAction("content_pending") },
   { key: "waiting", title: "Waiting on them", hint: "Nothing to do yet. They move up here when they write back or a follow-up is due." },
+  { key: "snoozed", title: "Snoozed", hint: "Hidden until the date you picked. They come back sooner if they write or their stage changes." },
 ];
 
 export interface TodayFacts {

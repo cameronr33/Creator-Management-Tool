@@ -15,6 +15,7 @@ import { changeStage } from "../src/lib/mutations";
 import { getStageSince } from "../src/lib/queries";
 import { getTodayData } from "../src/lib/today-data";
 import { DEFAULT_THRESHOLDS } from "../src/lib/thresholds";
+import { setSnooze } from "../src/lib/snooze";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail?: string) {
@@ -75,6 +76,30 @@ async function main() {
     check("…the recent one says when it arrived", videoRows[1]?.badge === null && videoRows[1]?.note === "Delivered 5 days ago.");
     const nudged = today.rows.find((r) => r.partnershipId === quiet);
     check("a deal gone quiet at Talking is back on Follow up", nudged?.section === "follow_up" && /nudge them/.test(nudged?.note ?? ""), JSON.stringify(nudged && { s: nudged.section, n: nudged.note }));
+
+    console.log("\n── Snooze ──");
+    const sleepy = await add("__verify_td_snooze");
+    await changeStage(sleepy, "in_conversation");
+    await setSnooze(sleepy, new Date(Date.now() + 3 * 86_400_000), "back from SEMA on the 10th", "Sam Teammate");
+    const [row] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, sleepy));
+    check("the stage it's snoozed at comes from the database", row.snoozeStage === "in_conversation" && row.snoozedByName === "Sam Teammate" && !!row.snoozedAt);
+    const rowOf = async () => (await getTodayData({ clientId: client.id, campaignId })).rows.find((r) => r.partnershipId === sleepy);
+    const asleep = await rowOf();
+    check("a snoozed creator sits in Snoozed, with when and why", asleep?.section === "snoozed" && asleep.snooze?.reason === "back from SEMA on the 10th" && asleep.snooze.by === "Sam Teammate");
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId: sleepy, direction: "outbound", channel: "ig_dm", kind: "follow_up", occurredAt: new Date() });
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId: sleepy, direction: "inbound", channel: "email", kind: "note", occurredAt: new Date() });
+    check("our own message or an invite doesn't wake it", (await rowOf())?.section === "snoozed");
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId: sleepy, direction: "inbound", channel: "ig_dm", kind: "reply", occurredAt: new Date(Date.now() - 86_400_000) });
+    check("their message stored after the snooze wakes it — even one dated yesterday", (await rowOf())?.section !== "snoozed");
+    const moved = await add("__verify_td_snooze_moved");
+    await setSnooze(moved, new Date(Date.now() + 3 * 86_400_000), null, null);
+    await changeStage(moved, "contacted");
+    check("a stage change wakes it", (await rowOf()) !== undefined && (await getTodayData({ clientId: client.id, campaignId })).rows.find((r) => r.partnershipId === moved)?.section !== "snoozed");
+    const cleared = await add("__verify_td_snooze_cleared");
+    await setSnooze(cleared, new Date(Date.now() + 3 * 86_400_000), null, null);
+    await setSnooze(cleared, null, null, null);
+    const [c2] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, cleared));
+    check("Bring back now clears it", c2.snoozedUntil === null && c2.snoozeStage === null && (await getTodayData({ clientId: client.id, campaignId })).rows.find((r) => r.partnershipId === cleared)?.section !== "snoozed");
   } finally {
     if (creatorIds.length) await db.delete(schema.cmCreators).where(inArray(schema.cmCreators.id, creatorIds));
     await db.delete(schema.cmCampaigns).where(and(eq(schema.cmCampaigns.id, campaignId)));

@@ -59,6 +59,8 @@ import { governingContract, isStaleRead, listContracts } from "@/lib/contracts";
 import { dealDifferences, type DealFacts, type EmailDeal } from "@/lib/deal-facts";
 import { Contracts, type ContractRow, type OfferedDifference } from "@/components/contracts";
 import { StatusNote } from "@/components/status-note";
+import { BringBackButton, SnoozeControl, SnoozeLine } from "@/components/snooze";
+import { snoozeActive } from "@/lib/snooze-rules";
 import { TrackingLink } from "@/components/tracking-link";
 import { OwnerPicker } from "@/components/owner-controls";
 import { listTeammates } from "@/lib/owners";
@@ -141,6 +143,11 @@ export default async function CreatorDetailPage({
   const client = clients.find((item) => item.id === creator.clientId);
 
   const hasAddress = !!(partnership.addressLine1 && partnership.city && partnership.region && partnership.postalCode);
+  // Snoozed off Today? The same rule Today uses, over the messages already loaded.
+  const lastInboundStoredAt = events
+    .filter((e) => e.direction === "inbound" && e.kind !== "note")
+    .reduce<Date | null>((latest, e) => (!latest || e.createdAt > latest ? e.createdAt : latest), null);
+  const asleep = snoozeActive({ ...partnership, lastInboundStoredAt });
   const step = nextStep({
     stage: partnership.stage,
     hasAddress,
@@ -270,6 +277,18 @@ export default async function CreatorDetailPage({
               />
               <div className="mt-2">
                 <StatusNote partnershipId={partnership.id} note={statusNoteView(partnership)} />
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted">
+                {asleep && partnership.snoozedUntil ? (
+                  <>
+                    <span>
+                      Off Today · <SnoozeLine until={partnership.snoozedUntil.toISOString()} by={partnership.snoozedByName} reason={partnership.snoozeReason} />
+                    </span>
+                    <BringBackButton partnershipId={partnership.id} name={creator.name} />
+                  </>
+                ) : (
+                  <SnoozeControl partnershipId={partnership.id} name={creator.name} label="Snooze on Today" />
+                )}
               </div>
               {partnership.clientApproval === "pending" ? (
                 <div className="mt-2">

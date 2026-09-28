@@ -8,6 +8,8 @@ import { placeOnToday, sortToday, type TodaySection } from "@/lib/today";
 import type { WhoseTurn } from "@/lib/activity";
 import { statusNoteView, type StatusNoteView } from "@/lib/status-note";
 import { hiddenSummary, splitByView, type View } from "@/lib/owners";
+import { snoozeActive } from "@/lib/snooze-rules";
+import { getLastInboundStoredAt } from "@/lib/snooze";
 
 /** One Today row — plain values only, so it can go straight to the client list. */
 export interface TodayRow {
@@ -39,6 +41,8 @@ export interface TodayRow {
   since: string | null;
   /** "due" (first message) or "late" (video). */
   badge: "due" | "late" | null;
+  /** While snoozed: back when (ISO), who snoozed it and why. */
+  snooze: { until: string; by: string | null; reason: string | null } | null;
 }
 
 export interface TodayData {
@@ -49,6 +53,8 @@ export interface TodayData {
   hiddenSummary: string | null;
   /** Creators on the client/campaign at all, whatever the view — tells "all caught up" from "none yet". */
   totalCreators: number;
+  /** How many are snoozed off Today right now. */
+  snoozedCount: number;
 }
 
 export interface TodayOptions {
@@ -64,10 +70,10 @@ export async function getTodayData({ clientId, campaignId, view = "all", userId 
   const stageCounts: Partial<Record<CmStage, number>> = {};
   for (const c of creators) stageCounts[c.stage] = (stageCounts[c.stage] ?? 0) + 1;
   const base = { stageCounts, hiddenSummary: hiddenSummary(hidden), totalCreators: all.length };
-  if (creators.length === 0) return { rows: [], ...base };
+  if (creators.length === 0) return { rows: [], ...base, snoozedCount: 0 };
 
   const ids = creators.map((c) => c.partnershipId);
-  const [outreach, thresholds, details, shipments, stageSince] = await Promise.all([
+  const [outreach, thresholds, details, shipments, stageSince, lastInbound] = await Promise.all([
     getOutreachStates(ids),
     getFollowUpThresholds(clientId),
     db
@@ -87,6 +93,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", userId 
       .where(inArray(cmShipments.partnershipId, ids))
       .orderBy(desc(cmShipments.createdAt)),
     getStageSince(ids),
+    getLastInboundStoredAt(ids),
   ]);
   const detailById = new Map(details.map((d) => [d.id, d]));
   const latestShipment = new Map<string, (typeof shipments)[number]>();
@@ -111,6 +118,8 @@ export async function getTodayData({ clientId, campaignId, view = "all", userId 
       deliveredAt: latestShipment.get(c.partnershipId)?.deliveredAt ?? null,
     });
     if (!placed) continue;
+    // Snoozed: off the working sections until the date, or until they write or the stage moves.
+    const asleep = snoozeActive({ ...c, stage: c.stage, lastInboundStoredAt: lastInbound.get(c.partnershipId) ?? null });
     const d = detailById.get(c.partnershipId);
     rows.push({
       partnershipId: c.partnershipId,
@@ -118,8 +127,8 @@ export async function getTodayData({ clientId, campaignId, view = "all", userId 
       username: c.profileUrl ? c.username : null,
       campaignName: c.campaignName,
       stage: c.stage,
-      section: placed.section,
-      note: placed.note,
+      section: asleep ? "snoozed" : placed.section,
+      note: asleep ? null : placed.note,
       latest: c.activity.text,
       latestFromEmail: c.activity.fromEmail,
       latestAt: c.activity.at?.toISOString() ?? null,
@@ -134,9 +143,10 @@ export async function getTodayData({ clientId, campaignId, view = "all", userId 
       approvalByName: c.approvalByName,
       ownerId: c.ownerId,
       ownerName: c.ownerName,
-      since: placed.since?.toISOString() ?? null,
-      badge: placed.badge,
+      since: asleep ? c.snoozedUntil!.toISOString() : (placed.since?.toISOString() ?? null),
+      badge: asleep ? null : placed.badge,
+      snooze: asleep ? { until: c.snoozedUntil!.toISOString(), by: c.snoozedByName, reason: c.snoozeReason } : null,
     });
   }
-  return { rows: sortToday(rows), ...base };
+  return { rows: sortToday(rows), ...base, snoozedCount: rows.filter((r) => r.section === "snoozed").length };
 }

@@ -151,6 +151,12 @@ export interface CreatorRow {
   /** Who looks after the deal (null = unassigned) and their name. */
   ownerId: string | null;
   ownerName: string | null;
+  /** Snoozed off Today (see snooze-rules.ts). */
+  snoozedUntil: Date | null;
+  snoozedAt: Date | null;
+  snoozeStage: CmStage | null;
+  snoozeReason: string | null;
+  snoozedByName: string | null;
   /** Our own note on where things stand, with who wrote it and when. */
   statusNote: string | null;
   statusNoteAt: Date | null;
@@ -212,6 +218,11 @@ export async function getCreatorRows(
       ownerName: users.name,
       createdAt: cmPartnerships.createdAt,
       approvalAt: cmPartnerships.approvalAt,
+      snoozedUntil: cmPartnerships.snoozedUntil,
+      snoozedAt: cmPartnerships.snoozedAt,
+      snoozeStage: cmPartnerships.snoozeStage,
+      snoozeReason: cmPartnerships.snoozeReason,
+      snoozedByName: cmPartnerships.snoozedByName,
       clientApproval: cmPartnerships.clientApproval,
       approvalByName: cmPartnerships.approvalByName,
       photoFetchedAt: cmCreatorPhotos.fetchedAt,
