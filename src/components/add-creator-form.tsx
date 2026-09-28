@@ -18,17 +18,20 @@ export function AddCreatorForm({
   clientId,
   clientName,
   campaigns,
+  defaultCampaignId = null,
 }: {
   clientId: string;
   clientName: string;
   campaigns: Campaign[];
+  /** The campaign picked in the sidebar, when there is one. */
+  defaultCampaignId?: string | null;
 }) {
   const router = useRouter();
   const { pending, run } = useSave();
 
   const [links, setLinks] = useState<string[]>([""]);
   const [name, setName] = useState("");
-  const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
+  const [campaignId, setCampaignId] = useState(defaultCampaignId && campaigns.some((c) => c.id === defaultCampaignId) ? defaultCampaignId : (campaigns[0]?.id ?? ""));
   const [newCampaign, setNewCampaign] = useState("");
   const [stage, setStage] = useState("shortlisted");
   const [email, setEmail] = useState("");

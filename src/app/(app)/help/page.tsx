@@ -258,7 +258,7 @@ export default async function HelpPage() {
         <Card id="words" className="p-5">
           <CardHeader title="Words we use" />
           <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-[11rem_1fr]">
-            <Term word="Creator">A person or channel — their profile links, follower count and research. One record, reused across clients and campaigns.</Term>
+            <Term word="Creator">A person or channel — their profile links, follower count and research. One record per client, reused across that client&apos;s campaigns.</Term>
             <Term word="Partnership">One creator working one campaign. That&apos;s what moves through the stages; a creator can have several.</Term>
             <Term word="Campaign">A client&apos;s effort that creators are recruited for, e.g. &ldquo;Evergreen creators&rdquo; or &ldquo;Suspension&rdquo;.</Term>
             <Term word="Content type (pillar)">What the creator mostly posts — overlanding, DIY, shop builds.</Term>

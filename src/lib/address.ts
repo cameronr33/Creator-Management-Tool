@@ -161,10 +161,12 @@ export function formatAddress(a: {
   city?: string | null;
   region?: string | null;
   postalCode?: string | null;
+  country?: string | null;
 }): string {
   const cityLine = [a.city, a.region].filter(Boolean).join(", ");
   const lastLine = [cityLine, a.postalCode].filter(Boolean).join(" ");
-  return [a.recipientName, a.addressLine1, a.addressLine2, lastLine]
+  const country = a.country && !/^(us|usa|united states)$/i.test(a.country.trim()) ? a.country.trim() : null;
+  return [a.recipientName, a.addressLine1, a.addressLine2, lastLine, country]
     .filter((p) => p && p.trim() !== "")
     .join("\n");
 }

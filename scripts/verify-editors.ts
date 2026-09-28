@@ -10,7 +10,8 @@
  */
 import { eq } from "drizzle-orm";
 import { db, schema } from "./db";
-import { parseAddress } from "../src/lib/address";
+import { formatAddress, parseAddress } from "../src/lib/address";
+import { trackingUrl } from "../src/lib/tracking";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 
 let failures = 0;
@@ -51,6 +52,16 @@ async function main() {
   );
   const a6 = parseAddress("7747 Lakeside Drive\nJurupa Valley, CA 92509\nUSA");
   check("multi-line without a name still complete, 'USA' dropped", !!a6?.isComplete && a6.recipientName === null, JSON.stringify(a6));
+
+  console.log("\n── Tracking links and addresses outside the US (2026-09-28 review) ──");
+  check("a UPS number links to UPS, whatever the carrier field says", trackingUrl(null, "1Z999AA10123456784")?.startsWith("https://www.ups.com/") === true);
+  check("a named carrier wins", trackingUrl("FedEx", "123")?.startsWith("https://www.fedex.com/") === true && trackingUrl("USPS", "9400111899223856923456")?.includes("usps.com") === true);
+  check("an unknown shape with no carrier isn't guessed", trackingUrl(null, "ABC-123") === null && trackingUrl("UPS", "") === null);
+  check(
+    "the country prints when it isn't the US",
+    formatAddress({ addressLine1: "1 King St", city: "Toronto", region: "ON", postalCode: "M5H 1A1", country: "Canada" }).endsWith("Canada") &&
+      formatAddress({ addressLine1: "1 A St", city: "Austin", region: "TX", postalCode: "78701", country: "US" }).endsWith("78701"),
+  );
 
   console.log("\n── metricsSource labeling rules (mirrors /api/deliverables) ──");
   // The route's decision table, restated: manual publicViews -> authoritative;

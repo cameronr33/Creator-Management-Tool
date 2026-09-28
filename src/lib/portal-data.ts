@@ -105,6 +105,7 @@ export async function getPortalCreators(clientId: string): Promise<PortalCreator
       city: cmPartnerships.city,
       region: cmPartnerships.region,
       postalCode: cmPartnerships.postalCode,
+      country: cmPartnerships.country,
       photoAt: cmCreatorPhotos.fetchedAt,
     })
     .from(cmPartnerships)

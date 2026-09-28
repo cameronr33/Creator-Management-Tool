@@ -1,3 +1,4 @@
+import { CheckEmailButton } from "@/components/check-email-button";
 import { requireAgencyPage } from "@/lib/page-guards";
 import { Plus, Mail } from "lucide-react";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
@@ -28,11 +29,13 @@ export default async function TodayPage() {
     <div className="space-y-4 p-4 sm:p-6">
       <AToZStrip counts={stageCounts} />
       <Callout tone={health.tone} icon={<Mail size={16} />} title={health.label}
-        actions={<Button size="sm" href="/settings#email-sync">Email settings</Button>}>
+        actions={<>{account && <CheckEmailButton />}<Button size="sm" variant="ghost" href="/settings#email-sync">Email settings</Button></>}>
         {health.detail}
       </Callout>
       {rows.length === 0
-        ? <EmptyState title={campaign ? `Nothing to do in ${campaign.name}` : "Nothing to do"} hint="Add creators or import a CSV to get started. Posted and closed deals don't show here." action={<Button href="/import">Import CSV</Button>} />
+        ? (Object.values(stageCounts).some((n) => (n ?? 0) > 0)
+          ? <EmptyState title="All caught up" hint="Nobody needs anything from you right now. Posted and closed deals don't show here." />
+          : <EmptyState title={campaign ? `No creators in ${campaign.name} yet` : "No creators yet"} hint="Add a creator or import a CSV to get started." action={<Button href="/import">Import CSV</Button>} />)
         : <TodayList rows={rows} />}
     </div>
   </>;

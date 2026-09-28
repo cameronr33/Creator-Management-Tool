@@ -65,7 +65,7 @@ export function ReplyButton({ partnershipId, name }: { partnershipId: string; na
               channel: "ig_dm",
               kind: "reply",
             }),
-          { success: `${name} marked as replied` },
+          { success: `Logged ${name}'s reply` },
         )
       }
     >

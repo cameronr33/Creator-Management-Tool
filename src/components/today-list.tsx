@@ -7,7 +7,7 @@ import { Avatar, Badge, Button, Card } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { QuickStage } from "@/components/quick-stage";
 import { StatusNote } from "@/components/status-note";
-import { MessagedButton } from "@/components/reply-button";
+import { MessagedButton, ReplyButton } from "@/components/reply-button";
 import { CloseAsDeclinedButton, NoReplyNeededButton } from "@/components/email-status";
 import { VideoLinkPrompt } from "@/components/partnership-actions";
 import { ApprovalButtons } from "@/components/approval-buttons";
@@ -149,8 +149,27 @@ function NextAction({ row: r }: { row: TodayRow }) {
     case "waiting_approval":
       return <ApprovalButtons partnershipId={r.partnershipId} name={r.name} who="agency" />;
     case "follow_up":
+      return (
+        <>
+          <MessagedButton partnershipId={r.partnershipId} name={r.name} hasOutbound={r.hasOutbound} variant="primary" />
+          <ReplyButton partnershipId={r.partnershipId} name={r.name} />
+        </>
+      );
     case "to_contact":
       return <MessagedButton partnershipId={r.partnershipId} name={r.name} hasOutbound={r.hasOutbound} variant="primary" />;
+    case "finalizing":
+      return (
+        <>
+          <Button size="sm" variant="primary" href={href(r, r.whoseTurn === "us" ? "conversation" : "agreement")} icon={<ArrowRight size={13} />}>
+            {r.whoseTurn === "us" ? "Open conversation" : "Open Deal"}
+          </Button>
+          {r.whoseTurn === "us" && (
+            <Button size="sm" variant="ghost" href={href(r, "agreement")}>
+              Open Deal
+            </Button>
+          )}
+        </>
+      );
     case "get_address":
       return r.suggestedAddress ? (
         <UseAddressButton row={r} />

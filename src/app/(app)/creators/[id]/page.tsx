@@ -59,6 +59,7 @@ import { governingContract, isStaleRead, listContracts } from "@/lib/contracts";
 import { dealDifferences, type DealFacts, type EmailDeal } from "@/lib/deal-facts";
 import { Contracts, type ContractRow, type OfferedDifference } from "@/components/contracts";
 import { StatusNote } from "@/components/status-note";
+import { TrackingLink } from "@/components/tracking-link";
 import { statusNoteView } from "@/lib/status-note";
 
 /** Where the Next: line's link goes, named for where it lands. */
@@ -432,6 +433,12 @@ export default async function CreatorDetailPage({
                     <div className="text-xs text-text-muted">
                       {shipment.shippedAt ? `Shipped ${shortDate(shipment.shippedAt)}` : "Not shipped yet"}
                       {shipment.deliveredAt ? ` · Delivered ${shortDate(shipment.deliveredAt)}` : ""}
+                      {shipment.trackingNumber && (
+                        <>
+                          {" · "}
+                          <TrackingLink carrier={shipment.carrier} number={shipment.trackingNumber} label="Track it" />
+                        </>
+                      )}
                     </div>
                     {shipment.notes && <p className="whitespace-pre-wrap text-sm text-text-muted">{shipment.notes}</p>}
                   </div>

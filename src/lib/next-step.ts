@@ -81,7 +81,7 @@ export function nextStep(i: NextStepInput): NextStep {
     case "shipped":
       switch (i.shipmentStatus) {
         case null:
-          return { text: "Create the shipment: pick Ready under Shipping.", anchor: "shipping" };
+          return { text: "Ship the product, then mark it Shipped with the tracking number.", anchor: "shipping" };
         case "ready":
           return { text: "Ship the product, then mark it Shipped (add the tracking number).", anchor: "shipping" };
         case "shipped":

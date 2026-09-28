@@ -1,3 +1,4 @@
+import { TrackingLink } from "@/components/tracking-link";
 import { redirect } from "next/navigation";
 import { MapPin, Package } from "lucide-react";
 import { Card, CardHeader, EmptyState } from "@/components/ui";
@@ -55,7 +56,16 @@ export default async function PortalShip() {
                   <PortalCreatorHeader c={c} showStage={false} />
                   <p className="ml-11 mt-1 text-xs text-text-muted">
                     Shipped{c.shipment?.shippedAt ? ` ${shortDate(c.shipment.shippedAt)}` : ""}
-                    {c.shipment?.carrier || c.shipment?.trackingNumber ? ` · ${[c.shipment?.carrier, c.shipment?.trackingNumber].filter(Boolean).join(" ")}` : ""}
+                    {c.shipment?.trackingNumber ? (
+                      <>
+                        {" · "}
+                        <TrackingLink carrier={c.shipment.carrier} number={c.shipment.trackingNumber} />
+                      </>
+                    ) : c.shipment?.carrier ? (
+                      ` · ${c.shipment.carrier}`
+                    ) : (
+                      ""
+                    )}
                   </p>
                 </div>
                 <PortalShipForm c={c} readOnly={ctx.readOnly} />

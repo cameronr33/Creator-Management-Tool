@@ -1,3 +1,4 @@
+import { TrackingLink } from "@/components/tracking-link";
 import { redirect } from "next/navigation";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { PortalCreatorHeader } from "@/components/portal";
@@ -19,7 +20,7 @@ export default async function PortalCreators() {
           <PortalCreatorHeader c={c} />
           <div className="ml-11 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
             {c.clientApproval === "pending" && c.stage === "shortlisted" && <Badge tone="warn">Waiting for your approval</Badge>}
-            {c.shipment?.status === "shipped" && <span>Shipped{c.shipment.shippedAt ? ` ${shortDate(c.shipment.shippedAt)}` : ""}{c.shipment.trackingNumber ? ` · ${c.shipment.trackingNumber}` : ""}</span>}
+            {c.shipment?.status === "shipped" && <span>Shipped{c.shipment.shippedAt ? ` ${shortDate(c.shipment.shippedAt)}` : ""}{c.shipment.trackingNumber ? <> · <TrackingLink carrier={c.shipment.carrier} number={c.shipment.trackingNumber} /></> : ""}</span>}
             {c.shipment?.status === "delivered" && <span>Delivered{c.shipment.deliveredAt ? ` ${shortDate(c.shipment.deliveredAt)}` : ""}</span>}
             {c.videos.map((v, i) => (
               <a key={v.url} href={v.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">

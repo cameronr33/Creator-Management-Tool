@@ -2,6 +2,7 @@ import { requireAgencyPage } from "@/lib/page-guards";
 import type { Metadata } from "next";
 import { resolveClient, getCampaigns } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
+import { resolveCampaign } from "@/lib/campaigns";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { AddCreatorForm } from "@/components/add-creator-form";
 
@@ -21,7 +22,7 @@ export default async function NewCreatorPage() {
     );
   }
 
-  const campaigns = await getCampaigns(client.id);
+  const [campaigns, selected] = await Promise.all([getCampaigns(client.id), resolveCampaign(client.id)]);
 
   return (
     <>
@@ -29,13 +30,14 @@ export default async function NewCreatorPage() {
         title="Add creator"
         client={client.name}
         back={{ href: "/creators", label: "Creators" }}
-        help="For a creator you already know about. Paste their profile link, auto-fill what you can, and pick the campaign — research runs add creators automatically, so this is only for the ones you find yourself."
+        help="For one creator at a time. Paste their profile link, auto-fill what you can, and pick the campaign. For a list, use Import CSV."
       />
       <div className="p-6">
         <AddCreatorForm
           clientId={client.id}
           clientName={client.name}
           campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))}
+          defaultCampaignId={selected?.id ?? null}
         />
       </div>
     </>

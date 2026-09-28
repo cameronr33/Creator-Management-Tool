@@ -31,7 +31,7 @@ export function AToZStrip({
               );
               const cls = "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-text-muted transition hover:bg-surface-2 hover:text-text";
               return links ? (
-                <Link href="/pipeline" title={`${s.hint} ${s.action}`} className={cls}>
+                <Link href={`/creators?stage=${s.value}`} title={`${s.hint} ${s.action}`} className={cls}>
                   {inner}
                 </Link>
               ) : (

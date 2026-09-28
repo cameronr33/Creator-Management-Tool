@@ -49,8 +49,8 @@ function main() {
   );
   check("a returned shipment overrides a later content stage", nextStep({ ...base, stage: "content_pending", briefSent: true, shipmentStatus: "returned" }).anchor === "shipping");
   check(
-    "fulfilling with no shipment says to create one",
-    /create the shipment/i.test(nextStep({ ...base, stage: "fulfilling" }).text),
+    "fulfilling with no shipment says to ship it and mark it Shipped with tracking",
+    /ship the product, then mark it shipped with the tracking number/i.test(nextStep({ ...base, stage: "fulfilling" }).text),
   );
   check(
     "fulfilling + shipped says to mark delivered",
