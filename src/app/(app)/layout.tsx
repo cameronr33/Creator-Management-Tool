@@ -64,7 +64,7 @@ export default async function AppLayout({
             <form action={signOutAction}>
               <button
                 type="submit"
-                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-sidebar-muted transition hover:bg-sidebar-hover-bg hover:text-white"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium text-sidebar-muted transition hover:bg-sidebar-hover-bg hover:text-white"
                 title="Sign out"
               >
                 <LogOut size={14} />

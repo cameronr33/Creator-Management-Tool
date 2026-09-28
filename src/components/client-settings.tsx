@@ -133,7 +133,7 @@ export function FollowUpCadence({
       </div>
       <div className="flex items-center gap-2">
         <Button variant="primary" size="sm" onClick={save} pending={pending}>
-          Save cadence
+          Save follow-up timing
         </Button>
         <Button variant="ghost" size="sm" onClick={reset} disabled={pending}>
           Reset to defaults

@@ -174,7 +174,7 @@ export interface DealDifference {
 }
 
 const money = (n: number | string) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-const COMP_LABEL: Record<CompensationType, string> = { free_product: "Free product", flat_fee: "Flat fee", hybrid: "Product + fee" };
+const COMP_LABEL: Record<CompensationType, string> = { free_product: "Product only", flat_fee: "Fee only", hybrid: "Product + fee" };
 
 function sameProduct(a: string, b: string): boolean {
   const x = squash(a);

@@ -69,6 +69,8 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
   const [closing, setClosing] = useState<Closing | null>(null);
   // A card moved to Posted with no video recorded: ask for the link on the card.
   const [posting, setPosting] = useState<string | null>(null);
+  // Closed deals fold away until asked for; the board is about live work.
+  const [showClosed, setShowClosed] = useState(false);
 
   // After a refresh the server hands down new cards; adopt them.
   const [seenCards, setSeenCards] = useState(cards);
@@ -161,6 +163,29 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
       {COLUMNS.map((col) => {
         const colCards = items.filter((c) => col.stages.includes(c.stage));
         const dropStage = col.stages[0];
+        // Empty stages (and Closed, until opened) fold to a slim strip so the whole
+        // pipeline fits on one screen; they open while a card is being dragged.
+        const folded = !dragId && !(closing && col.key === "closed") && (colCards.length === 0 || (col.key === "closed" && !showClosed));
+        if (folded) {
+          const isClosed = col.key === "closed" && colCards.length > 0;
+          return (
+            <button
+              key={col.key}
+              type="button"
+              disabled={!isClosed}
+              onClick={() => isClosed && setShowClosed(true)}
+              title={isClosed ? `Show ${colCards.length} closed` : `${col.label} — nobody here. ${col.hint}`}
+              aria-label={isClosed ? `Show ${colCards.length} closed` : `${col.label}: empty`}
+              className={cn(
+                "flex w-10 shrink-0 flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-surface-2/40 py-3 text-xs text-text-faint transition",
+                isClosed && "cursor-pointer border-solid hover:border-accent-ring hover:text-accent",
+              )}
+            >
+              <span className="rounded-full bg-surface px-1.5 text-[11px] font-semibold tabular ring-1 ring-inset ring-border">{colCards.length}</span>
+              <span className="font-medium [writing-mode:vertical-rl]">{col.label}</span>
+            </button>
+          );
+        }
         return (
           <div
             key={col.key}
@@ -178,7 +203,7 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
               setOverCol(null);
             }}
             className={cn(
-              "flex w-64 shrink-0 flex-col rounded-xl border bg-surface-2/60 transition",
+              "flex w-60 shrink-0 flex-col rounded-xl border bg-surface-2/60 transition",
               overCol === col.key ? "border-accent-ring ring-2 ring-accent-soft" : "border-border",
             )}
           >
@@ -189,7 +214,14 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                   {colCards.length}
                 </span>
               </div>
-              <div className="text-[11px] text-text-faint">{col.group}</div>
+              <div className="flex items-center justify-between text-[11px] text-text-faint">
+                <span>{col.group}</span>
+                {col.key === "closed" && showClosed && !dragId && (
+                  <Button variant="link" className="!text-[11px]" onClick={() => setShowClosed(false)}>
+                    Fold away
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="flex min-h-16 flex-col gap-2 px-2 pb-2">
               {closing && col.key === "closed" && closePrompt(closing)}
@@ -250,6 +282,7 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                       partnershipId={c.partnershipId}
                       name={c.name}
                       stage={c.stage}
+                      asMove
                       className="w-full"
                       onMoved={(landed) =>
                         setItems((prev) => prev.map((x) => (x.partnershipId === c.partnershipId ? { ...x, stage: landed } : x)))

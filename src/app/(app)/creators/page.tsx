@@ -112,6 +112,10 @@ export default async function CreatorsPage({
               repliedAt: r.repliedAt ? r.repliedAt.toISOString() : null,
               photoUrl: r.photoUrl,
               clientApproval: r.clientApproval,
+              standing: r.statusNote
+                ? { text: r.statusNote, ours: true, at: r.statusNoteAt?.toISOString() ?? null }
+                : { text: r.activity.text, ours: false, at: r.activity.at?.toISOString() ?? null },
+              whoseTurn: r.activity.whoseTurn,
             }))}
             campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))}
             scopeName={campaign?.name ?? null}

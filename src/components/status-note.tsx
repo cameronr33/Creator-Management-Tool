@@ -18,7 +18,7 @@ export function StatusNote({ partnershipId, note, compact = false }: { partnersh
   const [draft, setDraft] = useState(note?.text ?? "");
 
   const save = async (text: string) => {
-    const r = await run(() => api(`/api/partnerships/${partnershipId}`, { statusNote: text.trim() || null }, "PATCH"), { success: text.trim() ? "Note saved" : "Note removed" });
+    const r = await run(() => api(`/api/partnerships/${partnershipId}`, { statusNote: text.trim() || null }, "PATCH"), { success: text.trim() ? "Saved where things stand" : "Removed" });
     if (r.ok) setEditing(false);
   };
 
@@ -30,7 +30,7 @@ export function StatusNote({ partnershipId, note, compact = false }: { partnersh
           rows={compact ? 3 : 2}
           maxLength={600}
           autoFocus
-          aria-label="Our note on where things stand"
+          aria-label="Where things stand"
           placeholder="Where things stand — e.g. waiting on HELLA for wiper part numbers; she's fine with the delay."
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -41,7 +41,7 @@ export function StatusNote({ partnershipId, note, compact = false }: { partnersh
         />
         <div className="flex flex-wrap gap-1.5">
           <Button size="sm" variant="primary" pending={pending} onClick={() => save(draft)}>
-            Save note
+            Save
           </Button>
           <Button size="sm" variant="ghost" disabled={pending} onClick={() => setEditing(false)}>
             Cancel
@@ -67,7 +67,7 @@ export function StatusNote({ partnershipId, note, compact = false }: { partnersh
           setEditing(true);
         }}
       >
-        Add a note
+        Note where things stand
       </Button>
     );
   }
@@ -75,7 +75,7 @@ export function StatusNote({ partnershipId, note, compact = false }: { partnersh
   return (
     <div className={compact ? "flex items-start gap-1 text-xs leading-snug" : "flex items-start gap-1.5 text-sm"}>
       <NotebookPen size={compact ? 11 : 13} className="mt-[3px] shrink-0 text-accent" />
-      <p className={compact ? "line-clamp-4 min-w-0 flex-1 text-text" : "min-w-0 flex-1 text-text"} title={note.text}>
+      <p className={compact ? "line-clamp-4 min-w-0 flex-1 text-text" : "min-w-0 flex-1 text-text"} title={`Where things stand: ${note.text}`}>
         {note.text}
         <span className="text-text-faint">
           {" "}
@@ -84,7 +84,7 @@ export function StatusNote({ partnershipId, note, compact = false }: { partnersh
         </span>
       </p>
       <IconButton
-        label="Edit our note"
+        label="Edit where things stand"
         icon={<Pencil size={compact ? 11 : 12} />}
         onClick={() => {
           setDraft(note.text);

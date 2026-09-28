@@ -61,7 +61,8 @@ export function CreatorsFilterBar() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, handle, content type…"
+            placeholder="Search creators"
+            title="Search by name, handle or content type"
             aria-label="Search creators"
             className="w-64 pl-8"
           />

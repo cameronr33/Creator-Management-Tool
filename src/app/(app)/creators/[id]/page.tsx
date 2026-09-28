@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { getPartnershipDetail, getClients, getPhotoUrl, getCampaigns } from "@/lib/queries";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
-import { Card, CardHeader, StagePill, Avatar, Badge, Callout } from "@/components/ui";
+import { Card, CardHeader, Avatar, Badge, Callout } from "@/components/ui";
 import {
   StageControl,
   TimelineNote,
@@ -60,6 +60,14 @@ import { dealDifferences, type DealFacts, type EmailDeal } from "@/lib/deal-fact
 import { Contracts, type ContractRow, type OfferedDifference } from "@/components/contracts";
 import { StatusNote } from "@/components/status-note";
 import { statusNoteView } from "@/lib/status-note";
+
+/** Where the Next: line's link goes, named for where it lands. */
+const NEXT_LINK_LABELS: Record<string, string> = {
+  conversation: "Open the conversation",
+  agreement: "Open Deal",
+  shipping: "Open Shipping",
+  content: "Open Content",
+};
 
 /** Messages shown per thread before "Show earlier". */
 const THREAD_PREVIEW = 2;
@@ -159,7 +167,7 @@ export default async function CreatorDetailPage({
   ];
 
   const conversationBadge = outreach.hasReplied ? (
-    <Badge tone="good">replied</Badge>
+    <Badge tone="good">Replied</Badge>
   ) : outreach.totalOutbound > 0 ? (
     <Badge tone="warn">
       {outreach.followUpCount} follow-up{outreach.followUpCount === 1 ? "" : "s"} · no reply
@@ -199,7 +207,6 @@ export default async function CreatorDetailPage({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-lg font-semibold tracking-tight text-text">{creator.name}</h1>
-                <StagePill stage={partnership.stage} />
                 {creator.contentPillar && <Badge tone="accent">{creator.contentPillar}</Badge>}
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
@@ -240,7 +247,7 @@ export default async function CreatorDetailPage({
                     <>
                       {" "}
                       <a href={anchor(step.anchor as Parameters<typeof creatorSectionHref>[1])} className="font-medium underline">
-                        Go there
+                        {NEXT_LINK_LABELS[step.anchor] ?? "Open it"}
                       </a>
                     </>
                   )}
@@ -374,7 +381,7 @@ export default async function CreatorDetailPage({
             <div className="border-t border-border pt-3">
               <FeeEditor partnershipId={partnership.id} feeAmount={partnership.feeAmount} compensationType={partnership.compensationType} />
               {partnership.feeAmount && partnership.compensationType !== "free_product" && (
-                <div className="mt-1 text-xs text-text-faint">{money(partnership.feeAmount)} recorded — payment itself is tracked in accounting</div>
+                <div className="mt-1 text-xs text-text-faint">{money(partnership.feeAmount)} recorded</div>
               )}
             </div>
           </div>
@@ -475,7 +482,7 @@ export default async function CreatorDetailPage({
           <details open={!creator.profileUrl}>
             <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-text">
               <User size={14} /> Profile
-              <span className="text-xs font-normal text-text-muted">name, links, email addresses, numbers — shared across their campaigns</span>
+              <span className="text-xs font-normal text-text-muted">Name, links, email addresses and numbers — shared across their campaigns</span>
             </summary>
             <div className="mt-4 space-y-4">
               <EditableProfile creator={creator} />

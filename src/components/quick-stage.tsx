@@ -20,6 +20,7 @@ export function QuickStage({
   stage,
   onMoved,
   className = "w-40",
+  asMove = false,
 }: {
   partnershipId: string;
   name: string;
@@ -27,6 +28,8 @@ export function QuickStage({
   /** Called with where it landed, before the page refreshes (the board moves the card at once). */
   onMoved?: (stage: CmStage) => void;
   className?: string;
+  /** On a board card the column already says the stage: show "Move to…" instead. */
+  asMove?: boolean;
 }) {
   const { pending, run } = useSave();
   const [closingAs, setClosingAs] = useState<CmStage | null>(null);
@@ -49,7 +52,7 @@ export function QuickStage({
         compact
         aria-label={`Stage for ${name}`}
         title={stageHint(stage)}
-        value={stage}
+        value={asMove ? "" : stage}
         disabled={pending}
         className={className}
         onChange={(e) => {
@@ -62,10 +65,15 @@ export function QuickStage({
           }
         }}
       >
+        {asMove && (
+          <option value="" disabled>
+            Move to…
+          </option>
+        )}
         {stagesByGroup().map((g) => (
           <optgroup key={g.group} label={g.label}>
             {g.stages.map((s) => (
-              <option key={s.value} value={s.value}>
+              <option key={s.value} value={s.value} disabled={asMove && s.value === stage}>
                 {s.label}
               </option>
             ))}

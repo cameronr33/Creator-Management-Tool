@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Check, ExternalLink, ImageDown, Mail, Trash2, X } from "lucide-react";
+import { Check, ExternalLink, ImageDown, Mail, NotebookPen, Trash2, X } from "lucide-react";
 import { Avatar, Badge, Button, Checkbox, Field, Select, StagePill } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
@@ -25,6 +25,9 @@ export interface CreatorsTableRow {
   repliedAt: string | null;
   photoUrl: string | null;
   clientApproval: "pending" | "approved" | "passed" | null;
+  /** Where things stand: our own note when there is one, else the latest message's line. */
+  standing: { text: string; ours: boolean; at: string | null };
+  whoseTurn: "us" | "them" | "none" | null;
 }
 
 /**
@@ -184,7 +187,7 @@ export function CreatorsTable({
               <th className="px-4 py-2.5 font-semibold">Creator</th>
               {!scopeName && <th className="px-4 py-2.5 font-semibold">Campaign</th>}
               <th className="px-4 py-2.5 font-semibold">Stage</th>
-              <th className="px-4 py-2.5 font-semibold">Last contact</th>
+              <th className="px-4 py-2.5 font-semibold">Where things stand</th>
               <th className="px-4 py-2.5 text-right font-semibold">Followers</th>
             </tr>
           </thead>
@@ -228,16 +231,14 @@ export function CreatorsTable({
                       {r.clientApproval === "pending" && r.stage === "shortlisted" && <Badge tone="warn">Awaiting approval</Badge>}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-text-muted">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {r.emailWhoseTurn === "us" && <Badge tone="warn">Your turn</Badge>}
-                      {r.repliedAt ? (
-                        <span>Replied {relativeDays(r.repliedAt)}</span>
-                      ) : r.lastOutboundAt ? (
-                        <span>Messaged {relativeDays(r.lastOutboundAt)}</span>
-                      ) : (
-                        "—"
-                      )}
+                  <td className="max-w-md px-4 py-2.5 text-text-muted">
+                    <div className="flex items-start gap-1.5">
+                      {r.whoseTurn === "us" && <Badge tone="warn">Your turn</Badge>}
+                      <span className="line-clamp-2 min-w-0" title={r.standing.text}>
+                        {r.standing.ours && <NotebookPen size={12} className="mr-1 inline align-[-1px] text-accent" />}
+                        <span className={r.standing.ours ? "text-text" : undefined}>{r.standing.text}</span>
+                        {r.standing.at && <span className="text-text-faint"> · {relativeDays(r.standing.at)}</span>}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-right tabular">{compactNumber(r.followers)}</td>

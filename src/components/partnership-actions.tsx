@@ -236,7 +236,7 @@ export function TimelineNote({
   if (!open) {
     return (
       <Button variant="link" icon={<Plus size={13} />} onClick={() => setOpen(true)}>
-        Log a call, note or off-app message
+        Log a call or DM
       </Button>
     );
   }
@@ -270,7 +270,7 @@ export function TimelineNote({
 /* ── Shipment ─────────────────────────────────────────────────── */
 
 const SHIP_STATES = [
-  { value: "ready", label: "Ready", title: "Address in hand, not sent yet" },
+  { value: "ready", label: "Not sent yet", title: "Address in hand, not sent yet" },
   { value: "shipped", label: "Shipped", title: "On its way — add the tracking number" },
   { value: "delivered", label: "Delivered", title: "It landed — send the brief" },
   { value: "returned", label: "Returned", title: "Came back to us" },
@@ -305,7 +305,7 @@ export function ShipmentControls({
 
   return (
     <div className="space-y-2.5">
-      <Field label="Shipment status" hint={shipment ? undefined : "Pick a status to create the shipment."}>
+      <Field label="Shipment status">
         <Segmented<ShipState>
           aria-label="Shipment status"
           value={(shipment?.status as ShipState | undefined) ?? null}
@@ -444,7 +444,7 @@ export function AgreementEditor({
           rows={2}
         />
       </Field>
-      <Field label="Notes for this campaign">
+      <Field label="Deal notes">
         <Textarea
           compact
           value={noteText}
@@ -495,7 +495,7 @@ export function FeeEditor({
           }}
         >
           <option value="free_product">Product only</option>
-          <option value="flat_fee">Fee</option>
+          <option value="flat_fee">Fee only</option>
           <option value="hybrid">Product + fee</option>
         </Select>
       </Field>

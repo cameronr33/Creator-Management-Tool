@@ -68,19 +68,38 @@ export function PageHeader({
                 {campaign ?? "All campaigns"}
               </Badge>
             )}
-            {helpAnchor && (
-              <Link
-                href={`/help#${helpAnchor}`}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-full text-text-faint transition hover:bg-surface-2 hover:text-accent"
-                title="How this page works"
-                aria-label="How this page works"
-              >
-                <CircleHelp size={15} />
-              </Link>
+            {help ? (
+              <details className="group relative">
+                <summary
+                  className="inline-flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full text-text-faint transition hover:bg-surface-2 hover:text-accent [&::-webkit-details-marker]:hidden"
+                  title="How this page works"
+                  aria-label="How this page works"
+                >
+                  <CircleHelp size={15} />
+                </summary>
+                <div className="absolute z-20 mt-1 max-w-md rounded-lg border border-border bg-surface p-3 text-xs leading-relaxed text-text-muted shadow-card">
+                  {help}
+                  {helpAnchor && (
+                    <Link href={`/help#${helpAnchor}`} className="mt-1.5 block font-medium text-accent hover:underline">
+                      Full guide →
+                    </Link>
+                  )}
+                </div>
+              </details>
+            ) : (
+              helpAnchor && (
+                <Link
+                  href={`/help#${helpAnchor}`}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full text-text-faint transition hover:bg-surface-2 hover:text-accent"
+                  title="How this page works"
+                  aria-label="How this page works"
+                >
+                  <CircleHelp size={15} />
+                </Link>
+              )
             )}
           </div>
           {subtitle && <p className="mt-0.5 text-sm text-text-muted">{subtitle}</p>}
-          {help && <p className="mt-1 max-w-2xl text-xs leading-relaxed text-text-faint">{help}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -462,7 +481,7 @@ export function IconButton({
       title={label}
       className={cn(
         "inline-flex shrink-0 items-center justify-center rounded-md transition disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" ? "h-7 w-7" : "h-8 w-8",
+        size === "sm" ? "h-8 w-8" : "h-9 w-9",
         tone,
         className,
       )}

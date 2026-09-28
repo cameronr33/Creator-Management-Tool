@@ -73,7 +73,7 @@ export function ClientTeam({
         {clientName} approves each creator before anyone reaches out
       </label>
       <p className="-mt-2 text-xs text-text-muted">
-        New creators then wait in &ldquo;Waiting on client approval&rdquo; on Today. {clientName} approves or passes in their portal, or you can for them. Creators already here aren&apos;t affected.
+        {`New creators then wait in “Waiting on client approval” on Today. ${clientName} approves or passes in their portal, or you can for them. Creators already here aren't affected.`}
       </p>
       {(() => {
         const overlap = [...new Set(people.map((p) => p.email.split("@")[1]).filter((d) => ourSideDomains.includes(d)))];

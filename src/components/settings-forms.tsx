@@ -119,8 +119,7 @@ export function GmailConnectCard({
   if (!configured) {
     return (
       <Callout tone="info">
-        Email tracking needs Google credentials on the server (<code className="text-xs">GOOGLE_CLIENT_ID</code> and{" "}
-        <code className="text-xs">GOOGLE_CLIENT_SECRET</code>). The README has the one-time Google Cloud steps.
+        Email isn&apos;t set up on this server yet. Whoever runs the app adds the Google sign-in keys once (the README has the steps); then Connect appears here.
       </Callout>
     );
   }
