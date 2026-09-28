@@ -1,3 +1,4 @@
+import { statusNoteView } from "@/lib/status-note";
 import { requireAgencyPage } from "@/lib/page-guards";
 import { resolveClient, getCreatorRows } from "@/lib/queries";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
@@ -32,6 +33,7 @@ export default async function PipelinePage() {
     campaignName: r.campaignName,
     latest: r.activity.text,
     latestFromEmail: r.activity.fromEmail,
+    statusNote: statusNoteView(r),
     latestAt: r.activity.at?.toISOString() ?? null,
     whoseTurn: r.activity.whoseTurn,
     photoUrl: r.photoUrl,

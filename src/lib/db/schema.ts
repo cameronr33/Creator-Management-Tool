@@ -344,6 +344,14 @@ export const cmPartnerships = pgTable(
     suggestedAddressEventId: uuid("suggested_address_event_id"),
     /** "No reply needed": hides the Your-turn row until they write again. */
     replyHandledAt: timestamp("reply_handled_at"),
+    /**
+     * Our own note on where things stand (2026-09-28, owner: "we should be able
+     * to include our own notes"). Shown beside the email reader's summary on
+     * the creator page, Today and the Pipeline; never overwritten by a reading.
+     */
+    statusNote: text("status_note"),
+    statusNoteAt: timestamp("status_note_at"),
+    statusNoteBy: text("status_note_by"),
 
     // The client's approval before outreach (when the client requires it).
     clientApproval: cmClientApprovalEnum("client_approval"),

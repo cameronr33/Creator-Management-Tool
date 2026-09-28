@@ -6,6 +6,7 @@ import { deriveOutreachState } from "@/lib/outreach";
 import { hasCompleteAddress } from "@/lib/address";
 import { placeOnToday, type TodaySection } from "@/lib/today";
 import type { WhoseTurn } from "@/lib/activity";
+import { statusNoteView, type StatusNoteView } from "@/lib/status-note";
 
 /** One Today row — plain values only, so it can go straight to the client list. */
 export interface TodayRow {
@@ -21,6 +22,8 @@ export interface TodayRow {
   latestFromEmail: boolean;
   latestAt: string | null;
   whoseTurn: WhoseTurn | null;
+  /** Our own note, with who wrote it and when (ISO). */
+  statusNote: StatusNoteView | null;
   soundsLikeNo: boolean;
   hasOutbound: boolean;
   suggestedAddress: string | null;
@@ -93,6 +96,7 @@ export async function getTodayData(clientId: string, campaignId?: string): Promi
       latestFromEmail: c.activity.fromEmail,
       latestAt: c.activity.at?.toISOString() ?? null,
       whoseTurn: c.activity.whoseTurn,
+      statusNote: statusNoteView(c),
       soundsLikeNo: c.emailSoundsLikeNo,
       hasOutbound: o.totalOutbound > 0,
       suggestedAddress: d && !hasCompleteAddress(d) ? d.suggestedAddress : null,

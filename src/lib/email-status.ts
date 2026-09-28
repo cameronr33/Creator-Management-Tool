@@ -132,7 +132,7 @@ ${stages}
 Return:
 - stage: where the deal stands now, judged from the whole conversation with the most weight on the latest messages. If nothing has changed, return the current stage.
 - whose_turn: "us" if the latest message needs a reply or an action from us; "them" if we are waiting on the creator; "none" if nothing is pending (for example a simple thank-you).
-- summary: at most 20 plain words saying what the latest message says or what happens next. No names of software.
+- summary: one or two plain sentences (at most 40 words) on where things stand with this creator: what the latest message says and what happens next. No names of software.
 - evidence_quote: a short quote (at most 25 words) copied exactly, character for character, from one message the creator wrote themselves, that best supports the stage.
 - evidence_message: the number of the message the quote comes from.
 - address: if the creator wrote a full postal shipping address in their own message, copy it exactly as written; otherwise null.
@@ -486,7 +486,7 @@ export async function assessPartnership(
   await db
     .update(cmPartnerships)
     .set({
-      emailSummary: assessment.summary.trim().slice(0, 240) || null,
+      emailSummary: assessment.summary.trim().slice(0, 400) || null,
       emailSummaryAt: loaded.latestAt,
       emailWhoseTurn: assessment.whose_turn,
       emailAssessedAt: readAt,

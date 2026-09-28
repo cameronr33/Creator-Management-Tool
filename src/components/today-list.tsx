@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, Mail, MapPin, MessageCircle, PackageCheck, T
 import { Avatar, Badge, Button, Card } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { QuickStage } from "@/components/quick-stage";
+import { StatusNote } from "@/components/status-note";
 import { MessagedButton } from "@/components/reply-button";
 import { CloseAsDeclinedButton, NoReplyNeededButton } from "@/components/email-status";
 import { VideoLinkPrompt } from "@/components/partnership-actions";
@@ -106,6 +107,9 @@ function TodayItem({ row: r }: { row: TodayRow }) {
             {r.section === "waiting" && turn && <span className="text-text-faint"> · {turn.label}</span>}
           </p>
           {r.note && <p className="mt-0.5 text-xs text-text-faint">{r.note}</p>}
+          <div className="mt-1.5">
+            <StatusNote partnershipId={r.partnershipId} note={r.statusNote} />
+          </div>
           {r.section === "get_address" && r.suggestedAddress && (
             <p className="mt-1 text-xs text-text-muted">
               <MapPin size={12} className="mr-1 inline align-[-1px] text-text-faint" />

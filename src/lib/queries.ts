@@ -143,6 +143,10 @@ export interface CreatorRow {
   emailWhoseTurn: string | null;
   emailSoundsLikeNo: boolean;
   replyHandledAt: Date | null;
+  /** Our own note on where things stand, with who wrote it and when. */
+  statusNote: string | null;
+  statusNoteAt: Date | null;
+  statusNoteBy: string | null;
   /** The client's say before outreach: pending / approved / passed, or null when not needed. */
   clientApproval: "pending" | "approved" | "passed" | null;
   approvalByName: string | null;
@@ -193,6 +197,9 @@ export async function getCreatorRows(
       emailWhoseTurn: cmPartnerships.emailWhoseTurn,
       emailSoundsLikeNo: cmPartnerships.emailSoundsLikeNo,
       replyHandledAt: cmPartnerships.replyHandledAt,
+      statusNote: cmPartnerships.statusNote,
+      statusNoteAt: cmPartnerships.statusNoteAt,
+      statusNoteBy: cmPartnerships.statusNoteBy,
       clientApproval: cmPartnerships.clientApproval,
       approvalByName: cmPartnerships.approvalByName,
       photoFetchedAt: cmCreatorPhotos.fetchedAt,

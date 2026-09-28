@@ -31,6 +31,8 @@ const schema = z.object({
   country: z.string().nullable().optional(),
   addressRaw: z.string().nullable().optional(),
   outreachReason: z.string().nullable().optional(),
+  /** Our own note on where things stand; "" or null clears it. */
+  statusNote: z.string().max(600).nullable().optional(),
   /** "Keep mine" on a contract/email difference: that "field:value" isn't offered again. */
   dismissDeal: z.string().min(1).max(200).optional(),
 });
@@ -64,6 +66,13 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const update: Record<string, unknown> = { updatedAt: new Date() };
   for (const [k, v] of Object.entries(data)) {
     if (v === undefined) continue;
+    if (k === "statusNote") {
+      const note = typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "";
+      update.statusNote = note || null;
+      update.statusNoteAt = note ? new Date() : null;
+      update.statusNoteBy = note ? session.user.name || session.user.email || null : null;
+      continue;
+    }
     if (k === "dismissDeal") {
       update.dealDismissed = sql`coalesce(${cmPartnerships.dealDismissed}, '[]'::jsonb) || ${JSON.stringify([v])}::jsonb`;
       continue;

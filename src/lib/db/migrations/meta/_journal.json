@@ -141,6 +141,13 @@
       "when": 1790374438711,
       "tag": "0019_finalizing_stage",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790610217687,
+      "tag": "0020_status_note",
+      "breakpoints": true
     }
   ]
 }

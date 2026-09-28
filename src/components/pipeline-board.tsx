@@ -11,6 +11,8 @@ import { Avatar, Badge, StagePill, Button, IconButton, cn } from "@/components/u
 import { api, useSave } from "@/components/use-save";
 import { VideoLinkPrompt, needsVideo } from "@/components/partnership-actions";
 import { QuickStage } from "@/components/quick-stage";
+import { StatusNote } from "@/components/status-note";
+import type { StatusNoteView } from "@/lib/status-note";
 
 export interface BoardCard {
   partnershipId: string;
@@ -26,6 +28,8 @@ export interface BoardCard {
   /** ISO time of the latest message; null when unknown or none. */
   latestAt: string | null;
   whoseTurn: WhoseTurn | null;
+  /** Our own note on where things stand. */
+  statusNote: StatusNoteView | null;
   photoUrl: string | null;
   clientApproval: "pending" | "approved" | "passed" | null;
 }
@@ -238,6 +242,9 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                     {c.latest}
                     {c.latestAt && <span className="text-text-faint"> · {relativeDays(c.latestAt)}</span>}
                   </p>
+                  <div className="mt-1.5" onMouseDown={(e) => e.stopPropagation()} draggable={false}>
+                    <StatusNote partnershipId={c.partnershipId} note={c.statusNote} compact />
+                  </div>
                   <div className="mt-2" onMouseDown={(e) => e.stopPropagation()} draggable={false}>
                     <QuickStage
                       partnershipId={c.partnershipId}

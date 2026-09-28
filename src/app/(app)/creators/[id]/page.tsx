@@ -58,6 +58,8 @@ import type { CmOutreachEvent } from "@/lib/db/schema";
 import { governingContract, isStaleRead, listContracts } from "@/lib/contracts";
 import { dealDifferences, type DealFacts, type EmailDeal } from "@/lib/deal-facts";
 import { Contracts, type ContractRow, type OfferedDifference } from "@/components/contracts";
+import { StatusNote } from "@/components/status-note";
+import { statusNoteView } from "@/lib/status-note";
 
 /** Messages shown per thread before "Show earlier". */
 const THREAD_PREVIEW = 2;
@@ -253,6 +255,9 @@ export default async function CreatorDetailPage({
                 soundsLikeNo={partnership.emailSoundsLikeNo}
                 move={undoable.get(partnership.id) ?? null}
               />
+              <div className="mt-2">
+                <StatusNote partnershipId={partnership.id} note={statusNoteView(partnership)} />
+              </div>
               {partnership.clientApproval === "pending" ? (
                 <div className="mt-2">
                   <Callout tone="warn" title={`Waiting on ${client?.name ?? "the client"}'s approval`} actions={<ApprovalButtons partnershipId={partnership.id} name={creator.name} who="agency" />}>

@@ -268,7 +268,11 @@ async function main() {
     check("…and nothing moves", !off.moved && (await stageOf()) === "in_conversation");
     check("once read, it's no longer waiting", !(await partnershipsNeedingRead(500)).includes(partnershipId));
 
+    // Our own note (2026-09-28) sits beside the summary; a reading never touches it.
+    await db.update(schema.cmPartnerships).set({ statusNote: "Waiting on HELLA for part numbers.", statusNoteBy: "Sam", statusNoteAt: new Date() }).where(eq(schema.cmPartnerships.id, partnershipId));
     const on = await assessPartnership(partnershipId, { apply: true, model: fake, automove: true });
+    const [noteKept] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
+    check("a reading never overwrites our own note", noteKept.statusNote === "Waiting on HELLA for part numbers." && noteKept.statusNoteBy === "Sam");
     check("switched on: Talking → Shipping", on.moved?.to === "fulfilling" && (await stageOf()) === "fulfilling");
     const [t] = await db.select().from(schema.cmStageTransitions).where(eq(schema.cmStageTransitions.id, on.moved!.transitionId));
     check("the move says it came from their email, with the quote and the message", t.source === "email" && t.reason === "42 Test Lane" && !!t.evidenceEventId);

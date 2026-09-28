@@ -22,7 +22,7 @@ function check(label: string, cond: boolean, detail?: string) {
   if (!cond) failures++;
 }
 
-const SECRETS = ["SECRET_SUMMARY_7731", "SECRET_TERMS_7731", "SECRET_NOTE_7731", "SECRET_BODY_7731", "SECRET_CREATOR_NOTE_7731", "4242.00", "secret-creator@example.test", "SECRET_CONTRACT_7731", "SECRET_EMAIL_DEAL_7731"];
+const SECRETS = ["SECRET_SUMMARY_7731", "SECRET_TERMS_7731", "SECRET_NOTE_7731", "SECRET_BODY_7731", "SECRET_CREATOR_NOTE_7731", "4242.00", "secret-creator@example.test", "SECRET_CONTRACT_7731", "SECRET_EMAIL_DEAL_7731", "SECRET_STATUS_NOTE_7731"];
 
 async function main() {
   const [client] = await db.select({ id: schema.clients.id }).from(schema.clients).where(eq(schema.clients.slug, "hella")).limit(1);
@@ -44,7 +44,7 @@ async function main() {
       .where(eq(schema.cmPartnerships.id, a.partnershipId));
     await db.insert(schema.cmOutreachEvents).values({ partnershipId: a.partnershipId, direction: "inbound", channel: "email", kind: "reply", body: "SECRET_BODY_7731", subject: "SECRET_BODY_7731" });
     await db.insert(schema.cmContracts).values({ partnershipId: a.partnershipId, source: "upload", filename: "SECRET_CONTRACT_7731.pdf", data: "SECRET_CONTRACT_7731", readStatus: "read", extracted: { terms: "SECRET_CONTRACT_7731" } });
-    await db.update(schema.cmPartnerships).set({ emailDeal: { facts: { terms: "SECRET_EMAIL_DEAL_7731" } }, dealDismissed: ["SECRET_EMAIL_DEAL_7731"] }).where(eq(schema.cmPartnerships.id, a.partnershipId));
+    await db.update(schema.cmPartnerships).set({ emailDeal: { facts: { terms: "SECRET_EMAIL_DEAL_7731" } }, dealDismissed: ["SECRET_EMAIL_DEAL_7731"], statusNote: "SECRET_STATUS_NOTE_7731", statusNoteBy: "Sam" }).where(eq(schema.cmPartnerships.id, a.partnershipId));
 
     console.log("\n── What the portal returns ──");
     const mine = await getPortalCreators(client.id);
