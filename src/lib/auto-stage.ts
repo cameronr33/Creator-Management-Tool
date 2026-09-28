@@ -57,6 +57,8 @@ export function nextStageFor(current: CmStage, trigger: AutoStageTrigger): CmSta
 export interface AutoStageResult {
   from: CmStage;
   to: CmStage;
+  /** The move's cm_stage_transitions row — what a quick button's Undo reverses. */
+  transitionId: string;
 }
 
 /**
@@ -92,7 +94,7 @@ export async function applyAutoStage(
       evidenceEventId: opts.evidenceEventId ?? null,
       meta: { trigger, ...(opts.meta ?? {}) },
     });
-    if (r.status === "moved") return { from: r.from, to: r.to };
+    if (r.status === "moved") return { from: r.from, to: r.to, transitionId: r.transitionId };
     if (r.status !== "stale") return null;
   }
   return null;

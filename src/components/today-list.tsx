@@ -278,6 +278,7 @@ function ShipmentButton({ row: r, status, label, icon }: { row: TodayRow; status
       onClick={() =>
         run(() => api("/api/shipments", { id: r.shipmentId ?? undefined, partnershipId: r.partnershipId, status }), {
           success: `${r.name}: ${status === "shipped" ? "shipped" : "delivered"}`,
+          undo: true,
         })
       }
     >

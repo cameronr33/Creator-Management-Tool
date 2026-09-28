@@ -102,7 +102,7 @@ export function LogMessagePanel({
           kind: outbound ? (hasOutbound ? "follow_up" : "initial") : "reply",
           occurredAt: whenToIso(choice, picked),
         }),
-      { success: outbound ? `Logged a ${what} to ${name}` : `Logged ${name}'s ${what === "call" ? "call" : "reply"}` },
+      { success: outbound ? `Logged a ${what} to ${name}` : `Logged ${name}'s ${what === "call" ? "call" : "reply"}`, undo: true },
     );
     if (!r.ok) return;
     if (r.data.stageSkipped) toast("The stage didn't move", { tone: "info", detail: "Someone set it by hand after that date, so an older message doesn't change it." });

@@ -1,7 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cmOutreachEvents, cmShipments, cmShipmentStatusEnum } from "@/lib/db/schema";
 import { applyAutoStage, type AutoStageResult } from "@/lib/auto-stage";
+import { recordQuickAction, snapshotShipment, type QuickUndo } from "@/lib/quick-actions";
 
 /**
  * Recording a shipment — the one path for the agency (the shipment controls,
@@ -9,6 +10,10 @@ import { applyAutoStage, type AutoStageResult } from "@/lib/auto-stage";
  * and delivered move the stage through the rule table, exactly as before;
  * when it's the client, who did it is kept with the move and noted on the
  * timeline ("Marked shipped by Rob Tinson · UPS 1Z…").
+ *
+ * When a teammate changes the status to shipped or delivered, the press is
+ * recorded so it can be undone for ten minutes (src/lib/quick-actions.ts).
+ * The portal's presses are never undoable from here.
  */
 
 export type ShipmentStatus = (typeof cmShipmentStatusEnum.enumValues)[number];
@@ -34,11 +39,23 @@ export type ShipmentActor = { kind: "agency"; userId: string | null } | { kind: 
 export async function recordShipment(
   d: ShipmentInput,
   actor: ShipmentActor,
-): Promise<{ ok: true; stageChanged: AutoStageResult | null } | { ok: false; error: string }> {
-  // Auto-stamp shippedAt/deliveredAt when the status advances and no explicit date was supplied.
+): Promise<{ ok: true; stageChanged: AutoStageResult | null; undo: QuickUndo | null } | { ok: false; error: string }> {
   const now = new Date();
-  const shippedAt = d.shippedAt ? new Date(d.shippedAt) : d.status === "shipped" ? now : undefined;
-  const deliveredAt = d.deliveredAt ? new Date(d.deliveredAt) : d.status === "delivered" ? now : undefined;
+  // The shipment as it was. No id: adopt the partnership's existing shipment
+  // (the latest, as moveStage does) rather than inserting a second one — this
+  // is where the duplicate rows came from.
+  const [before] = d.id
+    ? await db.select().from(cmShipments).where(and(eq(cmShipments.id, d.id), eq(cmShipments.partnershipId, d.partnershipId))).limit(1)
+    : await db.select().from(cmShipments).where(eq(cmShipments.partnershipId, d.partnershipId)).orderBy(desc(cmShipments.createdAt)).limit(1);
+  if (d.id && !before) return { ok: false, error: "Shipment not found for this partnership" };
+
+  // Stamp shippedAt / deliveredAt only when the status really changes to it and
+  // no date was given: saving a tracking number the next day mustn't restart
+  // "Shipped N days ago" (2026-09-28).
+  const alreadyShipped = !!before?.shippedAt && (before.status === "shipped" || before.status === "delivered");
+  const alreadyDelivered = !!before?.deliveredAt && before.status === "delivered";
+  const shippedAt = d.shippedAt ? new Date(d.shippedAt) : d.status === "shipped" && !alreadyShipped ? now : undefined;
+  const deliveredAt = d.deliveredAt ? new Date(d.deliveredAt) : d.status === "delivered" && !alreadyDelivered ? now : undefined;
   const update: Record<string, unknown> = { status: d.status, updatedAt: now };
   // Merge: a status-only click must never wipe the carrier/tracking/notes already on the row.
   for (const k of ["carrier", "trackingNumber", "notes"] as const) {
@@ -47,21 +64,14 @@ export async function recordShipment(
   if (shippedAt !== undefined) update.shippedAt = shippedAt;
   if (deliveredAt !== undefined) update.deliveredAt = deliveredAt;
 
-  if (d.id) {
-    const updated = await db
-      .update(cmShipments)
-      .set(update)
-      .where(and(eq(cmShipments.id, d.id), eq(cmShipments.partnershipId, d.partnershipId)))
-      .returning({ id: cmShipments.id });
-    if (updated.length === 0) return { ok: false, error: "Shipment not found for this partnership" };
+  let shipmentId: string;
+  if (before) {
+    await db.update(cmShipments).set(update).where(eq(cmShipments.id, before.id));
+    shipmentId = before.id;
   } else {
-    // No id: adopt the partnership's existing shipment rather than inserting a
-    // second one — this is where the duplicate rows came from.
-    const [existing] = await db.select({ id: cmShipments.id }).from(cmShipments).where(eq(cmShipments.partnershipId, d.partnershipId)).limit(1);
-    if (existing) {
-      await db.update(cmShipments).set(update).where(eq(cmShipments.id, existing.id));
-    } else {
-      await db.insert(cmShipments).values({
+    const [created] = await db
+      .insert(cmShipments)
+      .values({
         partnershipId: d.partnershipId,
         status: d.status,
         carrier: d.carrier ?? null,
@@ -70,8 +80,9 @@ export async function recordShipment(
         ...(deliveredAt !== undefined ? { deliveredAt } : {}),
         notes: d.notes ?? null,
         updatedAt: now,
-      });
-    }
+      })
+      .returning({ id: cmShipments.id });
+    shipmentId = created.id;
   }
 
   const meta = actor.kind === "client" ? { byClient: actor.name, clientUserId: actor.id } : undefined;
@@ -93,5 +104,24 @@ export async function recordShipment(
       : d.status === "delivered"
         ? await applyAutoStage(d.partnershipId, "shipment_delivered", userId, { meta })
         : null;
-  return { ok: true, stageChanged };
+
+  // A teammate's press that changed the status to shipped or delivered: undoable.
+  let undo: QuickUndo | null = null;
+  if (actor.kind === "agency" && actor.userId && (d.status === "shipped" || d.status === "delivered") && before?.status !== d.status) {
+    const [after] = await db.select().from(cmShipments).where(eq(cmShipments.id, shipmentId)).limit(1);
+    if (after) {
+      const actionId = await recordQuickAction({
+        partnershipId: d.partnershipId,
+        kind: "shipment",
+        userId: actor.userId,
+        shipmentId,
+        transitionId: stageChanged?.transitionId ?? null,
+        prior: before ? snapshotShipment(before) : null,
+        applied: snapshotShipment(after),
+        createdShipment: !before,
+      });
+      undo = { actionId, partnershipId: d.partnershipId };
+    }
+  }
+  return { ok: true, stageChanged, undo };
 }

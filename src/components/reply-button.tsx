@@ -11,7 +11,7 @@ import { LogMessagePanel } from "@/components/log-message";
  * hand in one click. That starts the follow-up clock and moves a creator
  * from To contact to Contacted. Email on threads the mailbox is on needs no
  * button. The small calendar button logs it with a date, or as an email from
- * your own inbox or a call.
+ * your own inbox or a call. Either way the toast offers Undo.
  */
 export function MessagedButton({
   partnershipId,
@@ -45,7 +45,7 @@ export function MessagedButton({
                 channel: "ig_dm",
                 kind: hasOutbound ? "follow_up" : "initial",
               }),
-            { success: `Logged a DM to ${name}` },
+            { success: `Logged a DM to ${name}`, undo: true },
           )
         }
       >
@@ -77,7 +77,7 @@ export function ReplyButton({ partnershipId, name }: { partnershipId: string; na
                 channel: "ig_dm",
                 kind: "reply",
               }),
-            { success: `Logged ${name}'s reply` },
+            { success: `Logged ${name}'s reply`, undo: true },
           )
         }
       >

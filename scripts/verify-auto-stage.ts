@@ -198,9 +198,13 @@ async function main() {
     check("reopening clears the stale reason", reopened.stage === "in_conversation" && reopened.exitReason === null);
 
     // The reopen path.
-    await changeStage(pid3, "no_response");
+    await changeStage(pid3, "no_response", undefined, { exitReason: "went_dark" });
     const late = await applyAutoStage(pid3, "inbound_message");
     check("a reply reopens No response → Talking", late?.from === "no_response" && late?.to === "in_conversation");
+    // Undo on a quick button reverses exactly this move (2026-09-28): it names the move, and the move keeps the reason it cleared.
+    const [reopenMove] = late ? await db.select().from(schema.cmStageTransitions).where(eq(schema.cmStageTransitions.id, late.transitionId)) : [];
+    check("a rule move returns its transition's id", !!reopenMove && reopenMove.toStage === "in_conversation" && reopenMove.source === "rule");
+    check("…and keeps the exit reason it cleared (Stopped replying)", (reopenMove?.meta as { priorExitReason?: string } | null)?.priorExitReason === "went_dark");
     check("our own message never advances Talking", (await applyAutoStage(pid3, "outbound_message")) === null);
 
     // Finalizing: nothing leaves it until the deal is signed and the address is in.

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull, max, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, max, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   cmClientUsers,
@@ -478,7 +478,11 @@ export async function recomputeEmailKinds(partnershipIds: string[]): Promise<num
  * stage. Transitions written before the `source` column existed count as a
  * person's — the conservative reading. The opening row (a creator being
  * added, from_stage null) is not a decision about their mail, so it never
- * blocks what the mailbox shows.
+ * blocks what the mailbox shows. Nor is Undo on a quick button (2026-09-28):
+ * it puts things back as they were before the press, so the last say is
+ * whatever it was before — a DM re-logged as "yesterday" after an Undo still
+ * moves the stage. Undo of an email move still counts: that is a person
+ * disagreeing with the email, and the same email must not move it again.
  */
 export async function lastManualChangeAt(partnershipIds: string[]): Promise<Map<string, Date>> {
   const out = new Map<string, Date>();
@@ -494,6 +498,7 @@ export async function lastManualChangeAt(partnershipIds: string[]): Promise<Map<
         isNotNull(cmStageTransitions.fromStage),
         or(isNull(cmStageTransitions.source), inArray(cmStageTransitions.source, ["manual", "migration"])),
         isNull(cmStageTransitions.undoneAt),
+        sql`(${cmStageTransitions.meta} ->> 'quickActionId') is null`,
       ),
     )
     .groupBy(cmStageTransitions.partnershipId);

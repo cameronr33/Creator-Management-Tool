@@ -3,6 +3,7 @@ import { cmOutreachEvents } from "@/lib/db/schema";
 import { applyAutoStage, type AutoStageResult } from "@/lib/auto-stage";
 import { lastManualChangeAt } from "@/lib/email-ingest";
 import { resolveOccurredAt } from "@/lib/log-time";
+import { recordQuickAction, type QuickUndo } from "@/lib/quick-actions";
 
 /**
  * Logging a message by hand — a DM, a call, an email from a teammate's own
@@ -12,7 +13,8 @@ import { resolveOccurredAt } from "@/lib/log-time";
  *
  * A date earlier than a person's last stage change doesn't move the stage
  * (the email check's rule): an old reply logged late must not reopen a deal
- * someone closed since (frozen node 2).
+ * someone closed since (frozen node 2). Every log can be undone for ten
+ * minutes by whoever logged it (src/lib/quick-actions.ts).
  */
 
 export { LOG_MAX_PAST_DAYS, resolveOccurredAt, type ResolvedTime } from "@/lib/log-time";
@@ -28,7 +30,7 @@ export interface LogInput {
 }
 
 export type LogResult =
-  | { ok: true; eventId: string; stageChanged: AutoStageResult | null; stageSkipped: boolean }
+  | { ok: true; eventId: string; stageChanged: AutoStageResult | null; stageSkipped: boolean; undo: QuickUndo }
   | { ok: false; error: string };
 
 export async function logMessage(input: LogInput, userId: string, now = new Date()): Promise<LogResult> {
@@ -55,11 +57,19 @@ export async function logMessage(input: LogInput, userId: string, now = new Date
       : input.direction === "outbound" && (input.kind === "initial" || input.kind === "follow_up")
         ? ("outbound_message" as const)
         : null;
-  if (!trigger) return { ok: true, eventId: row.id, stageChanged: null, stageSkipped: false };
-  if (when.supplied) {
+  let stageChanged: AutoStageResult | null = null;
+  let stageSkipped = false;
+  if (trigger && when.supplied) {
     const decided = (await lastManualChangeAt([input.partnershipId])).get(input.partnershipId);
-    if (decided && when.at.getTime() <= decided.getTime()) return { ok: true, eventId: row.id, stageChanged: null, stageSkipped: true };
+    stageSkipped = !!decided && when.at.getTime() <= decided.getTime();
   }
-  const stageChanged = await applyAutoStage(input.partnershipId, trigger, userId, { evidenceEventId: row.id });
-  return { ok: true, eventId: row.id, stageChanged, stageSkipped: false };
+  if (trigger && !stageSkipped) stageChanged = await applyAutoStage(input.partnershipId, trigger, userId, { evidenceEventId: row.id });
+  const actionId = await recordQuickAction({
+    partnershipId: input.partnershipId,
+    kind: "message",
+    userId,
+    outreachEventId: row.id,
+    transitionId: stageChanged?.transitionId ?? null,
+  });
+  return { ok: true, eventId: row.id, stageChanged, stageSkipped, undo: { actionId, partnershipId: input.partnershipId } };
 }

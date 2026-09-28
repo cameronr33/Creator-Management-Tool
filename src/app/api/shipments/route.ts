@@ -30,7 +30,5 @@ export async function POST(req: NextRequest) {
 
   const r = await recordShipment(d, { kind: "agency", userId: session.user.id });
   if (!r.ok) return badRequest(r.error);
-  const stageChanged = r.stageChanged;
-
-  return NextResponse.json({ ok: true, stageChanged });
+  return NextResponse.json({ ok: true, stageChanged: r.stageChanged, undo: r.undo });
 }

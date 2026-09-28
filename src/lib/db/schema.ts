@@ -849,6 +849,42 @@ export const cmStageTransitions = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────
+// cm_quick_actions — one row per press of a quick button (I messaged
+// them, They replied, Mark shipped, Mark delivered), so its Undo knows
+// exactly what to reverse and never has to trust the browser
+// (product update E, 2026-09-28; src/lib/quick-actions.ts).
+// ─────────────────────────────────────────────────────────────────
+
+export const cmQuickActionKindEnum = pgEnum("cm_quick_action_kind", ["message", "shipment"]);
+
+export const cmQuickActions = pgTable(
+  "cm_quick_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    partnershipId: uuid("partnership_id")
+      .notNull()
+      .references(() => cmPartnerships.id, { onDelete: "cascade" }),
+    kind: cmQuickActionKindEnum("kind").notNull(),
+    /** Only this teammate may undo it. */
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    /** The message it logged (message actions) — always one logged in the app, never synced mail. */
+    outreachEventId: uuid("outreach_event_id").references(() => cmOutreachEvents.id, { onDelete: "set null" }),
+    /** The shipment it changed (shipment actions). */
+    shipmentId: uuid("shipment_id").references(() => cmShipments.id, { onDelete: "set null" }),
+    /** The stage move it caused, if any. */
+    transitionId: uuid("transition_id").references(() => cmStageTransitions.id, { onDelete: "set null" }),
+    /** The shipment before the press (ShipmentSnapshot); null when the press created it. */
+    prior: jsonb("prior"),
+    /** The shipment right after the press, updatedAt included — Undo refuses once it has changed since. */
+    applied: jsonb("applied"),
+    createdShipment: boolean("created_shipment").default(false).notNull(),
+    undoneAt: timestamp("undone_at"),
+  },
+  (t) => [index("cm_quick_actions_partnership_idx").on(t.partnershipId, t.createdAt)],
+);
+
+// ─────────────────────────────────────────────────────────────────
 // Inferred types
 // ─────────────────────────────────────────────────────────────────
 
@@ -858,6 +894,7 @@ export type CmCreator = typeof cmCreators.$inferSelect;
 export type CmCreatorSocial = typeof cmCreatorSocials.$inferSelect;
 export type CmPartnership = typeof cmPartnerships.$inferSelect;
 export type CmOutreachEvent = typeof cmOutreachEvents.$inferSelect;
+export type CmQuickAction = typeof cmQuickActions.$inferSelect;
 export type CmProductRequested = typeof cmProductsRequested.$inferSelect;
 export type CmShipment = typeof cmShipments.$inferSelect;
 export type CmDeliverable = typeof cmDeliverables.$inferSelect;

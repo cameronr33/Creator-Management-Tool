@@ -37,5 +37,6 @@ export async function POST(req: NextRequest) {
     { kind: "client", id: person.id, name: person.name },
   );
   if (!r.ok) return badRequest(r.error);
-  return NextResponse.json({ ok: true, stageChanged: r.stageChanged });
+  // Only where it moved: the move's own id is for the agency's Undo, not the portal.
+  return NextResponse.json({ ok: true, stageChanged: r.stageChanged ? { from: r.stageChanged.from, to: r.stageChanged.to } : null });
 }

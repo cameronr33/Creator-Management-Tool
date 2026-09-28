@@ -232,7 +232,7 @@ export function TimelineNote({
           body: body.trim() || undefined,
           occurredAt: whenToIso(when, picked),
         }),
-      { success: "Added to the timeline" },
+      { success: "Added to the timeline", undo: true },
     );
     if (r.ok) {
       if (r.data.stageSkipped) toast("The stage didn't move", { tone: "info", detail: "Someone set it by hand after that date, so an older message doesn't change it." });
@@ -313,7 +313,8 @@ export function ShipmentControls({
           carrier: carrier || null,
           trackingNumber: tracking || null,
         }),
-      { success: successText },
+      // Undo appears only when the server recorded a status change to shipped or delivered.
+      { success: successText, undo: true },
     );
 
   return (

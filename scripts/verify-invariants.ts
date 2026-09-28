@@ -121,6 +121,12 @@ async function main() {
       group by external_id having count(*) > 1
     ) dup`);
   check("no duplicated synced message (externalId unique in practice)", dupExternal === 0);
+  // Undo deletes the message a quick press logged, so a press may only ever point at one logged in the app.
+  const quickOnSynced = await scalar(sql`
+    select count(*)::int from cm_quick_actions q
+    join cm_outreach_events e on e.id = q.outreach_event_id
+    where e.external_id is not null`);
+  check("no quick action points at mail the mailbox holds", quickOnSynced === 0, `${quickOnSynced}`);
 
   console.log("\n── Test hygiene: verification scripts left nothing behind ──");
   const leftovers = await count(

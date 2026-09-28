@@ -29,5 +29,5 @@ export async function POST(req: NextRequest) {
 
   const r = await logMessage(d, session.user.id);
   if (!r.ok) return badRequest(r.error);
-  return NextResponse.json({ ok: true, eventId: r.eventId, stageChanged: r.stageChanged, stageSkipped: r.stageSkipped });
+  return NextResponse.json({ ok: true, eventId: r.eventId, stageChanged: r.stageChanged, stageSkipped: r.stageSkipped, undo: r.undo });
 }

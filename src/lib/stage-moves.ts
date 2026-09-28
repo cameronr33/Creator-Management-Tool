@@ -20,8 +20,9 @@ import type { cmExitReasonEnum } from "@/lib/db/schema";
  *  - Posted always has a video: a move to Posted without one needs the link.
  *  - Agreed with a complete address on file continues straight to Ready to ship.
  *  - Every move writes a cm_stage_transitions row saying who moved it
- *    (manual / rule / email / migration), why, and what it created, so Undo
- *    can take it back.
+ *    (manual / rule / email / migration), why, what it created and the exit
+ *    reason it replaced (`priorExitReason`), so Undo can take it back
+ *    exactly — "Stopped replying" comes back with No response.
  *
  * The write is a single statement (data-modifying CTEs) with a compare-and-
  * set on the stage it read, so a concurrent move can't be double-applied and
@@ -125,7 +126,10 @@ export async function moveStage(input: StageMoveInput): Promise<StageMoveResult>
   };
 
   const result = await db.execute(sql`
-    with moved as (
+    with prev as (
+      -- Read in the same snapshot as the update below, so this is the row before it.
+      select exit_reason from ${cmPartnerships} where id = ${input.partnershipId} and stage = ${from}::cm_stage
+    ), moved as (
       update ${cmPartnerships}
       set stage = ${to}::cm_stage,
           exit_reason = case
@@ -171,7 +175,8 @@ export async function moveStage(input: StageMoveInput): Promise<StageMoveResult>
                     'createdShipmentId', (select id from ship),
                     'markedShippedId', (select id from marked),
                     'unmarkedShippedId', (select id from unmarked),
-                    'createdDeliverableId', (select id from vid)))
+                    'createdDeliverableId', (select id from vid),
+                    'priorExitReason', (select exit_reason from prev)))
       from moved
       returning id
     )

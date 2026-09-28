@@ -162,6 +162,13 @@
       "when": 1790637673451,
       "tag": "0022_snooze",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790639236044,
+      "tag": "0023_quick_actions",
+      "breakpoints": true
     }
   ]
 }

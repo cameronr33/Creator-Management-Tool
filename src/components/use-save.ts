@@ -11,6 +11,8 @@ import type { CmStage } from "@/lib/db/schema";
  * nothing on failure. `useSave().run()` gives all of them the same contract:
  * a success toast when asked, an error toast always, an "auto-stage" toast
  * whenever the server moved the pipeline as a side effect, and one refresh.
+ * With `undo`, a quick button's toast carries an Undo for ten seconds (the
+ * server keeps what the press did and decides whether it can still be undone).
  */
 
 export interface StageChange {
@@ -18,7 +20,13 @@ export interface StageChange {
   to: CmStage;
 }
 
-export type ApiData<T> = T & { ok?: boolean; error?: string; stageChanged?: StageChange | null };
+/** A quick button's press, as the server recorded it (src/lib/quick-actions.ts). */
+export interface QuickUndo {
+  actionId: string;
+  partnershipId: string;
+}
+
+export type ApiData<T> = T & { ok?: boolean; error?: string; stageChanged?: StageChange | null; undo?: QuickUndo | null };
 
 export interface ApiResult<T = Record<string, unknown>> {
   ok: boolean;
@@ -49,7 +57,11 @@ export interface RunOptions {
   success?: string;
   /** Skip router.refresh() — for saves whose UI already reflects the change. */
   refresh?: boolean;
+  /** Offer Undo on the success toast when the server recorded the press. */
+  undo?: boolean;
 }
+
+export const UNDO_TOAST_MS = 10_000;
 
 export function useSave() {
   const router = useRouter();
@@ -69,8 +81,19 @@ export function useSave() {
     setPending(false);
 
     if (r.ok) {
-      if (opts.success) toast(opts.success, { tone: "good" });
-      if (r.data.stageChanged) toast(describeStageChange(r.data.stageChanged));
+      const undo = opts.undo ? r.data.undo : null;
+      if (undo) {
+        // One toast: what happened, the stage move it caused, and Undo.
+        toast(opts.success ?? "Saved", {
+          tone: "good",
+          detail: r.data.stageChanged ? describeStageChange(r.data.stageChanged) : undefined,
+          action: { label: "Undo", onClick: () => void undoPress(undo) },
+          durationMs: UNDO_TOAST_MS,
+        });
+      } else {
+        if (opts.success) toast(opts.success, { tone: "good" });
+        if (r.data.stageChanged) toast(describeStageChange(r.data.stageChanged));
+      }
       if (opts.refresh !== false) router.refresh();
     } else {
       toast(r.data.error ?? (r.status ? `Couldn't save (HTTP ${r.status})` : "Couldn't reach the server"), {
@@ -78,6 +101,15 @@ export function useSave() {
       });
     }
     return r;
+  }
+
+  async function undoPress(u: QuickUndo) {
+    const r = await api<{ stage?: CmStage | null }>(`/api/partnerships/${u.partnershipId}/undo`, { actionId: u.actionId }).catch(
+      () => ({ ok: false, status: 0, data: { error: "Couldn't reach the server" } }) as ApiResult<{ stage?: CmStage | null }>,
+    );
+    if (r.ok) toast(r.data.stage ? `Undone — back to ${stageLabel(r.data.stage)}` : "Undone", { tone: "good" });
+    else toast(r.data.error ?? "Couldn't undo it", { tone: "bad" });
+    router.refresh();
   }
 
   return { pending, run };
