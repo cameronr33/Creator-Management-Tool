@@ -11,6 +11,8 @@ export interface NextStepInput {
   hasAddress: boolean;
   /** The deal is marked signed (Finalizing needs it). */
   signed?: boolean;
+  /** The client's nudge days: Talking / Agreed / Finalizing say when Today brings a quiet deal back. */
+  nudgeAfterDays?: number;
   shipmentStatus: string | null;
   hasBrief: boolean;
   briefSent: boolean;
@@ -30,6 +32,15 @@ export interface NextStep {
 }
 
 export function nextStep(i: NextStepInput): NextStep {
+  const step = baseStep(i);
+  const stage = canonicalStage(i.stage);
+  if (i.nudgeAfterDays && (stage === "in_conversation" || stage === "awaiting_address" || stage === "finalizing")) {
+    return { ...step, text: `${step.text} If they go quiet, Today brings them back after ${i.nudgeAfterDays} days.` };
+  }
+  return step;
+}
+
+function baseStep(i: NextStepInput): NextStep {
   const stage = canonicalStage(i.stage);
   // Corrections and replacements can require shipping work after the stage advanced.
   if (stage === "content_pending" || stage === "posted") {

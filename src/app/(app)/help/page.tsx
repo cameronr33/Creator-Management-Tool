@@ -1,3 +1,4 @@
+import { THRESHOLD_FIELDS } from "@/lib/thresholds";
 import { requireAgencyPage } from "@/lib/page-guards";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -201,17 +202,17 @@ export default async function HelpPage() {
             description="Today builds its follow-up list from each creator's messages, so nobody has to remember who's overdue."
           />
           <ul className="mt-3 space-y-1.5 text-sm text-text-muted">
-            <li>
-              Messaged, no reply for <strong>{DEFAULT_THRESHOLDS.followUp1AfterDays} days</strong> → follow-up 1 due.
-            </li>
-            <li>
-              Still nothing <strong>{DEFAULT_THRESHOLDS.followUp2AfterDays} days</strong> after that → follow-up 2 due.
-            </li>
-            <li>
-              <strong>{DEFAULT_THRESHOLDS.markNoResponseAfterDays} days</strong> after the second follow-up → review the
-              conversation before closing as {stageLabel("no_response")}.
-            </li>
+            {THRESHOLD_FIELDS.map((f) => (
+              <li key={f.key}>
+                <strong>{f.label}</strong>: {DEFAULT_THRESHOLDS[f.key]} {f.hint}.
+              </li>
+            ))}
           </ul>
+          <p className="mt-2 text-sm text-text-muted">
+            Within each section of Today, whoever has waited longest comes first. Deals gone quiet at Talking, Agreed or
+            Finalizing come back to Follow up after the nudge days; after two follow-ups with no reply, review the
+            conversation before closing as {stageLabel("no_response")}.
+          </p>
           <p className="mt-3 text-xs text-text-faint">
             These are the defaults; each client can have its own timing under Settings → Follow-up timing. Rows imported
             from the old spreadsheet have no real dates, so they are flagged for a human check instead of being given an

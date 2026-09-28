@@ -6,12 +6,15 @@ import { canonicalStage, isTerminal, stageAction } from "@/lib/stages";
 /**
  * Today: every live creator in exactly one section, each with one thing to
  * do. Pure (scripts/verify-today.ts). The order is the order of the work —
- * answer people first, then chase, then reach out, then move product.
+ * answer people first, then chase, then reach out, then move product — and
+ * within a section, whoever has waited longest comes first.
  *
  * Fulfilment stages keep their own section even when it's our turn (a
  * creator in Ready to ship who just emailed is still "ship it"); the row
- * shows "Your turn" so the email isn't missed. Posted and closed deals
- * aren't on Today.
+ * shows "Your turn" so the email isn't missed. A deal gone quiet at Talking,
+ * Agreed or Finalizing comes back to Follow up after the nudge days (owner,
+ * 2026-09-28: "nudges for stalled deals"). Posted and closed deals aren't on
+ * Today.
  */
 
 export type TodaySection =
@@ -28,7 +31,11 @@ export type TodaySection =
 
 export const TODAY_SECTIONS: { key: TodaySection; title: string; hint: string }[] = [
   { key: "your_turn", title: "Your turn", hint: "They wrote last. Reply, or mark it as needing no reply." },
-  { key: "follow_up", title: "Follow up", hint: "We wrote and they haven't answered in a while. Nudge them, then click I messaged them for a DM (emails are tracked by themselves)." },
+  {
+    key: "follow_up",
+    title: "Follow up",
+    hint: "We wrote and they haven't answered in a while — including deals gone quiet at Talking, Agreed or Finalizing. Nudge them. Email on threads that include the mailbox is picked up by itself; log anything else here.",
+  },
   { key: "to_contact", title: "To contact", hint: stageAction("shortlisted") },
   { key: "waiting_approval", title: "Waiting on client approval", hint: "The client decides on these before anyone reaches out. Approve or pass for them if they've told you." },
   { key: "get_address", title: "Agreed — get the address", hint: stageAction("awaiting_address") },
@@ -49,46 +56,121 @@ export interface TodayFacts {
   /** The client's say before outreach, when they give one. */
   clientApproval?: "pending" | "approved" | "passed" | null;
   now?: Date;
+  // "Waiting since" (2026-09-28). All optional: unknown dates get no clock.
+  /** Who sent the last real message. */
+  lastFrom?: "us" | "them" | null;
+  /** When the last real message was sent (null for imported rows — date unknown). */
+  lastMessageAt?: Date | null;
+  /** When the deal entered its current stage. */
+  stageSince?: Date | null;
+  /** When the client approved it for outreach. */
+  approvalAt?: Date | null;
+  shippedAt?: Date | null;
+  deliveredAt?: Date | null;
 }
 
 export interface TodayPlacement {
   section: TodaySection;
   /** A short extra line when the section alone doesn't say it. */
   note: string | null;
+  /** Waiting since — rows sort oldest first within a section; null = unknown (sorts last). */
+  since: Date | null;
+  /** "due": the first message is due; "late": the video is overdue. */
+  badge: "due" | "late" | null;
 }
 
 const DAY = 86_400_000;
 
+function days(since: Date, now: Date): number {
+  return Math.max(0, Math.floor((now.getTime() - since.getTime()) / DAY));
+}
+
+function ago(n: number): string {
+  return n === 0 ? "today" : n === 1 ? "yesterday" : `${n} days ago`;
+}
+
+/** The nudge line for a deal gone quiet, by the stage it's stuck at. */
+export const NUDGE_LINES: Partial<Record<CmStage, (n: number) => string>> = {
+  in_conversation: (n) => `No reply in ${n} days — nudge them.`,
+  awaiting_address: (n) => `No reply in ${n} days — nudge them for their address.`,
+  finalizing: (n) => `No reply in ${n} days — nudge them about what's still open.`,
+};
+
+function place(section: TodaySection, note: string | null, since: Date | null | undefined, badge: TodayPlacement["badge"] = null): TodayPlacement {
+  return { section, note, since: since ?? null, badge };
+}
+
+/**
+ * A quiet deal: we're waiting on them (they owe the next message — whether
+ * we wrote last, or they promised something and went silent) and nothing has
+ * come for the nudge days. Imported rows (no date) never get a clock.
+ */
+function nudge(f: TodayFacts, stage: CmStage, now: Date): TodayPlacement | null {
+  const line = NUDGE_LINES[stage];
+  if (!line || !f.lastMessageAt) return null;
+  const waitingOnThem = f.whoseTurn === "them" || (f.whoseTurn == null && f.lastFrom === "us");
+  if (!waitingOnThem) return null;
+  const n = days(f.lastMessageAt, now);
+  return n >= f.thresholds.nudgeAfterDays ? place("follow_up", line(n), f.lastMessageAt) : null;
+}
+
 export function placeOnToday(f: TodayFacts): TodayPlacement | null {
   const stage = canonicalStage(f.stage);
+  const now = f.now ?? new Date();
   if (isTerminal(stage) || stage === "posted") return null;
   switch (stage) {
     case "fulfilling":
-      return { section: "ready_to_ship", note: null };
-    case "shipped":
-      return { section: "shipped", note: null };
-    case "content_pending":
-      return { section: "waiting_video", note: null };
+      return place("ready_to_ship", null, f.stageSince);
+    case "shipped": {
+      if (f.shippedAt) return place("shipped", `Shipped ${ago(days(f.shippedAt, now))}.`, f.shippedAt);
+      return place("shipped", f.stageSince ? `In Shipped for ${days(f.stageSince, now)} days — no ship date recorded.` : null, f.stageSince);
+    }
+    case "content_pending": {
+      const since = f.deliveredAt ?? f.stageSince ?? null;
+      if (!since) return place("waiting_video", null, null);
+      const n = days(since, now);
+      const late = n >= f.thresholds.videoDueAfterDays;
+      const what = f.deliveredAt ? `Delivered ${ago(n)}` : `Waiting on the video for ${n} days — no delivery date recorded`;
+      return place("waiting_video", late ? `${what} — the video is late (due after ${f.thresholds.videoDueAfterDays} days).` : `${what}.`, since, late ? "late" : null);
+    }
     case "awaiting_address":
-      return { section: "get_address", note: null };
+      return nudge(f, stage, now) ?? place("get_address", null, f.stageSince);
     case "finalizing":
-      return { section: "finalizing", note: f.whoseTurn === "us" ? "They wrote last — reply." : null };
+      return nudge(f, stage, now) ?? place("finalizing", f.whoseTurn === "us" ? "They wrote last — reply." : null, f.stageSince);
   }
-  if (f.whoseTurn === "us") return { section: "your_turn", note: null };
-  if (stage === "shortlisted") return f.clientApproval === "pending" ? { section: "waiting_approval", note: null } : { section: "to_contact", note: null };
+  if (f.whoseTurn === "us") return place("your_turn", null, f.lastMessageAt);
+  if (stage === "shortlisted") {
+    if (f.clientApproval === "pending") return place("waiting_approval", null, f.stageSince);
+    // The clock starts when they could first be contacted: added, or approved by the client.
+    const since = [f.stageSince, f.approvalAt].filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+    if (since && days(since, now) >= f.thresholds.initialOutreachAfterDays) {
+      return place("to_contact", `Added ${days(since, now)} days ago — the first message is due.`, since, "due");
+    }
+    return place("to_contact", null, since);
+  }
   if (stage === "contacted") {
-    if (f.datesAreMigrated) return { section: "waiting", note: "Imported from the sheet — when we last wrote is unknown." };
-    if (!f.lastOutboundAt) return { section: "waiting", note: null };
-    const days = Math.floor(((f.now ?? new Date()).getTime() - f.lastOutboundAt.getTime()) / DAY);
+    if (f.datesAreMigrated) return place("waiting", "Imported from the sheet — when we last wrote is unknown.", null);
+    if (!f.lastOutboundAt) return place("waiting", null, f.lastMessageAt);
+    const n = days(f.lastOutboundAt, now);
     if (f.followUpCount >= 2) {
-      return days >= f.thresholds.markNoResponseAfterDays
-        ? { section: "follow_up", note: `No reply after ${f.followUpCount} follow-ups — close as No response if they stay quiet.` }
-        : { section: "waiting", note: null };
+      return n >= f.thresholds.markNoResponseAfterDays
+        ? place("follow_up", `No reply after ${f.followUpCount} follow-ups — close as No response if they stay quiet.`, f.lastOutboundAt)
+        : place("waiting", null, f.lastOutboundAt);
     }
     const after = f.followUpCount === 0 ? f.thresholds.followUp1AfterDays : f.thresholds.followUp2AfterDays;
-    return days >= after
-      ? { section: "follow_up", note: `Last message ${days} days ago${f.followUpCount ? ` · ${f.followUpCount} follow-up sent` : ""}.` }
-      : { section: "waiting", note: null };
+    return n >= after
+      ? place("follow_up", `Last message ${n} days ago${f.followUpCount ? ` · ${f.followUpCount} follow-up sent` : ""}.`, f.lastOutboundAt)
+      : place("waiting", null, f.lastOutboundAt);
   }
-  return { section: "waiting", note: null };
+  return nudge(f, stage, now) ?? place("waiting", null, f.lastMessageAt);
+}
+
+/**
+ * Pure: whoever has waited longest first, within each section (sections keep
+ * their fixed order when the list groups them). Unknown dates go last; ties
+ * by name.
+ */
+export function sortToday<T extends { since: string | Date | null; name: string }>(rows: T[]): T[] {
+  const t = (d: string | Date | null) => (d == null ? Number.POSITIVE_INFINITY : new Date(d).getTime());
+  return [...rows].sort((a, b) => t(a.since) - t(b.since) || a.name.localeCompare(b.name));
 }

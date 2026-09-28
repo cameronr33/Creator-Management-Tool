@@ -4,19 +4,13 @@ import { eq } from "drizzle-orm";
 import { requireAgency, badRequest } from "@/lib/api-helpers";
 import { db } from "@/lib/db";
 import { clients, cmClientSettings } from "@/lib/db/schema";
+import { THRESHOLDS_SCHEMA } from "@/lib/thresholds";
 
 /**
  * PATCH /api/clients/[id]/settings — this app's per-client knobs. Never
  * touches the shared sa_clients row.
  */
-const thresholdsSchema = z
-  .object({
-    initialOutreachAfterDays: z.number().int().min(0).max(365).optional(),
-    followUp1AfterDays: z.number().int().min(1).max(365).optional(),
-    followUp2AfterDays: z.number().int().min(1).max(365).optional(),
-    markNoResponseAfterDays: z.number().int().min(1).max(365).optional(),
-  })
-  .strict();
+const thresholdsSchema = THRESHOLDS_SCHEMA;
 
 const schema = z.object({
   hidden: z.boolean().optional(),

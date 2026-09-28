@@ -62,20 +62,8 @@ export function deriveOutreachState(
   };
 }
 
-/** Thresholds for the follow-up loop. Configurable per client later. */
-export interface FollowUpThresholds {
-  initialOutreachAfterDays: number;
-  followUp1AfterDays: number;
-  followUp2AfterDays: number;
-  markNoResponseAfterDays: number;
-}
-
-export const DEFAULT_THRESHOLDS: FollowUpThresholds = {
-  initialOutreachAfterDays: 3,
-  followUp1AfterDays: 5,
-  followUp2AfterDays: 7,
-  markNoResponseAfterDays: 10,
-};
+/** Today's timing, per client — defined once in thresholds.ts. */
+export { DEFAULT_THRESHOLDS, type FollowUpThresholds } from "@/lib/thresholds";
 
 /** Channel enum values as a teammate reads them. */
 export const CHANNEL_LABELS: Record<string, string> = {

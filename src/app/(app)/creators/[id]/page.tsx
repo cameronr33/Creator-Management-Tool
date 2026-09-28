@@ -17,7 +17,7 @@ import {
   User,
   TriangleAlert,
 } from "lucide-react";
-import { getPartnershipDetail, getClients, getPhotoUrl, getCampaigns } from "@/lib/queries";
+import { getPartnershipDetail, getClients, getPhotoUrl, getCampaigns, getFollowUpThresholds } from "@/lib/queries";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
 import { Card, CardHeader, Avatar, Badge, Callout } from "@/components/ui";
 import {
@@ -99,7 +99,7 @@ export default async function CreatorDetailPage({
 
   const { creator, partnership, campaign, socials, events, products, shipments, deliverables, outreach, otherPartnerships } =
     detail;
-  const [clients, creatorEmails, gmailAccount, undoable, photo, campaigns, contracts, teammates] = await Promise.all([
+  const [clients, creatorEmails, gmailAccount, undoable, photo, campaigns, contracts, teammates, thresholds] = await Promise.all([
     getClients(),
     getCreatorEmails(creator.id),
     getActiveGmailAccount(),
@@ -108,6 +108,7 @@ export default async function CreatorDetailPage({
     getCampaigns(creator.clientId),
     listContracts(partnership.id),
     listTeammates(),
+    getFollowUpThresholds(creator.clientId),
   ]);
 
   // Contracts and their email: where they disagree with what's recorded (blanks were filled already).
@@ -154,6 +155,7 @@ export default async function CreatorDetailPage({
     daysSinceLastOutbound: outreach.daysSinceLastOutbound,
     datesAreMigrated: outreach.datesAreMigrated,
     exitReason: partnership.exitReason,
+    nudgeAfterDays: thresholds.nudgeAfterDays,
   });
 
   // What the auto-stage engine would do from here, in plain words.

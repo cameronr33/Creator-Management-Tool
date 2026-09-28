@@ -87,6 +87,13 @@ function main() {
       /move them to Ready to ship/.test(nextStep({ ...base, stage: "finalizing", signed: true, hasAddress: true }).text),
   );
   check(
+    "with the client's nudge days, deal stages say when Today brings a quiet deal back",
+    / If they go quiet, Today brings them back after 5 days\.$/.test(nextStep({ ...base, stage: "in_conversation", nudgeAfterDays: 5 }).text) &&
+      / after 5 days\.$/.test(nextStep({ ...base, stage: "finalizing", nudgeAfterDays: 5 }).text) &&
+      !/go quiet/.test(nextStep({ ...base, stage: "fulfilling", nudgeAfterDays: 5 }).text) &&
+      !/go quiet/.test(nextStep({ ...base, stage: "in_conversation" }).text),
+  );
+  check(
     "a retired stage is answered as the stage it now means",
     nextStep({ ...base, stage: "negotiating" }).text === nextStep({ ...base, stage: "in_conversation" }).text,
   );

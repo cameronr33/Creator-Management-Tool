@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   clients,
@@ -14,6 +14,7 @@ import {
   cmCreatorSocials,
   cmClientSettings,
   users,
+  cmStageTransitions,
   type CmStage,
 } from "@/lib/db/schema";
 import { canonicalStage } from "@/lib/stages";
@@ -144,6 +145,9 @@ export interface CreatorRow {
   emailWhoseTurn: string | null;
   emailSoundsLikeNo: boolean;
   replyHandledAt: Date | null;
+  /** When the deal was created, and when the client approved it (for "waiting since" on Today). */
+  createdAt: Date;
+  approvalAt: Date | null;
   /** Who looks after the deal (null = unassigned) and their name. */
   ownerId: string | null;
   ownerName: string | null;
@@ -206,6 +210,8 @@ export async function getCreatorRows(
       statusNoteBy: cmPartnerships.statusNoteBy,
       ownerId: cmPartnerships.ownerId,
       ownerName: users.name,
+      createdAt: cmPartnerships.createdAt,
+      approvalAt: cmPartnerships.approvalAt,
       clientApproval: cmPartnerships.clientApproval,
       approvalByName: cmPartnerships.approvalByName,
       photoFetchedAt: cmCreatorPhotos.fetchedAt,
@@ -392,4 +398,22 @@ export async function getCampaignCounts(clientId: string): Promise<Map<string, n
     .where(eq(cmCampaigns.clientId, clientId))
     .groupBy(cmPartnerships.campaignId);
   return new Map(rows.map((r) => [r.campaignId, r.n]));
+}
+
+/**
+ * When each deal entered the stage it's in now: the latest move into that
+ * stage that wasn't undone, preferring a real move over an undo row (an undo
+ * returns it to where it was, not a fresh start). Deals with no such move
+ * (only ever at their first stage) are absent — callers fall back to createdAt.
+ * Selected as a column, so the timestamp keeps its UTC reading.
+ */
+export async function getStageSince(partnershipIds: string[]): Promise<Map<string, Date>> {
+  if (!partnershipIds.length) return new Map();
+  const rows = await db
+    .selectDistinctOn([cmStageTransitions.partnershipId], { id: cmStageTransitions.partnershipId, at: cmStageTransitions.changedAt })
+    .from(cmStageTransitions)
+    .innerJoin(cmPartnerships, and(eq(cmPartnerships.id, cmStageTransitions.partnershipId), eq(cmStageTransitions.toStage, cmPartnerships.stage)))
+    .where(and(inArray(cmStageTransitions.partnershipId, partnershipIds), isNull(cmStageTransitions.undoneAt)))
+    .orderBy(cmStageTransitions.partnershipId, sql`(coalesce(${cmStageTransitions.reason}, '') = 'undo')`, desc(cmStageTransitions.changedAt));
+  return new Map(rows.map((r) => [r.id, r.at]));
 }

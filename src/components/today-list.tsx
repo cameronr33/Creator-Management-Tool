@@ -95,6 +95,8 @@ function TodayItem({ row: r, meId, ownerLabels }: { row: TodayRow; meId: string 
               {r.name}
             </Link>
             <OwnerSlot partnershipId={r.partnershipId} owner={owner} meId={meId} />
+            {r.badge === "due" && <Badge tone="warn" title="The first message is overdue">Due</Badge>}
+            {r.badge === "late" && <Badge tone="bad" title="The video is later than the client's Video due setting">Late</Badge>}
             {r.username && <span className="text-xs text-text-muted">@{r.username}</span>}
             <Badge tone="info" title="Campaign">{r.campaignName}</Badge>
             {turn && r.section !== "your_turn" && r.section !== "waiting" && r.whoseTurn === "us" && <Badge tone="warn">Your turn</Badge>}

@@ -1,10 +1,10 @@
 import { desc, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cmPartnerships, cmShipments, type CmStage } from "@/lib/db/schema";
-import { getCreatorRows, getFollowUpThresholds, getOutreachStates } from "@/lib/queries";
+import { getCreatorRows, getFollowUpThresholds, getOutreachStates, getStageSince } from "@/lib/queries";
 import { deriveOutreachState } from "@/lib/outreach";
 import { hasCompleteAddress } from "@/lib/address";
-import { placeOnToday, type TodaySection } from "@/lib/today";
+import { placeOnToday, sortToday, type TodaySection } from "@/lib/today";
 import type { WhoseTurn } from "@/lib/activity";
 import { statusNoteView, type StatusNoteView } from "@/lib/status-note";
 import { hiddenSummary, splitByView, type View } from "@/lib/owners";
@@ -35,6 +35,10 @@ export interface TodayRow {
   /** Who looks after it; null = unassigned. */
   ownerId: string | null;
   ownerName: string | null;
+  /** Waiting since (ISO) — the order within a section; null = unknown. */
+  since: string | null;
+  /** "due" (first message) or "late" (video). */
+  badge: "due" | "late" | null;
 }
 
 export interface TodayData {
@@ -63,7 +67,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", userId 
   if (creators.length === 0) return { rows: [], ...base };
 
   const ids = creators.map((c) => c.partnershipId);
-  const [outreach, thresholds, details, shipments] = await Promise.all([
+  const [outreach, thresholds, details, shipments, stageSince] = await Promise.all([
     getOutreachStates(ids),
     getFollowUpThresholds(clientId),
     db
@@ -78,14 +82,15 @@ export async function getTodayData({ clientId, campaignId, view = "all", userId 
       .from(cmPartnerships)
       .where(inArray(cmPartnerships.id, ids)),
     db
-      .select({ id: cmShipments.id, partnershipId: cmShipments.partnershipId })
+      .select({ id: cmShipments.id, partnershipId: cmShipments.partnershipId, shippedAt: cmShipments.shippedAt, deliveredAt: cmShipments.deliveredAt })
       .from(cmShipments)
       .where(inArray(cmShipments.partnershipId, ids))
       .orderBy(desc(cmShipments.createdAt)),
+    getStageSince(ids),
   ]);
   const detailById = new Map(details.map((d) => [d.id, d]));
-  const latestShipment = new Map<string, string>();
-  for (const s of shipments) if (!latestShipment.has(s.partnershipId)) latestShipment.set(s.partnershipId, s.id);
+  const latestShipment = new Map<string, (typeof shipments)[number]>();
+  for (const s of shipments) if (!latestShipment.has(s.partnershipId)) latestShipment.set(s.partnershipId, s);
 
   const rows: TodayRow[] = [];
   for (const c of creators) {
@@ -98,6 +103,12 @@ export async function getTodayData({ clientId, campaignId, view = "all", userId 
       datesAreMigrated: o.datesAreMigrated,
       thresholds,
       clientApproval: c.clientApproval,
+      lastFrom: c.activity.lastFrom,
+      lastMessageAt: c.activity.at,
+      stageSince: stageSince.get(c.partnershipId) ?? c.createdAt,
+      approvalAt: c.approvalAt,
+      shippedAt: latestShipment.get(c.partnershipId)?.shippedAt ?? null,
+      deliveredAt: latestShipment.get(c.partnershipId)?.deliveredAt ?? null,
     });
     if (!placed) continue;
     const d = detailById.get(c.partnershipId);
@@ -117,13 +128,15 @@ export async function getTodayData({ clientId, campaignId, view = "all", userId 
       soundsLikeNo: c.emailSoundsLikeNo,
       hasOutbound: o.totalOutbound > 0,
       suggestedAddress: d && !hasCompleteAddress(d) ? d.suggestedAddress : null,
-      shipmentId: latestShipment.get(c.partnershipId) ?? null,
+      shipmentId: latestShipment.get(c.partnershipId)?.id ?? null,
       photoUrl: c.photoUrl,
       clientApproval: c.clientApproval,
       approvalByName: c.approvalByName,
       ownerId: c.ownerId,
       ownerName: c.ownerName,
+      since: placed.since?.toISOString() ?? null,
+      badge: placed.badge,
     });
   }
-  return { rows, ...base };
+  return { rows: sortToday(rows), ...base };
 }

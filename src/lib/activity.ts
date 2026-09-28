@@ -38,6 +38,8 @@ export interface Activity {
   whoseTurn: WhoseTurn | null;
   /** True when the text is the summary of their email. */
   fromEmail: boolean;
+  /** Who sent the last real message — we ("us") or they ("them"); null when there's none. */
+  lastFrom: "us" | "them" | null;
 }
 
 function cleanSubject(s: string | null): string | null {
@@ -65,19 +67,20 @@ export function latestActivity(i: ActivityInput): Activity {
   const { last } = i;
   if (!last) {
     return i.emailSummary
-      ? { text: i.emailSummary, at: i.emailSummaryAt, whoseTurn: turn(i.emailWhoseTurn), fromEmail: true }
-      : { text: "No messages yet", at: null, whoseTurn: null, fromEmail: false };
+      ? { text: i.emailSummary, at: i.emailSummaryAt, whoseTurn: turn(i.emailWhoseTurn), fromEmail: true, lastFrom: null }
+      : { text: "No messages yet", at: null, whoseTurn: null, fromEmail: false, lastFrom: null };
   }
   // The summary is current when it describes this very message (or a later one).
   const summaryCurrent = !!i.emailSummary && !!i.emailSummaryAt && i.emailSummaryAt.getTime() >= last.at.getTime();
   let whoseTurn: WhoseTurn | null = summaryCurrent ? turn(i.emailWhoseTurn) : last.direction === "inbound" ? "us" : "them";
   if (whoseTurn === "us" && i.replyHandledAt && i.replyHandledAt.getTime() >= last.at.getTime()) whoseTurn = "none";
+  const lastFrom = last.direction === "outbound" ? "us" : "them";
   if (last.isMigrated) {
-    return { text: `${describe(last)} (imported from the sheet — date unknown)`, at: null, whoseTurn, fromEmail: false };
+    return { text: `${describe(last)} (imported from the sheet — date unknown)`, at: null, whoseTurn, fromEmail: false, lastFrom };
   }
   return summaryCurrent
-    ? { text: i.emailSummary!, at: last.at, whoseTurn, fromEmail: true }
-    : { text: describe(last), at: last.at, whoseTurn, fromEmail: false };
+    ? { text: i.emailSummary!, at: last.at, whoseTurn, fromEmail: true, lastFrom }
+    : { text: describe(last), at: last.at, whoseTurn, fromEmail: false, lastFrom };
 }
 
 function turn(t: string | null): WhoseTurn | null {

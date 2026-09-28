@@ -5,7 +5,8 @@
  *   npm run preview:verify -- scripts/verify-today.ts
  */
 import { latestActivity, type LastMessage } from "../src/lib/activity";
-import { placeOnToday, TODAY_SECTIONS, type TodayFacts } from "../src/lib/today";
+import { placeOnToday, sortToday, TODAY_SECTIONS, type TodayFacts } from "../src/lib/today";
+import { THRESHOLD_FIELDS, THRESHOLDS_SCHEMA } from "../src/lib/thresholds";
 import { DEFAULT_THRESHOLDS } from "../src/lib/outreach";
 import { ACTIVE_STAGES, STAGE_VALUES, isTerminal } from "../src/lib/stages";
 import type { CmStage } from "../src/lib/db/schema";
@@ -61,6 +62,50 @@ check("Shipped → on the way", place({ stage: "shipped" })?.section === "shippe
 check("Waiting on video → add the link", place({ stage: "content_pending" })?.section === "waiting_video");
 check("a retired stage is placed as the stage it now means", place({ stage: "agreed" })?.section === "get_address");
 check("the section list covers every placement", STAGE_VALUES.filter((s) => !isTerminal(s)).every((s) => { const p = place({ stage: s }); return !p || TODAY_SECTIONS.some((t) => t.key === p.section); }));
+
+console.log("\n── Nudges for quiet deals (2026-09-28) ──");
+const daysAfter = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000);
+const quiet = (stage: CmStage, over: Partial<TodayFacts> = {}) =>
+  place({ stage, whoseTurn: "them", lastFrom: "us", lastMessageAt: at(20), now: daysAfter(at(20), DEFAULT_THRESHOLDS.nudgeAfterDays), ...over });
+check("Talking, we wrote, no reply for the nudge days → Follow up", quiet("in_conversation")?.section === "follow_up" && quiet("in_conversation")?.note === `No reply in ${DEFAULT_THRESHOLDS.nudgeAfterDays} days — nudge them.`);
+check("Agreed gone quiet → Follow up, asking for the address", quiet("awaiting_address")?.section === "follow_up" && /for their address/.test(quiet("awaiting_address")?.note ?? ""));
+check("Finalizing gone quiet → Follow up, about what's open", quiet("finalizing")?.section === "follow_up" && /still open/.test(quiet("finalizing")?.note ?? ""));
+check("…a day earlier they stay where they were", quiet("in_conversation", { now: daysAfter(at(20), DEFAULT_THRESHOLDS.nudgeAfterDays - 1) })?.section === "waiting" && quiet("awaiting_address", { now: daysAfter(at(20), DEFAULT_THRESHOLDS.nudgeAfterDays - 1) })?.section === "get_address");
+check("they wrote last (our turn) → never a nudge", quiet("in_conversation", { whoseTurn: "us", lastFrom: "them" })?.section === "your_turn" && quiet("finalizing", { whoseTurn: "us", lastFrom: "them" })?.section === "finalizing");
+check("they promised something and went quiet (their turn, their message last) → nudged", quiet("awaiting_address", { lastFrom: "them" })?.section === "follow_up");
+check("nothing pending (a thank-you) → no nudge", quiet("in_conversation", { whoseTurn: "none" })?.section === "waiting");
+check("imported rows (no date) never get a nudge clock", quiet("in_conversation", { lastMessageAt: null })?.section === "waiting" && quiet("awaiting_address", { lastMessageAt: null })?.section === "get_address");
+check("fulfilment stages are never nudged", (["fulfilling", "shipped", "content_pending"] as CmStage[]).every((s) => quiet(s)?.section !== "follow_up"));
+check("a client's own nudge days are used", quiet("in_conversation", { thresholds: { ...DEFAULT_THRESHOLDS, nudgeAfterDays: 9 } })?.section === "waiting" && quiet("in_conversation", { thresholds: { ...DEFAULT_THRESHOLDS, nudgeAfterDays: 2 } })?.section === "follow_up");
+
+console.log("\n── Waiting since, Due and Late ──");
+check("Your turn waits since their message", place({ stage: "in_conversation", whoseTurn: "us", lastMessageAt: at(18) })?.since?.getTime() === at(18).getTime());
+check("Follow up waits since our last message", place({ now: at(28) })?.since?.getTime() === at(20).getTime());
+check("Agreed / Ready to ship wait since the stage began", place({ stage: "awaiting_address", stageSince: at(15) })?.since?.getTime() === at(15).getTime() && place({ stage: "fulfilling", stageSince: at(16) })?.since?.getTime() === at(16).getTime());
+const toContact = (over: Partial<TodayFacts>) => place({ stage: "shortlisted", whoseTurn: null, ...over });
+check("To contact: due after the first-message days, with a Due badge", toContact({ stageSince: at(20), now: daysAfter(at(20), DEFAULT_THRESHOLDS.initialOutreachAfterDays) })?.badge === "due" && /first message is due/.test(toContact({ stageSince: at(20), now: daysAfter(at(20), 3) })?.note ?? ""));
+check("…not before", toContact({ stageSince: at(20), now: daysAfter(at(20), DEFAULT_THRESHOLDS.initialOutreachAfterDays - 1) })?.badge === null);
+check("…and the clock starts at the client's approval when that's later", toContact({ stageSince: at(10), approvalAt: at(20), now: daysAfter(at(20), 1) })?.badge === null);
+check("Shipped says when it went out", place({ stage: "shipped", shippedAt: at(18) })?.note === "Shipped 3 days ago." && place({ stage: "shipped", shippedAt: at(18) })?.since?.getTime() === at(18).getTime());
+check("…or that no ship date was recorded", /no ship date recorded/.test(place({ stage: "shipped", stageSince: at(18) })?.note ?? ""));
+const video = (n: number, over: Partial<TodayFacts> = {}) => place({ stage: "content_pending", deliveredAt: at(1), now: daysAfter(at(1), n), ...over });
+check(`Waiting on video: late from ${DEFAULT_THRESHOLDS.videoDueAfterDays} days after delivery`, video(DEFAULT_THRESHOLDS.videoDueAfterDays)?.badge === "late" && /the video is late/.test(video(DEFAULT_THRESHOLDS.videoDueAfterDays)?.note ?? ""));
+check("…not a day before", video(DEFAULT_THRESHOLDS.videoDueAfterDays - 1)?.badge === null && video(DEFAULT_THRESHOLDS.videoDueAfterDays - 1)?.note === `Delivered ${DEFAULT_THRESHOLDS.videoDueAfterDays - 1} days ago.`);
+check("…a stage moved there by hand counts from when it moved", /no delivery date recorded/.test(video(3, { deliveredAt: null, stageSince: at(1) })?.note ?? ""));
+check("…and with no date at all there's no clock", video(30, { deliveredAt: null, stageSince: null })?.badge === null && video(30, { deliveredAt: null, stageSince: null })?.since === null);
+const sorted = sortToday([
+  { name: "Cy", since: at(12).toISOString() },
+  { name: "Al", since: null },
+  { name: "Bo", since: at(10).toISOString() },
+  { name: "Ab", since: at(12).toISOString() },
+]);
+check("whoever has waited longest comes first; unknown dates last; ties by name", sorted.map((r) => r.name).join(",") === "Bo,Ab,Cy,Al", sorted.map((r) => r.name).join(","));
+
+console.log("\n── The timing table ──");
+check("the field table, the defaults and the settings schema have the same keys", JSON.stringify(THRESHOLD_FIELDS.map((f) => f.key).sort()) === JSON.stringify(Object.keys(DEFAULT_THRESHOLDS).sort()));
+check("the settings schema takes the new keys", THRESHOLDS_SCHEMA.safeParse({ nudgeAfterDays: 4, videoDueAfterDays: 21 }).success);
+check("…and refuses an unknown one or a fraction", !THRESHOLDS_SCHEMA.safeParse({ nudgeDays: 4 }).success && !THRESHOLDS_SCHEMA.safeParse({ nudgeAfterDays: 2.5 }).success);
+check("the owner's defaults: nudge after 5, video due after 14", DEFAULT_THRESHOLDS.nudgeAfterDays === 5 && DEFAULT_THRESHOLDS.videoDueAfterDays === 14);
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`}`);
 process.exitCode = failures === 0 ? 0 : 1;
