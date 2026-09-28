@@ -1,0 +1,65 @@
+import { db } from "@/lib/db";
+import { cmOutreachEvents } from "@/lib/db/schema";
+import { applyAutoStage, type AutoStageResult } from "@/lib/auto-stage";
+import { lastManualChangeAt } from "@/lib/email-ingest";
+import { resolveOccurredAt } from "@/lib/log-time";
+
+/**
+ * Logging a message by hand — a DM, a call, an email from a teammate's own
+ * inbox — with when it actually happened (owner, 2026-09-28: "when + how on
+ * logging"), so follow-up clocks stay right when a batch is logged the next
+ * morning.
+ *
+ * A date earlier than a person's last stage change doesn't move the stage
+ * (the email check's rule): an old reply logged late must not reopen a deal
+ * someone closed since (frozen node 2).
+ */
+
+export { LOG_MAX_PAST_DAYS, resolveOccurredAt, type ResolvedTime } from "@/lib/log-time";
+
+export interface LogInput {
+  partnershipId: string;
+  direction: "inbound" | "outbound";
+  channel: "ig_dm" | "email" | "phone" | "other";
+  kind: "initial" | "follow_up" | "reply" | "note";
+  body?: string | null;
+  subject?: string | null;
+  occurredAt?: string | null;
+}
+
+export type LogResult =
+  | { ok: true; eventId: string; stageChanged: AutoStageResult | null; stageSkipped: boolean }
+  | { ok: false; error: string };
+
+export async function logMessage(input: LogInput, userId: string, now = new Date()): Promise<LogResult> {
+  const when = resolveOccurredAt(input.occurredAt, now);
+  if (!when.ok) return when;
+  const [row] = await db
+    .insert(cmOutreachEvents)
+    .values({
+      partnershipId: input.partnershipId,
+      direction: input.direction,
+      channel: input.channel,
+      kind: input.kind,
+      body: input.body?.trim() || null,
+      subject: input.subject?.trim() || null,
+      occurredAt: when.at,
+      createdBy: userId,
+    })
+    .returning({ id: cmOutreachEvents.id });
+
+  // A first message implies Contacted; their reply implies Talking. Notes never move the stage.
+  const trigger =
+    input.direction === "inbound" && input.kind === "reply"
+      ? ("inbound_message" as const)
+      : input.direction === "outbound" && (input.kind === "initial" || input.kind === "follow_up")
+        ? ("outbound_message" as const)
+        : null;
+  if (!trigger) return { ok: true, eventId: row.id, stageChanged: null, stageSkipped: false };
+  if (when.supplied) {
+    const decided = (await lastManualChangeAt([input.partnershipId])).get(input.partnershipId);
+    if (decided && when.at.getTime() <= decided.getTime()) return { ok: true, eventId: row.id, stageChanged: null, stageSkipped: true };
+  }
+  const stageChanged = await applyAutoStage(input.partnershipId, trigger, userId, { evidenceEventId: row.id });
+  return { ok: true, eventId: row.id, stageChanged, stageSkipped: false };
+}

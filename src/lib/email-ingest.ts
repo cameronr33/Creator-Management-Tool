@@ -451,6 +451,7 @@ export async function recomputeEmailKinds(partnershipIds: string[]): Promise<num
       direction: cmOutreachEvents.direction,
       kind: cmOutreachEvents.kind,
       channel: cmOutreachEvents.channel,
+      externalId: cmOutreachEvents.externalId,
       occurredAt: cmOutreachEvents.occurredAt,
       createdAt: cmOutreachEvents.createdAt,
     })
@@ -463,7 +464,7 @@ export async function recomputeEmailKinds(partnershipIds: string[]): Promise<num
     for (const e of mine) {
       // Only synced email is re-labelled; hand-logged entries keep what the person chose.
       const next = kinds.get(e.id);
-      if (e.channel === "email" && next && next !== e.kind) {
+      if (e.channel === "email" && e.externalId && next && next !== e.kind) {
         await db.update(cmOutreachEvents).set({ kind: next }).where(eq(cmOutreachEvents.id, e.id));
         changed++;
       }

@@ -2,8 +2,9 @@ import { displayNames } from "@/lib/email-body";
 
 /**
  * The creator page's conversation, grouped the way people remember it: one
- * group per email thread (newest thread first), and one for Instagram DMs,
- * calls and notes. Pure (scripts/verify-today.ts).
+ * group per email thread the mailbox holds (newest thread first), and one for
+ * everything logged by hand — DMs, calls, notes and emails from a teammate's
+ * own inbox. Pure (scripts/verify-logging.ts).
  */
 
 export interface ThreadEvent {
@@ -15,6 +16,8 @@ export interface ThreadEvent {
   fromAddress: string | null;
   toAddress: string | null;
   messageId: string | null;
+  /** Set on email the mailbox holds; null on anything logged by hand. Required so no caller can drop it and misfile every email. */
+  externalId: string | null;
 }
 
 export interface Thread<E extends ThreadEvent> {
@@ -35,7 +38,8 @@ const OTHER = "__other__";
 export function groupThreads<E extends ThreadEvent>(events: E[]): Thread<E>[] {
   const groups = new Map<string, E[]>();
   for (const e of events) {
-    const key = e.channel === "email" && e.threadId ? e.threadId : e.channel === "email" ? `email:${e.id}` : OTHER;
+    const synced = e.channel === "email" && !!e.externalId;
+    const key = synced && e.threadId ? e.threadId : synced ? `email:${e.id}` : OTHER;
     groups.set(key, [...(groups.get(key) ?? []), e]);
   }
   const threads: Thread<E>[] = [];
@@ -48,7 +52,7 @@ export function groupThreads<E extends ThreadEvent>(events: E[]): Thread<E>[] {
     const withId = [...sorted].reverse().find((e) => e.messageId);
     threads.push({
       key,
-      title: isEmail ? (first.subject ?? "(no subject)").replace(/^\s*((re|fwd?|fw)\s*:\s*)+/i, "") : "Instagram DMs, calls and notes",
+      title: isEmail ? (first.subject ?? "(no subject)").replace(/^\s*((re|fwd?|fw)\s*:\s*)+/i, "") : "Logged by hand: DMs, calls, notes and emails from your own inbox",
       isEmail,
       participants: [...names],
       events: sorted,

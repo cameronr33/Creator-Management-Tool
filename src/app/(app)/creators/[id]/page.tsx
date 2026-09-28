@@ -338,7 +338,7 @@ export default async function CreatorDetailPage({
                 {conversationBadge}
                 <MessagedButton partnershipId={partnership.id} name={creator.name} hasOutbound={outreach.totalOutbound > 0} />
                 <ReplyButton partnershipId={partnership.id} name={creator.name} />
-                {events.some((e) => e.channel === "email") && <RereadEmailsButton partnershipId={partnership.id} />}
+                {events.some((e) => e.channel === "email" && e.externalId) && <RereadEmailsButton partnershipId={partnership.id} />}
               </>
             }
           />

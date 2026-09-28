@@ -12,6 +12,8 @@ import {
 import type { CmStage, CmShipment } from "@/lib/db/schema";
 import { Button, Field, Input, Select, Textarea, Segmented } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
+import { toast } from "@/components/toast";
+import { DateChoice, defaultPickedDate, whenToIso, type WhenChoice } from "@/components/log-message";
 
 /* ── Stage ────────────────────────────────────────────────────── */
 
@@ -189,16 +191,18 @@ export function StageControl({
 
 const HAPPENINGS = [
   { value: "dm_out", label: "We sent them a DM", direction: "outbound", channel: "ig_dm", kind: "outbound" },
-  { value: "email_out", label: "We emailed them", direction: "outbound", channel: "email", kind: "outbound" },
+  { value: "email_out", label: "We emailed them from our own inbox", direction: "outbound", channel: "email", kind: "outbound" },
   { value: "call", label: "We spoke on the phone", direction: "outbound", channel: "phone", kind: "outbound" },
   { value: "reply_dm", label: "They replied by DM", direction: "inbound", channel: "ig_dm", kind: "reply" },
-  { value: "reply_email", label: "They replied by email", direction: "inbound", channel: "email", kind: "reply" },
+  { value: "reply_email", label: "They replied to our own inbox", direction: "inbound", channel: "email", kind: "reply" },
   { value: "note", label: "Internal note", direction: "outbound", channel: "other", kind: "note" },
 ] as const;
 
 /**
- * Logs calls, notes and off-app messages onto the timeline. Templated DMs
- * and emails go through MessageComposer; this covers everything else.
+ * Logs calls, notes and off-app messages onto the timeline, today or on an
+ * earlier date. Email on threads the mailbox is on arrives by itself; this
+ * covers everything else. An email logged here is never read by the email
+ * reader — there is nothing stored to read.
  */
 export function TimelineNote({
   partnershipId,
@@ -212,23 +216,28 @@ export function TimelineNote({
   const [open, setOpen] = useState(false);
   const [what, setWhat] = useState<(typeof HAPPENINGS)[number]["value"]>("reply_dm");
   const [body, setBody] = useState("");
+  const [when, setWhen] = useState<WhenChoice>("today");
+  const [picked, setPicked] = useState(defaultPickedDate);
 
   const submit = async () => {
     const h = HAPPENINGS.find((x) => x.value === what)!;
     const kind = h.kind === "outbound" ? (hasOutbound ? "follow_up" : "initial") : h.kind;
     const r = await run(
       () =>
-        api("/api/outreach", {
+        api<{ stageSkipped?: boolean }>("/api/outreach", {
           partnershipId,
           direction: h.direction,
           channel: h.channel,
           kind,
           body: body.trim() || undefined,
+          occurredAt: whenToIso(when, picked),
         }),
       { success: "Added to the timeline" },
     );
     if (r.ok) {
+      if (r.data.stageSkipped) toast("The stage didn't move", { tone: "info", detail: "Someone set it by hand after that date, so an older message doesn't change it." });
       setBody("");
+      setWhen("today");
       setOpen(false);
     }
   };
@@ -243,7 +252,10 @@ export function TimelineNote({
 
   return (
     <div className="space-y-2 rounded-lg border border-border bg-surface-2/60 p-3">
-      <Field label="What happened?">
+      <Field
+        label="What happened?"
+        hint={what === "email_out" || what === "reply_email" ? "Only for email the connected mailbox can't see — it picks up the rest by itself." : undefined}
+      >
         <Select compact value={what} onChange={(e) => setWhat(e.target.value as typeof what)}>
           {HAPPENINGS.map((h) => (
             <option key={h.value} value={h.value}>
@@ -252,6 +264,7 @@ export function TimelineNote({
           ))}
         </Select>
       </Field>
+      <DateChoice choice={when} picked={picked} onChoice={setWhen} onPicked={setPicked} />
       <Field label="What was said (optional)">
         <Textarea compact value={body} onChange={(e) => setBody(e.target.value)} rows={2} />
       </Field>

@@ -98,6 +98,8 @@ export interface PromptMessage {
   eventId: string;
   occurredAt: Date;
   channel: string;
+  /** False for email a teammate logged by hand (from their own inbox) — not a message the mailbox holds. */
+  synced?: boolean;
   direction: "inbound" | "outbound";
   senderRole: "team" | "creator" | "client" | "other" | null;
   kind: string;
@@ -161,8 +163,21 @@ Return:
           : m.senderRole === "other"
             ? `from someone else on the creator's thread (${displayNames(m.from) || "unknown"})`
             : "from the creator";
-    const channel = m.channel === "email" ? "Email" : m.channel === "ig_dm" ? "Instagram DM (logged by a teammate, text not available)" : m.channel;
-    const kind = m.kind === "note" && m.senderRole !== "client" ? " · calendar invite / automatic message" : "";
+    const channel =
+      m.channel === "email"
+        ? m.synced === false
+          ? "Email logged by a teammate (from their own inbox — text may be missing)"
+          : "Email"
+        : m.channel === "ig_dm"
+          ? "Instagram DM (logged by a teammate, text not available)"
+          : m.channel;
+    // A note in the mailbox is an invite or an auto-reply; anywhere else it's a teammate's own note.
+    const kind =
+      m.kind !== "note" || m.senderRole === "client"
+        ? ""
+        : m.channel === "email" && m.synced !== false
+          ? " · calendar invite / automatic message"
+          : " · a teammate's internal note";
     const subject = m.subject ? `\nSubject: ${m.subject}` : "";
     const body = m.body ? `\n${m.body.slice(0, BODY_CHARS)}` : "";
     return `[${m.n}] ${m.occurredAt.toISOString().slice(0, 10)} · ${channel} · ${who}${kind}${subject}${body}`;
@@ -406,6 +421,7 @@ async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentCont
     eventId: e.id,
     occurredAt: e.occurredAt,
     channel: e.channel,
+    synced: e.channel === "email" ? !!e.externalId : undefined,
     direction: e.direction,
     senderRole: (e.senderRole as PromptMessage["senderRole"]) ?? (e.direction === "outbound" ? "team" : "creator"),
     kind: e.kind,
@@ -427,7 +443,8 @@ async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentCont
       agreementType: p.agreementType,
       messages,
     },
-    hasEmail: messages.some((m) => m.channel === "email"),
+    // Only mail the mailbox holds counts — an email logged by hand has nothing to read.
+    hasEmail: messages.some((m) => m.channel === "email" && m.synced),
     latestAt: latest?.occurredAt ?? null,
     dealEditedAt: p.dealEditedAt,
   };
@@ -544,7 +561,7 @@ export async function partnershipsNeedingRead(limit = MAX_PER_RUN): Promise<stri
     select p.id from ${cmPartnerships} p
     join lateral (
       select max(e.created_at) as newest from ${cmOutreachEvents} e
-      where e.partnership_id = p.id and e.channel = 'email'
+      where e.partnership_id = p.id and e.channel = 'email' and e.external_id is not null
     ) x on true
     where x.newest is not null and (p.email_assessed_at is null or x.newest > p.email_assessed_at)
     order by x.newest desc
