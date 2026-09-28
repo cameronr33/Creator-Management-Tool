@@ -60,6 +60,8 @@ import { dealDifferences, type DealFacts, type EmailDeal } from "@/lib/deal-fact
 import { Contracts, type ContractRow, type OfferedDifference } from "@/components/contracts";
 import { StatusNote } from "@/components/status-note";
 import { TrackingLink } from "@/components/tracking-link";
+import { OwnerPicker } from "@/components/owner-controls";
+import { listTeammates } from "@/lib/owners";
 import { statusNoteView } from "@/lib/status-note";
 
 /** Where the Next: line's link goes, named for where it lands. */
@@ -87,7 +89,7 @@ export default async function CreatorDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ returnTo?: string | string[] }>;
 }) {
-  await requireAgencyPage();
+  const session = await requireAgencyPage();
   await scheduleEmailCheckForVisitor();
   const { id } = await params;
   const query = await searchParams;
@@ -97,7 +99,7 @@ export default async function CreatorDetailPage({
 
   const { creator, partnership, campaign, socials, events, products, shipments, deliverables, outreach, otherPartnerships } =
     detail;
-  const [clients, creatorEmails, gmailAccount, undoable, photo, campaigns, contracts] = await Promise.all([
+  const [clients, creatorEmails, gmailAccount, undoable, photo, campaigns, contracts, teammates] = await Promise.all([
     getClients(),
     getCreatorEmails(creator.id),
     getActiveGmailAccount(),
@@ -105,6 +107,7 @@ export default async function CreatorDetailPage({
     getPhotoUrl(creator.id),
     getCampaigns(creator.clientId),
     listContracts(partnership.id),
+    listTeammates(),
   ]);
 
   // Contracts and their email: where they disagree with what's recorded (blanks were filled already).
@@ -284,6 +287,7 @@ export default async function CreatorDetailPage({
           <div className="w-full space-y-3 sm:w-72">
             <StageControl partnershipId={partnership.id} stage={partnership.stage} exitReason={partnership.exitReason} autoNote={autoNote} />
             <CampaignPicker partnershipId={partnership.id} campaignId={campaign.id} campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))} />
+            <OwnerPicker partnershipId={partnership.id} ownerId={partnership.ownerId} teammates={teammates} meId={session.user.id} />
           </div>
         </div>
         <nav aria-label="Jump to" className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">

@@ -38,7 +38,16 @@ function handlers(src: string): { method: string; body: string }[] {
   return starts.map((s, i) => ({ method: s.method, body: src.slice(s.at, starts[i + 1]?.at ?? src.length) }));
 }
 
-const COOKIE_SCOPED = /getSelectedClientSlug|resolveClient\(|InSelectedClient|getSelectedCampaignId|resolveCampaign\(/;
+const COOKIE_SCOPED = /getSelectedClientSlug|resolveClient\(|InSelectedClient|getSelectedCampaignId|resolveCampaign\(|getSelectedView/;
+
+/** Exported functions whose body reads a cookie — each must be a known scope getter. */
+function cookieGetters(src: string): string[] {
+  const out: string[] = [];
+  for (const m of src.matchAll(/export\s+async\s+function\s+(\w+)\s*\([^)]*\)[^{]*\{([\s\S]*?)\n\}/g)) {
+    if (/cookies\(\)/.test(m[2]) && !/^set/.test(m[1])) out.push(m[1]);
+  }
+  return out;
+}
 
 function main() {
   console.log("\n── Every API route states who may call it ──");
@@ -108,6 +117,14 @@ function main() {
   check(`every portal page (${portalPages.length}) resolves its brand from the login itself`, portalPages.length >= 4 && portalLoose.length === 0, portalLoose.join(", "));
   const guard = readFileSync(join(SRC, "lib", "page-guards.ts"), "utf8");
   check("the page guard refuses signed-out and client logins", /if \(!session\?\.user\) redirect\("\/login"\)/.test(guard) && /kind === "client"\) redirect\("\/portal"\)/.test(guard));
+
+  console.log("\n── Every cookie scope is known to the portal check (2026-09-28) ──");
+  const libFiles = readdirSync(join(SRC, "lib")).filter((f) => f.endsWith(".ts"));
+  const unknownGetters = libFiles.flatMap((f) => cookieGetters(readFileSync(join(SRC, "lib", f), "utf8")).filter((n) => !COOKIE_SCOPED.test(n)).map((n) => `${f}: ${n}`));
+  check("every cookie getter in src/lib is in the scope pattern the portal routes are checked against", unknownGetters.length === 0, unknownGetters.join(", "));
+  const probeGetters = cookieGetters("export async function getSecretScope() {\n  return (await cookies()).get(\"x\");\n}");
+  check("…and that check catches a new one", probeGetters.length === 1 && !COOKIE_SCOPED.test(probeGetters[0]));
+  check("the Mine / Everyone view cookie is one of them", cookieGetters(readFileSync(join(SRC, "lib", "view-cookie.ts"), "utf8")).includes("getSelectedView"));
 
   console.log("\n── A client login is re-checked every time ──");
   const clientPaths = [join(SRC, "lib", "api-helpers.ts"), join(SRC, "lib", "portal-data.ts"), join(SRC, "app", "api", "creators", "[id]", "photo", "route.ts")];

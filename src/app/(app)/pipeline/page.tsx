@@ -6,9 +6,12 @@ import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { resolveCampaign } from "@/lib/campaigns";
 import { PageHeader, EmptyState, Button } from "@/components/ui";
 import { PipelineBoard, type BoardCard } from "@/components/pipeline-board";
+import { MineToggle } from "@/components/mine-toggle";
+import { getSelectedView } from "@/lib/view-cookie";
+import { chipLabels, hiddenSummary, listTeammates, splitByView } from "@/lib/owners";
 
 export default async function PipelinePage() {
-  await requireAgencyPage();
+  const session = await requireAgencyPage();
   await scheduleEmailCheckForVisitor();
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) {
@@ -22,8 +25,12 @@ export default async function PipelinePage() {
     );
   }
 
-  const campaign = await resolveCampaign(client.id);
-  const rows = await getCreatorRows(client.id, { campaignId: campaign?.id, withOutreach: false });
+  const [campaign, view, teammates] = await Promise.all([resolveCampaign(client.id), getSelectedView(), listTeammates()]);
+  const meId = session.user.id;
+  const labels = chipLabels(teammates);
+  const all = await getCreatorRows(client.id, { campaignId: campaign?.id, withOutreach: false });
+  const { shown: rows, hidden } = splitByView(all, view, meId);
+  const hiddenLine = hiddenSummary(hidden);
   const cards: BoardCard[] = rows.map((r) => ({
     partnershipId: r.partnershipId,
     name: r.name,
@@ -38,6 +45,7 @@ export default async function PipelinePage() {
     whoseTurn: r.activity.whoseTurn,
     photoUrl: r.photoUrl,
     clientApproval: r.clientApproval,
+    owner: r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: labels.get(r.ownerId) ?? "?" } : null,
   }));
 
   return (
@@ -46,19 +54,22 @@ export default async function PipelinePage() {
         title="Pipeline"
         client={client.name}
         campaign={campaign?.name ?? null}
-        subtitle={`${cards.length} creator${cards.length === 1 ? "" : "s"}`}
+        subtitle={`${cards.length} creator${cards.length === 1 ? "" : "s"}${view === "mine" ? ` · yours and unassigned${hiddenLine ? ` (${hiddenLine})` : ""}` : ""}`}
+        actions={<MineToggle view={view} />}
         help="One column per stage. Each card shows the campaign, the latest message and whose turn it is. Change the stage from the menu on the card, or drag it. Hover a column name to see what that stage means; closing a deal asks who ended it and why."
         helpAnchor="stages"
       />
       <div className="p-6">
-        {cards.length === 0 ? (
+        {cards.length === 0 && all.length > 0 ? (
+          <EmptyState title="Nothing of yours here" hint={`${hiddenLine ?? "Everyone's creators are hidden"} — switch to Everyone to see them.`} />
+        ) : cards.length === 0 ? (
           <EmptyState
             title={campaign ? `No creators in ${campaign.name} yet` : "No creators yet"}
             hint="Import a CSV of creators, or add one by pasting their profile link."
             action={<div className="flex gap-2"><Button href="/import">Import CSV</Button><Button href="/creators/new" variant="primary">Add creator</Button></div>}
           />
         ) : (
-          <PipelineBoard cards={cards} />
+          <PipelineBoard cards={cards} meId={meId} />
         )}
       </div>
     </>

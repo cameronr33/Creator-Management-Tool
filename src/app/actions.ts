@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { setSelectedClientSlug } from "@/lib/client-cookie";
 import { setSelectedCampaignId } from "@/lib/campaigns";
+import { setSelectedView } from "@/lib/view-cookie";
+import { parseView } from "@/lib/owners";
 import { auth, signOut } from "@/lib/auth";
 
 /** Server actions are public endpoints too: the agency's ones refuse a client login. */
@@ -30,6 +32,13 @@ export async function selectCampaign(formData: FormData) {
   await agencyOnly();
   const id = String(formData.get("campaign") ?? "");
   await setSelectedCampaignId(/^[0-9a-f-]{36}$/i.test(id) ? id : null);
+  revalidatePath("/", "layout");
+}
+
+/** Mine / Everyone on Today, Pipeline and Creators — remembered, stays on the current page. */
+export async function selectView(view: string) {
+  await agencyOnly();
+  await setSelectedView(parseView(view));
   revalidatePath("/", "layout");
 }
 

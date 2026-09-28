@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Check, ExternalLink, ImageDown, Mail, NotebookPen, Trash2, X } from "lucide-react";
 import { Avatar, Badge, Button, Checkbox, Field, Select, StagePill } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
+import { OwnerSlot, type OwnerInfo, type TeammateOption } from "@/components/owner-controls";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
 import { stagesByGroup } from "@/lib/stages";
@@ -28,6 +29,8 @@ export interface CreatorsTableRow {
   /** Where things stand: our own note when there is one, else the latest message's line. */
   standing: { text: string; ours: boolean; at: string | null };
   whoseTurn: "us" | "them" | "none" | null;
+  /** Who looks after it; null = unassigned. */
+  owner: OwnerInfo | null;
 }
 
 /**
@@ -40,11 +43,16 @@ export function CreatorsTable({
   rows,
   campaigns,
   scopeName,
+  teammates,
+  meId,
 }: {
   rows: CreatorsTableRow[];
   campaigns: { id: string; name: string }[];
   /** The sidebar campaign, or null for all campaigns. */
   scopeName: string | null;
+  /** Everyone with a Sentic login, for "Assign to…". */
+  teammates: TeammateOption[];
+  meId: string | null;
 }) {
   const { pending, run } = useSave();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -129,6 +137,32 @@ export function CreatorsTable({
               </Select>
             </Field>
           )}
+          <Field label="Assign to">
+            <Select
+              compact
+              value=""
+              disabled={pending}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                const to = v === "__nobody" ? null : v;
+                const who = to ? (to === meId ? "you" : (teammates.find((t) => t.id === to)?.name.split(" ")[0] ?? "them")) : null;
+                bulk({ action: "set_owner", ownerId: to }, (d) => (who ? `${d.updated ?? 0} assigned to ${who}` : `${d.updated ?? 0} unassigned`));
+              }}
+              className="w-44"
+            >
+              <option value="">Choose…</option>
+              {meId && teammates.some((t) => t.id === meId) && <option value={meId}>Me</option>}
+              {teammates
+                .filter((t) => t.id !== meId)
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              <option value="__nobody">Nobody</option>
+            </Select>
+          </Field>
           {rows.some((r) => chosen.includes(r.partnershipId) && r.clientApproval === "pending") && (
             <div className="self-center">
               <Button
@@ -187,6 +221,7 @@ export function CreatorsTable({
               <th className="px-4 py-2.5 font-semibold">Creator</th>
               {!scopeName && <th className="px-4 py-2.5 font-semibold">Campaign</th>}
               <th className="px-4 py-2.5 font-semibold">Stage</th>
+              <th className="px-4 py-2.5 font-semibold">Owner</th>
               <th className="px-4 py-2.5 font-semibold">Where things stand</th>
               <th className="px-4 py-2.5 text-right font-semibold">Followers</th>
             </tr>
@@ -229,6 +264,12 @@ export function CreatorsTable({
                     <div className="flex flex-wrap items-center gap-1">
                       <StagePill stage={r.stage} />
                       {r.clientApproval === "pending" && r.stage === "shortlisted" && <Badge tone="warn">Awaiting approval</Badge>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-1.5 text-xs text-text-muted">
+                      <OwnerSlot partnershipId={r.partnershipId} owner={r.owner} meId={meId} />
+                      {r.owner && <span className="truncate">{r.owner.id === meId ? "You" : r.owner.name.split(" ")[0]}</span>}
                     </div>
                   </td>
                   <td className="max-w-md px-4 py-2.5 text-text-muted">

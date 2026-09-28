@@ -370,6 +370,13 @@ export const cmPartnerships = pgTable(
     dealDismissed: jsonb("deal_dismissed"),
     /** When a person last edited the deal, address or products — email fills only from mail newer than this. */
     dealEditedAt: timestamp("deal_edited_at"),
+    /**
+     * Who on the team looks after this deal (2026-09-28, owner: "an owner per
+     * creator"). Null = unassigned — new deals start that way until someone
+     * takes them. A login removed from the shared users table leaves it null.
+     * Changing it never touches updatedAt (the email check files mail by it).
+     */
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -378,6 +385,7 @@ export const cmPartnerships = pgTable(
     unique("cm_partnerships_creator_campaign_uq").on(t.creatorId, t.campaignId),
     index("cm_partnerships_stage_idx").on(t.stage),
     index("cm_partnerships_campaign_idx").on(t.campaignId),
+    index("cm_partnerships_owner_idx").on(t.ownerId),
     // Email roster: most recently updated open partnership per creator.
     index("cm_partnerships_creator_updated_idx").on(t.creatorId, t.updatedAt.desc()),
   ],

@@ -7,6 +7,7 @@ import { hasCompleteAddress } from "@/lib/address";
 import { placeOnToday, type TodaySection } from "@/lib/today";
 import type { WhoseTurn } from "@/lib/activity";
 import { statusNoteView, type StatusNoteView } from "@/lib/status-note";
+import { hiddenSummary, splitByView, type View } from "@/lib/owners";
 
 /** One Today row — plain values only, so it can go straight to the client list. */
 export interface TodayRow {
@@ -31,19 +32,35 @@ export interface TodayRow {
   photoUrl: string | null;
   clientApproval: "pending" | "approved" | "passed" | null;
   approvalByName: string | null;
+  /** Who looks after it; null = unassigned. */
+  ownerId: string | null;
+  ownerName: string | null;
 }
 
 export interface TodayData {
   rows: TodayRow[];
-  /** Live creators per stage, for the A-to-Z strip. */
+  /** Live creators per stage on this view, for the A-to-Z strip. */
   stageCounts: Partial<Record<CmStage, number>>;
+  /** On Mine: how many deals (and whose) aren't shown — "7 of Kieran's not shown". */
+  hiddenSummary: string | null;
+  /** Creators on the client/campaign at all, whatever the view — tells "all caught up" from "none yet". */
+  totalCreators: number;
 }
 
-export async function getTodayData(clientId: string, campaignId?: string): Promise<TodayData> {
-  const creators = await getCreatorRows(clientId, { campaignId, withOutreach: false });
+export interface TodayOptions {
+  clientId: string;
+  campaignId?: string;
+  view?: View;
+  userId?: string | null;
+}
+
+export async function getTodayData({ clientId, campaignId, view = "all", userId }: TodayOptions): Promise<TodayData> {
+  const all = await getCreatorRows(clientId, { campaignId, withOutreach: false });
+  const { shown: creators, hidden } = splitByView(all, view, userId);
   const stageCounts: Partial<Record<CmStage, number>> = {};
   for (const c of creators) stageCounts[c.stage] = (stageCounts[c.stage] ?? 0) + 1;
-  if (creators.length === 0) return { rows: [], stageCounts };
+  const base = { stageCounts, hiddenSummary: hiddenSummary(hidden), totalCreators: all.length };
+  if (creators.length === 0) return { rows: [], ...base };
 
   const ids = creators.map((c) => c.partnershipId);
   const [outreach, thresholds, details, shipments] = await Promise.all([
@@ -104,7 +121,9 @@ export async function getTodayData(clientId: string, campaignId?: string): Promi
       photoUrl: c.photoUrl,
       clientApproval: c.clientApproval,
       approvalByName: c.approvalByName,
+      ownerId: c.ownerId,
+      ownerName: c.ownerName,
     });
   }
-  return { rows, stageCounts };
+  return { rows, ...base };
 }

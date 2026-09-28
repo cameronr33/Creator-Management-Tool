@@ -7,6 +7,7 @@ import { Avatar, Badge, Button, Card } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { QuickStage } from "@/components/quick-stage";
 import { StatusNote } from "@/components/status-note";
+import { OwnerSlot } from "@/components/owner-controls";
 import { MessagedButton, ReplyButton } from "@/components/reply-button";
 import { CloseAsDeclinedButton, NoReplyNeededButton } from "@/components/email-status";
 import { VideoLinkPrompt } from "@/components/partnership-actions";
@@ -23,7 +24,7 @@ import { relativeDays } from "@/lib/format";
  * last and whose turn it is, a stage menu to fix the stage in place, and the
  * one button for the next step. "Waiting on them" starts folded.
  */
-export function TodayList({ rows }: { rows: TodayRow[] }) {
+export function TodayList({ rows, meId, ownerLabels }: { rows: TodayRow[]; meId: string | null; ownerLabels: Record<string, string> }) {
   const [openWaiting, setOpenWaiting] = useState(false);
   const bySection = new Map<TodaySection, TodayRow[]>();
   for (const r of rows) bySection.set(r.section, [...(bySection.get(r.section) ?? []), r]);
@@ -53,7 +54,7 @@ export function TodayList({ rows }: { rows: TodayRow[] }) {
             {!folded && (
               <ul className="divide-y divide-border">
                 {list.map((r) => (
-                  <TodayItem key={r.partnershipId} row={r} />
+                  <TodayItem key={r.partnershipId} row={r} meId={meId} ownerLabels={ownerLabels} />
                 ))}
               </ul>
             )}
@@ -81,8 +82,9 @@ function href(r: TodayRow, section: CreatorSection) {
   return creatorSectionHref(r.partnershipId, section, "/");
 }
 
-function TodayItem({ row: r }: { row: TodayRow }) {
+function TodayItem({ row: r, meId, ownerLabels }: { row: TodayRow; meId: string | null; ownerLabels: Record<string, string> }) {
   const turn = whoseTurnText(r.whoseTurn);
+  const owner = r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: ownerLabels[r.ownerId] ?? "?" } : null;
   return (
     <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start">
       <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -92,6 +94,7 @@ function TodayItem({ row: r }: { row: TodayRow }) {
             <Link href={href(r, "overview")} className="text-sm font-semibold text-text hover:text-accent">
               {r.name}
             </Link>
+            <OwnerSlot partnershipId={r.partnershipId} owner={owner} meId={meId} />
             {r.username && <span className="text-xs text-text-muted">@{r.username}</span>}
             <Badge tone="info" title="Campaign">{r.campaignName}</Badge>
             {turn && r.section !== "your_turn" && r.section !== "waiting" && r.whoseTurn === "us" && <Badge tone="warn">Your turn</Badge>}

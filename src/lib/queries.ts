@@ -13,6 +13,7 @@ import {
   cmProductsRequested,
   cmCreatorSocials,
   cmClientSettings,
+  users,
   type CmStage,
 } from "@/lib/db/schema";
 import { canonicalStage } from "@/lib/stages";
@@ -143,6 +144,9 @@ export interface CreatorRow {
   emailWhoseTurn: string | null;
   emailSoundsLikeNo: boolean;
   replyHandledAt: Date | null;
+  /** Who looks after the deal (null = unassigned) and their name. */
+  ownerId: string | null;
+  ownerName: string | null;
   /** Our own note on where things stand, with who wrote it and when. */
   statusNote: string | null;
   statusNoteAt: Date | null;
@@ -200,6 +204,8 @@ export async function getCreatorRows(
       statusNote: cmPartnerships.statusNote,
       statusNoteAt: cmPartnerships.statusNoteAt,
       statusNoteBy: cmPartnerships.statusNoteBy,
+      ownerId: cmPartnerships.ownerId,
+      ownerName: users.name,
       clientApproval: cmPartnerships.clientApproval,
       approvalByName: cmPartnerships.approvalByName,
       photoFetchedAt: cmCreatorPhotos.fetchedAt,
@@ -208,6 +214,7 @@ export async function getCreatorRows(
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
     .innerJoin(cmCampaigns, eq(cmPartnerships.campaignId, cmCampaigns.id))
     .leftJoin(cmCreatorPhotos, eq(cmCreatorPhotos.creatorId, cmCreators.id))
+    .leftJoin(users, eq(users.id, cmPartnerships.ownerId))
     .where(and(...conds))
     .orderBy(desc(cmCreators.followers));
 

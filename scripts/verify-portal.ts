@@ -43,6 +43,8 @@ async function main() {
       .set({ emailSummary: "SECRET_SUMMARY_7731", agreedTerms: "SECRET_TERMS_7731", notes: "SECRET_NOTE_7731", feeAmount: "4242.00", addressLine1: "1 Test St", city: "Testville", region: "CA", postalCode: "90000", recipientName: "Verify Portal" })
       .where(eq(schema.cmPartnerships.id, a.partnershipId));
     await db.insert(schema.cmOutreachEvents).values({ partnershipId: a.partnershipId, direction: "inbound", channel: "email", kind: "reply", body: "SECRET_BODY_7731", subject: "SECRET_BODY_7731" });
+    const [someone] = await db.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).limit(1);
+    if (someone) await db.update(schema.cmPartnerships).set({ ownerId: someone.id }).where(eq(schema.cmPartnerships.id, a.partnershipId));
     await db.insert(schema.cmContracts).values({ partnershipId: a.partnershipId, source: "upload", filename: "SECRET_CONTRACT_7731.pdf", data: "SECRET_CONTRACT_7731", readStatus: "read", extracted: { terms: "SECRET_CONTRACT_7731" } });
     await db.update(schema.cmPartnerships).set({ emailDeal: { facts: { terms: "SECRET_EMAIL_DEAL_7731" } }, dealDismissed: ["SECRET_EMAIL_DEAL_7731"], statusNote: "SECRET_STATUS_NOTE_7731", statusNoteBy: "Sam" }).where(eq(schema.cmPartnerships.id, a.partnershipId));
 
@@ -55,6 +57,8 @@ async function main() {
     const leaked = SECRETS.filter((s) => dump.includes(s));
     check("no email text, summary, fee, terms, notes, contract or creator email ever reaches it", leaked.length === 0, leaked.join(", "));
     check("another client's creators never appear", !mine.some((c) => c.partnershipId === b.partnershipId));
+    const [owner] = await db.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).limit(1);
+    check("who owns the deal on our side never reaches the portal", !!owner && !dump.includes(owner.id) && !JSON.stringify(mine).includes(`"${owner.name}"`));
     check("no address before it's theirs to ship", row?.shipTo === null);
 
     await changeStage(a.partnershipId, "fulfilling");

@@ -10,7 +10,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 
@@ -44,6 +44,13 @@ async function main() {
     if (reg.reg) present.push(t);
   }
   check("every retired table stays dropped after repeated runs", present.length === 0, present.join(", "));
+
+  // Frozen node 4: shared tables are never altered by this app's migrations (FKs pointing at them are fine).
+  const SHARED_CHANGE = /\b(?:ALTER|DROP)\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:"public"\.)?"(?:users|sa_clients)"/i;
+  const dir = resolve(__dirname, "../src/lib/db/migrations");
+  const touching = files.filter((f) => SHARED_CHANGE.test(readFileSync(resolve(dir, f), "utf8")));
+  check("no migration alters or drops the shared users / sa_clients tables", touching.length === 0, touching.join(", "));
+  check("…and that check catches one that would", SHARED_CHANGE.test('ALTER TABLE "users" ADD COLUMN "x" text') && !SHARED_CHANGE.test('ALTER TABLE "cm_partnerships" ADD CONSTRAINT "f" FOREIGN KEY ("owner_id") REFERENCES "public"."users"("id")'));
 }
 
 main().then(

@@ -133,6 +133,8 @@ async function main() {
     db.select({ n: N }).from(schema.cmGmailAccounts).where(sql`${schema.cmGmailAccounts.email} like '\\_\\_verify%' escape '\\'`),
   );
   check("no __verify_ creators/campaigns/accounts in the database", leftovers + leftoverCampaigns + leftoverAccounts === 0, `${leftovers}/${leftoverCampaigns}/${leftoverAccounts}`);
+  const leftoverUsers = await count(db.select({ n: N }).from(schema.users).where(sql`${schema.users.email} like '\\_\\_verify%' escape '\\'`));
+  check("no throwaway __verify logins left in the shared users table", leftoverUsers === 0, String(leftoverUsers));
 
   console.log("\n── Shared tables untouched by this app's verification ──");
   const clientsN = await count(db.select({ n: N }).from(schema.clients));

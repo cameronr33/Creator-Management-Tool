@@ -16,6 +16,7 @@ import {
 import { changeStage } from "@/lib/mutations";
 import { moveToCampaign, removePartnerships } from "@/lib/campaigns";
 import { STAGE_VALUES } from "@/lib/stages";
+import { setOwner, takeUnassigned } from "@/lib/owners";
 import { cmExitReasonEnum } from "@/lib/db/schema";
 
 const schema = z.discriminatedUnion("action", [
@@ -29,6 +30,9 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("set_campaign"), ids: z.array(z.string()).min(1).max(500), campaignId: z.string() }),
   z.object({ action: z.literal("refresh_instagram"), ids: z.array(z.string()).min(1).max(500) }),
   z.object({ action: z.literal("approve"), ids: z.array(z.string()).min(1).max(500) }),
+  // Owners (2026-09-28): assign to a teammate (null = nobody), or take unassigned ones yourself.
+  z.object({ action: z.literal("set_owner"), ids: z.array(z.string()).min(1).max(500), ownerId: z.string().uuid().nullable() }),
+  z.object({ action: z.literal("take"), ids: z.array(z.string()).min(1).max(500) }),
 ]);
 
 /**
@@ -60,6 +64,15 @@ export async function POST(req: NextRequest) {
     const rows = await db.selectDistinct({ creatorId: cmPartnerships.creatorId }).from(cmPartnerships).where(inArray(cmPartnerships.id, d.ids));
     after(() => refreshFromInstagram(rows.map((r) => r.creatorId)).then((r) => console.log("[instagram] bulk refresh", r)));
     return NextResponse.json({ ok: true, queued: rows.length });
+  }
+  if (d.action === "set_owner") {
+    const r = await setOwner([...new Set(d.ids)], d.ownerId);
+    if (!r.ok) return badRequest(r.error);
+    return NextResponse.json({ ok: true, updated: r.updated });
+  }
+  if (d.action === "take") {
+    const r = await takeUnassigned([...new Set(d.ids)], session.user.id);
+    return NextResponse.json({ ok: true, ...r });
   }
   if (d.action === "set_campaign") {
     const c = await assertCampaignInSelectedClient(d.campaignId);

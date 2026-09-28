@@ -1,3 +1,6 @@
+import { MineToggle } from "@/components/mine-toggle";
+import { getSelectedView } from "@/lib/view-cookie";
+import { chipLabels, hiddenSummary, listTeammates, splitByView } from "@/lib/owners";
 import { requireAgencyPage } from "@/lib/page-guards";
 import type { Metadata } from "next";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
@@ -18,7 +21,7 @@ export default async function CreatorsPage({
 }: {
   searchParams: Promise<{ q?: string; stage?: string }>;
 }) {
-  await requireAgencyPage();
+  const session = await requireAgencyPage();
   await scheduleEmailCheckForVisitor();
   const sp = await searchParams;
   const client = await resolveClient(await getSelectedClientSlug());
@@ -33,11 +36,16 @@ export default async function CreatorsPage({
     );
   }
 
-  const [campaigns, campaign] = await Promise.all([getCampaigns(client.id), resolveCampaign(client.id)]);
-  let rows = await getCreatorRows(client.id, {
+  const [campaigns, campaign, view, teammates] = await Promise.all([getCampaigns(client.id), resolveCampaign(client.id), getSelectedView(), listTeammates()]);
+  const meId = session.user.id;
+  const labels = chipLabels(teammates);
+  const scoped = await getCreatorRows(client.id, {
     campaignId: campaign?.id,
     stage: STAGES.some((s) => s.value === sp.stage) ? (sp.stage as CmStage) : undefined,
   });
+  const { shown, hidden } = splitByView(scoped, view, meId);
+  const hiddenLine = hiddenSummary(hidden);
+  let rows = shown;
   const total = rows.length;
   const q = (sp.q ?? "").trim().toLowerCase();
   if (q) {
@@ -67,10 +75,11 @@ export default async function CreatorsPage({
         title="Creators"
         client={client.name}
         campaign={campaign?.name ?? null}
-        subtitle={rows.length === total ? `${total} creator${total === 1 ? "" : "s"}` : `${rows.length} of ${total} shown`}
+        subtitle={`${rows.length === total ? `${total} creator${total === 1 ? "" : "s"}` : `${rows.length} of ${total} shown`}${view === "mine" ? ` · yours and unassigned${hiddenLine ? ` (${hiddenLine})` : ""}` : ""}`}
         help="Everyone you're tracking. Tick creators to move them to a stage or another campaign, or to delete them. Open a creator for their conversation, deal, shipping and videos."
         actions={
           <>
+            <MineToggle view={view} />
             {importButton}
             {addButton}
           </>
@@ -79,7 +88,9 @@ export default async function CreatorsPage({
         <CreatorsFilterBar />
       </PageHeader>
       <div className="p-4 sm:p-6">
-        {rows.length === 0 ? (
+        {rows.length === 0 && total === 0 && hidden.length > 0 ? (
+          <EmptyState title="Nothing of yours here" hint={`${hiddenLine} — switch to Everyone to see them.`} />
+        ) : rows.length === 0 ? (
           <EmptyState
             title={total === 0 ? (campaign ? `No creators in ${campaign.name} yet` : "No creators yet") : "No creators match"}
             hint={
@@ -116,9 +127,12 @@ export default async function CreatorsPage({
                 ? { text: r.statusNote, ours: true, at: r.statusNoteAt?.toISOString() ?? null }
                 : { text: r.activity.text, ours: false, at: r.activity.at?.toISOString() ?? null },
               whoseTurn: r.activity.whoseTurn,
+              owner: r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: labels.get(r.ownerId) ?? "?" } : null,
             }))}
             campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))}
             scopeName={campaign?.name ?? null}
+            teammates={teammates}
+            meId={meId}
           />
         )}
       </div>

@@ -204,6 +204,43 @@ export function Badge({
 }
 
 /**
+ * Who looks after a deal, as a small round chip with their initials — filled
+ * when it's yours, quiet when it's a teammate's. The full name is the tooltip
+ * and the accessible label.
+ */
+export function OwnerChip({ label, name, mine = false }: { label: string; name: string; mine?: boolean }) {
+  return (
+    <span
+      role="img"
+      aria-label={`Owner: ${name}`}
+      title={mine ? `Yours (${name})` : `${name}'s`}
+      className={cn(
+        "inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[11px] font-semibold leading-none",
+        mine ? "bg-accent text-white" : "bg-surface-2 text-text-muted ring-1 ring-inset ring-border",
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+/** A small dashed chip that does one thing — "Take it" on an unassigned deal. Sits where an OwnerChip would. */
+export function ChipButton({ children, icon, onClick, disabled, title }: { children: ReactNode; icon?: ReactNode; onClick: () => void; disabled?: boolean; title?: string }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      title={title}
+      onClick={onClick}
+      className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full border border-dashed border-border-strong px-1.5 text-[11px] font-medium text-text-muted transition hover:border-accent hover:text-accent disabled:opacity-50"
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
+/**
  * A creator's picture, or their initials when there isn't one. `src` is the
  * app's own photo URL (/api/creators/[id]/photo) — never Instagram's link.
  */

@@ -11,6 +11,7 @@ import { Avatar, Badge, StagePill, Button, IconButton, cn } from "@/components/u
 import { api, useSave } from "@/components/use-save";
 import { VideoLinkPrompt, needsVideo } from "@/components/partnership-actions";
 import { QuickStage } from "@/components/quick-stage";
+import { OwnerSlot, type OwnerInfo } from "@/components/owner-controls";
 import { StatusNote } from "@/components/status-note";
 import type { StatusNoteView } from "@/lib/status-note";
 
@@ -32,6 +33,8 @@ export interface BoardCard {
   statusNote: StatusNoteView | null;
   photoUrl: string | null;
   clientApproval: "pending" | "approved" | "passed" | null;
+  /** Who looks after it; null = unassigned. */
+  owner: OwnerInfo | null;
 }
 
 // Active stages get their own column; the three terminal stages collapse into
@@ -61,7 +64,7 @@ interface Closing {
   stage: CmStage | null;
 }
 
-export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
+export function PipelineBoard({ cards, meId }: { cards: BoardCard[]; meId: string | null }) {
   const { run, pending } = useSave();
   const [items, setItems] = useState(cards);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -250,6 +253,9 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                       </Link>
                       <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
                         <span className="truncate">{c.username ? `@${c.username}` : "No profile link yet"}</span>
+                        <span onMouseDown={(e) => e.stopPropagation()} draggable={false}>
+                          <OwnerSlot partnershipId={c.partnershipId} owner={c.owner} meId={meId} />
+                        </span>
                         <span className="tabular" title="Followers">
                           {compactNumber(c.followers)}
                         </span>
