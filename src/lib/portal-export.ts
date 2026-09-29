@@ -11,13 +11,13 @@ export const SHIPPING_LIST_HEADER = ["Creator", "Instagram", "Campaign", "Recipi
 
 /**
  * A spreadsheet cell. Names and addresses can come from a creator's email, so
- * anything a spreadsheet would run as a formula (= + - @, tab, return) is
+ * nothing in one may run as a formula: every cell is one line (tabs and line
+ * breaks become spaces, so nothing starts a new cell), and = + - @ at the
+ * start — or after a ";", the separator in many European settings — is
  * prefixed with ' and shown as text.
  */
 export function csvCell(value: string | null | undefined): string {
-  const raw = value ?? "";
-  let v = raw.replace(/\r\n?/g, "\n");
-  if (/^[=+\-@\t\r]/.test(raw)) v = `'${v}`;
+  const v = (value ?? "").replace(/[\t\r\n]+/g, " ").replace(/(^|;)(\s*)([=+\-@])/g, "$1$2'$3");
   return `"${v.replace(/"/g, '""')}"`;
 }
 
@@ -27,7 +27,8 @@ export function shippingListCsv(creators: PortalCreator[]): string {
     .filter((c) => c.stage === "fulfilling" && c.shipToParts)
     .map((c) => {
       const a = c.shipToParts!;
-      return [c.name, c.handle ? `@${c.handle}` : "", c.campaignName, a.recipient, a.line1, a.line2, a.city, a.region, a.postalCode, a.country, c.products.join("; ")];
+      // The bare handle: an "@" would trip the formula guard and show as '@name.
+      return [c.name, c.handle ?? "", c.campaignName, a.recipient, a.line1, a.line2, a.city, a.region, a.postalCode, a.country, c.products.join("; ")];
     });
   // A byte-order mark so Excel reads it as UTF-8 (accents, emoji in names); CRLF line ends.
   return "﻿" + [SHIPPING_LIST_HEADER, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";

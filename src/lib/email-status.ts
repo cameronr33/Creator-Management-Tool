@@ -169,7 +169,9 @@ Return:
           ? "Email logged by a teammate (from their own inbox — text may be missing)"
           : "Email"
         : m.channel === "ig_dm"
-          ? "Instagram DM (logged by a teammate, text not available)"
+          ? m.body
+            ? "Instagram DM logged by a teammate (their summary, not the creator's words)"
+            : "Instagram DM (logged by a teammate, text not available)"
           : m.channel;
     // A note in the mailbox is an invite or an auto-reply; anywhere else it's a teammate's own note.
     const kind =
@@ -235,8 +237,18 @@ export type Decision =
  * else on the thread (anyone can cc themselves in), not an invite or an
  * automatic reply.
  */
-export function isCreatorsOwn(m: Pick<PromptMessage, "direction" | "senderRole" | "kind">): boolean {
-  return m.direction === "inbound" && (m.senderRole === "creator" || m.senderRole === null) && m.kind !== "note";
+export function isCreatorsOwn(m: Pick<PromptMessage, "direction" | "senderRole" | "kind" | "channel" | "synced">): boolean {
+  return fromMailbox(m) && m.direction === "inbound" && (m.senderRole === "creator" || m.senderRole === null) && m.kind !== "note";
+}
+
+/**
+ * Pure: a message the connected mailbox holds (review, 2026-09-28). A DM or an
+ * email a teammate logged by hand is their summary, not anyone's own words:
+ * it may be in the prompt, labelled, but never be quoted to move a stage or
+ * fill the deal.
+ */
+export function fromMailbox(m: Pick<PromptMessage, "channel" | "synced">): boolean {
+  return m.channel === "email" && m.synced !== false;
 }
 
 /** Pure: an address the creator wrote in their own message, or null. */
@@ -304,7 +316,7 @@ export function verifiedDeal(
   let eventId: string | null = null;
   if (opts.agreed && a.deal_quote && a.deal_message != null) {
     const cited = messages.find((m) => m.n === a.deal_message);
-    const ours = !!cited && cited.direction === "outbound" && cited.senderRole === "team" && cited.kind !== "note";
+    const ours = !!cited && fromMailbox(cited) && cited.direction === "outbound" && cited.senderRole === "team" && cited.kind !== "note";
     if (cited && (ours || isCreatorsOwn(cited)) && quoteFoundIn(a.deal_quote, cited)) {
       eventId = cited.eventId;
       if (ours && a.fee_amount != null && amountsIn(a.deal_quote).some((n) => Math.abs(n - a.fee_amount!) < 0.01)) {

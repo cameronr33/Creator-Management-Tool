@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { UserPlus } from "lucide-react";
 import { ChipButton, Field, OwnerChip, Select } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
@@ -23,18 +24,21 @@ export interface TeammateOption {
  */
 export function OwnerSlot({ partnershipId, owner, meId }: { partnershipId: string; owner: OwnerInfo | null; meId: string | null }) {
   const { pending, run } = useSave();
+  // Yours from the moment it's taken, until the refreshed page shows your chip (review, 2026-09-28).
+  const [claimed, setClaimed] = useState(false);
   if (owner) return <OwnerChip label={owner.label} name={owner.name} mine={owner.id === meId} />;
   return (
     <ChipButton
-      disabled={pending}
+      disabled={pending || claimed}
       title="Nobody has this one — make it yours"
       icon={<UserPlus size={11} aria-hidden />}
       onClick={async () => {
         const r = await run(() => api<{ taken?: number }>("/api/partnerships/bulk", { action: "take", ids: [partnershipId] }));
+        if (r.ok && r.data.taken) setClaimed(true);
         if (r.ok) toast(r.data.taken ? "It's yours" : "Someone took it a moment ago", { tone: r.data.taken ? "good" : "info" });
       }}
     >
-      Take it
+      {claimed ? "Yours" : "Take it"}
     </ChipButton>
   );
 }

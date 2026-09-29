@@ -4,7 +4,7 @@ import { cmPartnerships, cmShipments, type CmStage } from "@/lib/db/schema";
 import { getCreatorRows, getFollowUpThresholds, getOutreachStates, getStageSince } from "@/lib/queries";
 import { deriveOutreachState } from "@/lib/outreach";
 import { hasCompleteAddress } from "@/lib/address";
-import { placeOnToday, sortToday, type TodaySection } from "@/lib/today";
+import { listedOnToday, placeOnToday, sortToday, type TodaySection } from "@/lib/today";
 import type { WhoseTurn } from "@/lib/activity";
 import { statusNoteView, type StatusNoteView } from "@/lib/status-note";
 import { hiddenSummary, splitByView, type View } from "@/lib/owners";
@@ -69,7 +69,8 @@ export async function getTodayData({ clientId, campaignId, view = "all", userId 
   const { shown: creators, hidden } = splitByView(all, view, userId);
   const stageCounts: Partial<Record<CmStage, number>> = {};
   for (const c of creators) stageCounts[c.stage] = (stageCounts[c.stage] ?? 0) + 1;
-  const base = { stageCounts, hiddenSummary: hiddenSummary(hidden), totalCreators: all.length };
+  // "N of Kieran's not shown" counts only what Today would have listed — never their Posted or closed deals.
+  const base = { stageCounts, hiddenSummary: hiddenSummary(hidden.filter((h) => listedOnToday(h.stage))), totalCreators: all.length };
   if (creators.length === 0) return { rows: [], ...base, snoozedCount: 0 };
 
   const ids = creators.map((c) => c.partnershipId);

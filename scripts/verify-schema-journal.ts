@@ -45,12 +45,32 @@ async function main() {
   }
   check("every retired table stays dropped after repeated runs", present.length === 0, present.join(", "));
 
-  // Frozen node 4: shared tables are never altered by this app's migrations (FKs pointing at them are fine).
-  const SHARED_CHANGE = /\b(?:ALTER|DROP)\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:"public"\.)?"(?:users|sa_clients)"/i;
+  // Frozen node 4: shared objects are never changed by this app's migrations. Tightened after the security
+  // review (2026-09-28): a statement may name users, any sa_* table or the user_role type only as a foreign-key
+  // target, or be the original CREATE TABLE that db:apply skips — no ALTER, DROP, index, type change, ONLY or
+  // unquoted spelling slips through.
+  const FK_TARGET = /REFERENCES\s+(?:"public"\.)?"?(?:users|sa_[a-z0-9_]+)"?\s*\(\s*"?id"?\s*\)/gi;
+  const SKIPPED_CREATE = /^CREATE TABLE "(?:users|sa_clients)"/i;
+  const SHARED_NAME = /(?:^|[^\w])"?(?:users|sa_[a-z0-9_]+|user_role)"?(?!\w)/i;
+  const touchesShared = (stmt: string) => !SKIPPED_CREATE.test(stmt) && SHARED_NAME.test(stmt.replace(FK_TARGET, "REFERENCES <shared>"));
+  const statements = (text: string) => text.split(/-->\s*statement-breakpoint|;\s*\n/).map((s) => s.trim()).filter(Boolean);
   const dir = resolve(__dirname, "../src/lib/db/migrations");
-  const touching = files.filter((f) => SHARED_CHANGE.test(readFileSync(resolve(dir, f), "utf8")));
-  check("no migration alters or drops the shared users / sa_clients tables", touching.length === 0, touching.join(", "));
-  check("…and that check catches one that would", SHARED_CHANGE.test('ALTER TABLE "users" ADD COLUMN "x" text') && !SHARED_CHANGE.test('ALTER TABLE "cm_partnerships" ADD CONSTRAINT "f" FOREIGN KEY ("owner_id") REFERENCES "public"."users"("id")'));
+  const touching = files.flatMap((f) => statements(readFileSync(resolve(dir, f), "utf8")).filter(touchesShared).map((s) => `${f}: ${s.slice(0, 80)}`));
+  check("no migration changes a shared table or type (users, sa_*, user_role)", touching.length === 0, touching.join(" | "));
+  const wouldTouch = [
+    'ALTER TABLE "users" ADD COLUMN "x" text',
+    'CREATE INDEX "users_name_idx" ON "users" USING btree ("name")',
+    'ALTER TABLE ONLY "users" ADD COLUMN "x" text',
+    "alter table users add column x text",
+    `ALTER TYPE "public"."user_role" ADD VALUE 'viewer'`,
+    'DROP TABLE "sa_reports"',
+  ];
+  const fine = [
+    'ALTER TABLE "cm_partnerships" ADD CONSTRAINT "f" FOREIGN KEY ("owner_id") REFERENCES "public"."users"("id") ON DELETE set null',
+    'ALTER TABLE "cm_api_keys" ADD CONSTRAINT "cm_api_keys_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id")',
+    'CREATE TABLE "users" (\n\t"id" uuid PRIMARY KEY NOT NULL\n)',
+  ];
+  check("…and that check catches each way one could", wouldTouch.every(touchesShared) && !fine.some(touchesShared), JSON.stringify({ missed: wouldTouch.filter((s) => !touchesShared(s)), flagged: fine.filter(touchesShared) }));
 }
 
 main().then(

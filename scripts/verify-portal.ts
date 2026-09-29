@@ -132,9 +132,20 @@ async function main() {
       "no cell a spreadsheet would run as a formula",
       csv.includes(`"'=HYPERLINK(""http://x.test"",""click"")"`) && csv.includes(`"'+1 Evil St"`) && csv.includes(`"'@SUM(A1)"`) && csv.includes(`"'-Town"`),
     );
+    // Rule tightened (security review, 2026-09-28): tabs and line breaks become spaces — one line per cell, so
+    // nothing can start a new cell — and a formula after a ";" (the separator in many European settings) is
+    // neutralised too, not only at the start.
     check(
       "the cell rule, on its own",
-      csvCell("=1+1") === `"'=1+1"` && csvCell("\tx") === `"'\tx"` && csvCell('He said "hi"') === `"He said ""hi"""` && csvCell(null) === `""` && csvCell("a\r\nb") === `"a\nb"` && csvCell("Plain") === `"Plain"`,
+      csvCell("=1+1") === `"'=1+1"` && csvCell('He said "hi"') === `"He said ""hi"""` && csvCell(null) === `""` && csvCell("Plain") === `"Plain"`,
+    );
+    check("a line break or tab never starts a new cell", csvCell("a\r\nb") === `"a b"` && csvCell("a\tb") === `"a b"` && csvCell("\t=cmd") === `" '=cmd"`);
+    check("a formula hiding after a ; is neutralised", csvCell('12 Main St;=HYPERLINK("http://x.test")') === `"12 Main St;'=HYPERLINK(""http://x.test"")"` && csvCell("Rd; +1") === `"Rd; '+1"`);
+    const mineLine = lines.find((l) => l.startsWith('"Verify Portal",')) ?? "";
+    check(
+      "the Instagram cell is the bare handle (no stray apostrophe from the guard)",
+      mineLine.split('","')[1] === "__verify_portal__" && lines.slice(1).every((l) => !(l.split('","')[1] ?? "").startsWith("'")),
+      mineLine,
     );
 
     console.log("\n── What the portal can do ──");

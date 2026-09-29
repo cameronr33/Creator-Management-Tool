@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   cmOutreachEvents,
@@ -9,7 +9,7 @@ import {
   type CmShipment,
   type CmStage,
 } from "@/lib/db/schema";
-import { moveStage, type ExitReason } from "@/lib/stage-moves";
+import type { ExitReason } from "@/lib/stage-moves";
 import { isTerminal, stageIndex } from "@/lib/stages";
 
 /**
@@ -21,10 +21,12 @@ import { isTerminal, stageIndex } from "@/lib/stages";
  * Undo is allowed only for the teammate who pressed it, within ten minutes,
  * once; never for mail the mailbox holds; never once the shipment has been
  * changed since; and only while the stage move the press caused is still the
- * latest real move. The stage goes back through moveStage (a person's move,
- * reason "undo", compare-and-set on the stage), so a race writes nothing. A
- * retried or doubled request finds the undo it already wrote and finishes
- * the same way. Tested in scripts/verify-undo.ts.
+ * latest real move. The reversal is ONE statement (review, 2026-09-28): the
+ * stage back (a person's move, reason "undo"), the shipment the press touched
+ * put back, the logged message removed, and both marked undone — all of it or
+ * none, each guarded by a compare-and-set, so a race or a dropped connection
+ * can't leave half an undo. Only the rows the press touched are changed —
+ * never "the latest shipment" by side effect. Tested in scripts/verify-undo.ts.
  */
 
 export const UNDO_WINDOW_MS = 10 * 60_000;
@@ -120,27 +122,35 @@ export interface UndoState {
   /** The partnership's latest move that isn't undone and isn't itself an undo. */
   latestRealMoveId: string | null;
   stage: CmStage;
-  /** An earlier (retried or doubled) request already moved the stage back. */
-  alreadyMovedBack: boolean;
   /** The shipment as it is now (null when it's gone). */
   shipment: ShipmentSnapshot | null;
+}
+
+export type ShipmentUndo =
+  | { mode: "restore"; expect: ShipmentState; to: ShipmentState }
+  /** The press created it and the stage no longer needs one (and nobody added tracking): it goes, as it came. */
+  | { mode: "delete"; expect: ShipmentState };
+
+export interface ShipmentState {
+  status: CmShipment["status"];
+  shippedAt: string | null;
+  deliveredAt: string | null;
 }
 
 export type UndoPlan =
   | {
       ok: true;
       /** Put the stage back: from where the press left it to where it was, with the exit reason it had. */
-      moveBack: { from: CmStage; to: CmStage; exitReason: ExitReason | undefined } | null;
+      moveBack: { from: CmStage; to: CmStage; exitReason: ExitReason | null } | null;
       /** Where the stage ends up (null: the press never moved it). */
       backTo: CmStage | null;
       deleteEvent: boolean;
-      /** Put the shipment's status and dates back (carrier, tracking and notes are kept). */
-      restoreShipment: boolean;
+      /** What happens to the shipment the press touched (carrier, tracking and notes are always kept). */
+      shipment: ShipmentUndo | null;
     }
   | { ok: false; error: string };
 
-const sameState = (a: ShipmentSnapshot, b: Pick<ShipmentSnapshot, "status" | "shippedAt" | "deliveredAt">) =>
-  a.status === b.status && a.shippedAt === b.shippedAt && a.deliveredAt === b.deliveredAt;
+const stateOf = (s: Pick<ShipmentSnapshot, "status" | "shippedAt" | "deliveredAt">): ShipmentState => ({ status: s.status, shippedAt: s.shippedAt, deliveredAt: s.deliveredAt });
 
 export function planQuickUndo(a: QuickActionFacts, s: UndoState): UndoPlan {
   if (a.undoneAt) return { ok: false, error: UNDO_MESSAGES.already };
@@ -154,52 +164,113 @@ export function planQuickUndo(a: QuickActionFacts, s: UndoState): UndoPlan {
     deleteEvent = true;
   }
 
-  let moveBack: { from: CmStage; to: CmStage; exitReason: ExitReason | undefined } | null = null;
+  let moveBack: { from: CmStage; to: CmStage; exitReason: ExitReason | null } | null = null;
   let backTo: CmStage | null = null;
   if (a.transitionId) {
     const t = s.transition;
-    if (s.alreadyMovedBack) {
-      backTo = t?.fromStage ?? null;
-    } else {
-      if (!t || t.undoneAt || !t.fromStage || s.latestRealMoveId !== t.id || s.stage !== t.toStage) return { ok: false, error: UNDO_MESSAGES.stageMoved };
-      const prior = (t.meta as { priorExitReason?: ExitReason } | null)?.priorExitReason;
-      moveBack = { from: t.toStage, to: t.fromStage, exitReason: prior ?? undefined };
-      backTo = t.fromStage;
-    }
+    if (!t || t.undoneAt || !t.fromStage || s.latestRealMoveId !== t.id || s.stage !== t.toStage) return { ok: false, error: UNDO_MESSAGES.stageMoved };
+    // Back to a closed stage brings its reason back ("Stopped replying"); an open one has none.
+    const prior = (t.meta as { priorExitReason?: ExitReason } | null)?.priorExitReason ?? null;
+    moveBack = { from: t.toStage, to: t.fromStage, exitReason: isTerminal(t.fromStage) ? prior : null };
+    backTo = t.fromStage;
   }
 
-  let restoreShipment = false;
+  let shipment: ShipmentUndo | null = null;
   if (a.kind === "shipment") {
     const now = s.shipment;
-    const target = a.prior ?? { status: "ready" as const, shippedAt: null, deliveredAt: null };
-    if (now && sameState(now, target)) restoreShipment = false; // already back (a retried request)
-    else if (s.alreadyMovedBack) restoreShipment = !!now; // finishing an undo that already moved the stage back
-    else if (!now || !a.applied || now.updatedAt !== a.applied.updatedAt) return { ok: false, error: UNDO_MESSAGES.shipmentChanged };
-    else restoreShipment = true;
+    if (!now || !a.applied || now.updatedAt !== a.applied.updatedAt) return { ok: false, error: UNDO_MESSAGES.shipmentChanged };
+    const landing = backTo ?? s.stage;
+    const beforeReady = !isTerminal(landing) && stageIndex(landing) < stageIndex("fulfilling");
+    shipment =
+      a.createdShipment && beforeReady && !now.carrier && !now.trackingNumber
+        ? { mode: "delete", expect: stateOf(a.applied) }
+        : { mode: "restore", expect: stateOf(a.applied), to: a.prior ? stateOf(a.prior) : { status: "ready", shippedAt: null, deliveredAt: null } };
   }
 
-  return { ok: true, moveBack, backTo, deleteEvent, restoreShipment };
+  return { ok: true, moveBack, backTo, deleteEvent, shipment };
 }
 
-/* ── Doing it ───────────────────────────────────────────────────── */
+/* ── Doing it: one statement ────────────────────────────────────── */
 
-async function undoWrittenFor(partnershipId: string, actionId: string): Promise<boolean> {
-  const [u] = await db
-    .select({ id: cmStageTransitions.id })
-    .from(cmStageTransitions)
-    .where(and(eq(cmStageTransitions.partnershipId, partnershipId), eq(cmStageTransitions.reason, "undo"), sql`${cmStageTransitions.meta}->>'quickActionId' = ${actionId}`))
-    .limit(1);
-  return !!u;
+/** Same moment to the millisecond (a JS Date holds milliseconds; the column holds microseconds). */
+function sameTime(column: SQL, iso: string | null): SQL {
+  return iso === null ? sql`${column} is null` : sql`(${column} is not null and abs(extract(epoch from (${column} - ${iso}::timestamp))) < 0.001)`;
+}
+
+async function writeUndo(a: { id: string; partnershipId: string; transitionId: string | null; outreachEventId: string | null; shipmentId: string | null }, plan: Extract<UndoPlan, { ok: true }>, userId: string): Promise<boolean> {
+  const move = plan.moveBack;
+  const ship = a.shipmentId ? plan.shipment : null;
+  const hasShipment = !!ship;
+  const deleting = ship?.mode === "delete";
+  const restoring = ship?.mode === "restore";
+  const to = ship?.mode === "restore" ? ship.to : null;
+  const expected = ship
+    ? sql`s.status = ${ship.expect.status}::cm_shipment_status and ${sameTime(sql`s.shipped_at`, ship.expect.shippedAt)} and ${sameTime(sql`s.delivered_at`, ship.expect.deliveredAt)}`
+    : sql`false`;
+  const res = await db.execute(sql`
+    with gate as (
+      -- The press, still not undone: locked, so a doubled click waits and then finds it done.
+      select id from ${cmQuickActions} where id = ${a.id} and undone_at is null for update
+    ), ship_lock as (
+      -- The shipment exactly as the press left it (and, to delete it, still without tracking).
+      select s.id from ${cmShipments} s
+      where ${hasShipment} and s.id = ${a.shipmentId} and ${expected}
+        and (not ${deleting} or (s.carrier is null and s.tracking_number is null))
+      for update
+    ), moved as (
+      update ${cmPartnerships}
+      set stage = ${move?.to ?? null}::cm_stage, exit_reason = ${move?.exitReason ?? null}::cm_exit_reason, updated_at = now()
+      where ${!!move} and id = ${a.partnershipId} and stage = ${move?.from ?? null}::cm_stage
+        and exists (select 1 from gate) and (not ${hasShipment} or exists (select 1 from ship_lock))
+      returning id
+    ), go as (
+      -- All or nothing: still undoable, the shipment untouched since, and the stage back (when the press moved it).
+      select 1 as ok from gate
+      where (not ${hasShipment} or exists (select 1 from ship_lock)) and (not ${!!move} or exists (select 1 from moved))
+    ), restored as (
+      update ${cmShipments}
+      set status = ${to?.status ?? "ready"}::cm_shipment_status, shipped_at = ${to?.shippedAt ?? null}::timestamp,
+          delivered_at = ${to?.deliveredAt ?? null}::timestamp, updated_at = now()
+      where ${restoring} and id = ${a.shipmentId} and exists (select 1 from go)
+      returning id
+    ), removed as (
+      delete from ${cmShipments} where ${deleting} and id = ${a.shipmentId} and exists (select 1 from go)
+      returning id
+    ), unlogged as (
+      delete from ${cmOutreachEvents}
+      where ${plan.deleteEvent} and id = ${a.outreachEventId} and external_id is null and exists (select 1 from go)
+      returning id
+    ), undone_move as (
+      update cm_stage_transitions set undone_at = now()
+      where ${!!move} and id = ${a.transitionId} and undone_at is null and exists (select 1 from go)
+      returning id
+    ), undo_row as (
+      insert into cm_stage_transitions (partnership_id, from_stage, to_stage, changed_by, source, reason, meta)
+      select id, ${move?.from ?? null}::cm_stage, ${move?.to ?? null}::cm_stage, ${userId}::uuid, 'manual', 'undo',
+             jsonb_build_object('undoOf', ${a.transitionId}::text, 'quickActionId', ${a.id}::text)
+      from moved
+      returning id
+    ), done as (
+      update ${cmQuickActions} set undone_at = now() where id = ${a.id} and exists (select 1 from go)
+      returning id
+    )
+    select (select count(*) from done)::int as done
+  `);
+  return Number((res.rows[0] as { done?: number } | undefined)?.done ?? 0) === 1;
 }
 
 export type UndoResult = { ok: true; stage: CmStage | null } | { ok: false; error: string };
 
-export async function undoQuickAction(actionId: string, userId: string, now = new Date()): Promise<UndoResult> {
+/**
+ * `hooks.beforeWrite` runs between the checks and the write — only the race
+ * tests use it, to change something in that gap and prove nothing is written.
+ */
+export async function undoQuickAction(actionId: string, userId: string, now = new Date(), hooks: { beforeWrite?: () => Promise<void> } = {}): Promise<UndoResult> {
   const [a] = await db.select().from(cmQuickActions).where(eq(cmQuickActions.id, actionId)).limit(1);
   if (!a) return { ok: false, error: UNDO_MESSAGES.gone };
   const facts: QuickActionFacts = { ...a, prior: a.prior as ShipmentSnapshot | null, applied: a.applied as ShipmentSnapshot | null };
 
-  const [[p], [event], [transition], [latest], [shipment], movedBack] = await Promise.all([
+  const [[p], [event], [transition], [latest], [shipment]] = await Promise.all([
     db.select({ stage: cmPartnerships.stage }).from(cmPartnerships).where(eq(cmPartnerships.id, a.partnershipId)).limit(1),
     a.outreachEventId
       ? db.select({ externalId: cmOutreachEvents.externalId }).from(cmOutreachEvents).where(eq(cmOutreachEvents.id, a.outreachEventId)).limit(1)
@@ -218,7 +289,6 @@ export async function undoQuickAction(actionId: string, userId: string, now = ne
       .orderBy(desc(cmStageTransitions.changedAt))
       .limit(1),
     a.shipmentId ? db.select().from(cmShipments).where(eq(cmShipments.id, a.shipmentId)).limit(1) : Promise.resolve([]),
-    undoWrittenFor(a.partnershipId, a.id),
   ]);
   if (!p) return { ok: false, error: UNDO_MESSAGES.gone };
 
@@ -229,57 +299,19 @@ export async function undoQuickAction(actionId: string, userId: string, now = ne
     transition: transition ?? null,
     latestRealMoveId: latest?.id ?? null,
     stage: p.stage,
-    alreadyMovedBack: movedBack,
     shipment: shipment ? snapshotShipment(shipment) : null,
   });
   if (!plan.ok) return plan;
 
-  // 1. The stage, first: if someone moved it meanwhile, nothing below is written.
+  await hooks.beforeWrite?.();
+  if (await writeUndo(a, plan, userId)) return { ok: true, stage: plan.backTo };
+
+  // Nothing was written: something changed between the checks and the write. Say what.
+  const [again] = await db.select({ undoneAt: cmQuickActions.undoneAt }).from(cmQuickActions).where(eq(cmQuickActions.id, a.id)).limit(1);
+  if (again?.undoneAt) return { ok: false, error: UNDO_MESSAGES.already };
   if (plan.moveBack) {
-    const r = await moveStage({
-      partnershipId: a.partnershipId,
-      to: plan.moveBack.to,
-      source: "manual",
-      userId,
-      expectFrom: plan.moveBack.from,
-      exact: true,
-      reason: "undo",
-      exitReason: plan.moveBack.exitReason,
-      meta: { undoOf: a.transitionId, quickActionId: a.id },
-    });
-    // A doubled click: the other request got there first — finish the same way.
-    if (r.status !== "moved" && !(await undoWrittenFor(a.partnershipId, a.id))) return { ok: false, error: UNDO_MESSAGES.stageMoved };
+    const [q] = await db.select({ stage: cmPartnerships.stage }).from(cmPartnerships).where(eq(cmPartnerships.id, a.partnershipId)).limit(1);
+    if (q?.stage !== plan.moveBack.from) return { ok: false, error: UNDO_MESSAGES.stageMoved };
   }
-
-  // 2. The shipment: its status and dates as they were (carrier, tracking and notes stay).
-  if (a.kind === "shipment" && a.shipmentId && (plan.restoreShipment || a.createdShipment)) {
-    const [s] = await db.select().from(cmShipments).where(eq(cmShipments.id, a.shipmentId)).limit(1);
-    const [after] = await db.select({ stage: cmPartnerships.stage }).from(cmPartnerships).where(eq(cmPartnerships.id, a.partnershipId)).limit(1);
-    const beforeReady = !!after && !isTerminal(after.stage) && stageIndex(after.stage) < stageIndex("fulfilling");
-    if (s && a.createdShipment && beforeReady && !s.carrier && !s.trackingNumber) {
-      // The press created it and the stage no longer needs one: it goes, as it came.
-      await db.delete(cmShipments).where(eq(cmShipments.id, s.id));
-    } else if (s && plan.restoreShipment) {
-      const prior = facts.prior;
-      await db
-        .update(cmShipments)
-        .set({
-          status: prior?.status ?? "ready",
-          shippedAt: prior?.shippedAt ? new Date(prior.shippedAt) : null,
-          deliveredAt: prior?.deliveredAt ? new Date(prior.deliveredAt) : null,
-          updatedAt: new Date(),
-        })
-        .where(eq(cmShipments.id, s.id));
-    }
-  }
-
-  // 3. The message it logged — only ever one logged in the app.
-  if (plan.deleteEvent && a.outreachEventId) {
-    await db.delete(cmOutreachEvents).where(and(eq(cmOutreachEvents.id, a.outreachEventId), isNull(cmOutreachEvents.externalId)));
-  }
-
-  // 4. Marked undone last, so a request that stopped halfway can be finished by pressing again.
-  if (a.transitionId) await db.update(cmStageTransitions).set({ undoneAt: now }).where(and(eq(cmStageTransitions.id, a.transitionId), isNull(cmStageTransitions.undoneAt)));
-  await db.update(cmQuickActions).set({ undoneAt: now }).where(and(eq(cmQuickActions.id, a.id), isNull(cmQuickActions.undoneAt)));
-  return { ok: true, stage: plan.backTo };
+  return { ok: false, error: plan.shipment ? UNDO_MESSAGES.shipmentChanged : UNDO_MESSAGES.stageMoved };
 }

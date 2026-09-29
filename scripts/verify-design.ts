@@ -79,9 +79,19 @@ function main() {
     /select option\s*\{[^}]*background-color[^}]*color/.test(cssAll) && /\.select-chevron-light option\s*\{[^}]*background-color/.test(cssAll),
   );
 
+  // Regression (review, 2026-09-28): Field renders a <label>, which hands its clicks to the first button inside —
+  // clicking "When" pressed "Today". A row of buttons goes in FieldGroup, never in Field.
+  const segmentedInLabel: string[] = [];
+  for (const file of files) {
+    const rel = relative(ROOT, file);
+    if (!rel.endsWith(".tsx")) continue;
+    for (const m of readFileSync(file, "utf8").match(/<Field\b[^>]*>\s*<Segmented\b/g) ?? []) segmentedInLabel.push(`${rel}: ${m.replace(/\s+/g, " ").slice(0, 60)}`);
+  }
+  check("no Segmented inside a Field (a <label> would press its first button) — use FieldGroup", segmentedInLabel.length === 0, segmentedInLabel.slice(0, 5).join("; "));
+
   console.log("\n── primitives exist ──");
   const ui = readFileSync(join(ROOT, "components", "ui.tsx"), "utf8");
-  for (const name of ["Button", "IconButton", "Input", "Select", "Textarea", "Field", "Callout", "Badge", "StagePill", "PageHeader", "Card", "CardHeader", "EmptyState", "Segmented", "Checkbox"]) {
+  for (const name of ["Button", "IconButton", "Input", "Select", "Textarea", "Field", "Callout", "Badge", "StagePill", "PageHeader", "Card", "CardHeader", "EmptyState", "Segmented", "Checkbox", "FieldGroup", "OwnerChip", "ChipButton"]) {
     check(`ui.tsx exports ${name}`, new RegExp(`export function ${name}\\b`).test(ui));
   }
   const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8");

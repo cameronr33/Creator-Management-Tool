@@ -10,7 +10,7 @@ import {
   EXIT_REASONS_BY_STAGE,
 } from "@/lib/stages";
 import type { CmStage, CmShipment } from "@/lib/db/schema";
-import { Button, Field, Input, Select, Textarea, Segmented } from "@/components/ui";
+import { Button, Field, FieldGroup, Input, Select, Textarea, Segmented } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
 import { DateChoice, defaultPickedDate, whenToIso, type WhenChoice } from "@/components/log-message";
@@ -269,7 +269,7 @@ export function TimelineNote({
         <Textarea compact value={body} onChange={(e) => setBody(e.target.value)} rows={2} />
       </Field>
       <div className="flex gap-2">
-        <Button size="sm" variant="primary" onClick={submit} pending={pending} icon={<SendIcon size={13} />}>
+        <Button size="sm" variant="primary" onClick={submit} pending={pending} disabled={when === "pick" && !picked} icon={<SendIcon size={13} />}>
           Save to timeline
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
@@ -319,7 +319,7 @@ export function ShipmentControls({
 
   return (
     <div className="space-y-2.5">
-      <Field label="Shipment status">
+      <FieldGroup label="Shipment status">
         <Segmented<ShipState>
           aria-label="Shipment status"
           value={(shipment?.status as ShipState | undefined) ?? null}
@@ -327,7 +327,7 @@ export function ShipmentControls({
           onChange={(s) => save(s, `Shipment marked ${s}`)}
           options={SHIP_STATES.map((s) => ({ value: s.value, label: s.label, title: s.title }))}
         />
-      </Field>
+      </FieldGroup>
       <div className="grid grid-cols-[7rem_1fr] gap-2">
         <Field label="Carrier">
           <Input compact value={carrier} onChange={(e) => setCarrier(e.target.value)} placeholder="UPS" />

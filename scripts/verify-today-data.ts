@@ -68,7 +68,16 @@ async function main() {
     }
     const quiet = await add("__verify_td_quiet");
     await changeStage(quiet, "in_conversation");
+    // At Talking since before our last DM (a stage move since would restart the quiet clock — verify-today).
+    await db
+      .update(schema.cmStageTransitions)
+      .set({ changedAt: daysAgo(DEFAULT_THRESHOLDS.nudgeAfterDays + 4) })
+      .where(and(eq(schema.cmStageTransitions.partnershipId, quiet), eq(schema.cmStageTransitions.toStage, "in_conversation")));
     await db.insert(schema.cmOutreachEvents).values({ partnershipId: quiet, direction: "outbound", channel: "ig_dm", kind: "follow_up", occurredAt: daysAgo(DEFAULT_THRESHOLDS.nudgeAfterDays + 2) });
+    // …and one moved to Talking this morning after a DM just as old is not quiet: someone just acted on it.
+    const fresh2 = await add("__verify_td_fresh_move");
+    await changeStage(fresh2, "in_conversation");
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId: fresh2, direction: "outbound", channel: "ig_dm", kind: "follow_up", occurredAt: daysAgo(DEFAULT_THRESHOLDS.nudgeAfterDays + 2) });
     const today = await getTodayData({ clientId: client.id, campaignId });
     const videoRows = today.rows.filter((r) => r.section === "waiting_video");
     check("waiting on video: the longest-waiting first", videoRows[0]?.partnershipId === late && videoRows[1]?.partnershipId === recent, videoRows.map((r) => r.name).join(","));
@@ -76,6 +85,7 @@ async function main() {
     check("…the recent one says when it arrived", videoRows[1]?.badge === null && videoRows[1]?.note === "Delivered 5 days ago.");
     const nudged = today.rows.find((r) => r.partnershipId === quiet);
     check("a deal gone quiet at Talking is back on Follow up", nudged?.section === "follow_up" && /nudge them/.test(nudged?.note ?? ""), JSON.stringify(nudged && { s: nudged.section, n: nudged.note }));
+    check("…but not one moved there this morning", today.rows.find((r) => r.partnershipId === fresh2)?.section === "waiting");
 
     console.log("\n── Snooze ──");
     const sleepy = await add("__verify_td_snooze");

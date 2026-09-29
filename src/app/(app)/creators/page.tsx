@@ -1,6 +1,6 @@
 import { MineToggle } from "@/components/mine-toggle";
 import { getSelectedView } from "@/lib/view-cookie";
-import { chipLabels, hiddenSummary, listTeammates, splitByView } from "@/lib/owners";
+import { chipLabels, hiddenSummary, listTeammates, splitForList } from "@/lib/owners";
 import { requireAgencyPage } from "@/lib/page-guards";
 import type { Metadata } from "next";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
@@ -43,20 +43,17 @@ export default async function CreatorsPage({
     campaignId: campaign?.id,
     stage: STAGES.some((s) => s.value === sp.stage) ? (sp.stage as CmStage) : undefined,
   });
-  const { shown, hidden } = splitByView(scoped, view, meId);
-  const hiddenLine = hiddenSummary(hidden);
-  let rows = shown;
-  const total = rows.length;
   const q = (sp.q ?? "").trim().toLowerCase();
-  if (q) {
-    rows = rows.filter(
-      (r) =>
+  const matches = q
+    ? (r: (typeof scoped)[number]) =>
         r.name.toLowerCase().includes(q) ||
         r.username.toLowerCase().includes(q) ||
         (r.contentPillar ?? "").toLowerCase().includes(q) ||
-        (r.businessEmail ?? "").toLowerCase().includes(q),
-    );
-  }
+        (r.businessEmail ?? "").toLowerCase().includes(q)
+    : null;
+  // The search looks through teammates' too, so their match is mentioned rather than lost.
+  const { rows, total, hidden } = splitForList(scoped, view, meId, matches);
+  const hiddenLine = hiddenSummary(hidden, { matching: !!q });
 
   const addButton = (
     <Button href="/creators/new" variant="primary" icon={<Plus size={15} />}>
@@ -88,8 +85,8 @@ export default async function CreatorsPage({
         <CreatorsFilterBar />
       </PageHeader>
       <div className="p-4 sm:p-6">
-        {rows.length === 0 && total === 0 && hidden.length > 0 ? (
-          <EmptyState title="Nothing of yours here" hint={`${hiddenLine} — switch to Everyone to see them.`} />
+        {rows.length === 0 && hidden.length > 0 ? (
+          <EmptyState title={q ? "None of yours match" : "Nothing of yours here"} hint={`${hiddenLine} — switch to Everyone to see them.`} />
         ) : rows.length === 0 ? (
           <EmptyState
             title={total === 0 ? (campaign ? `No creators in ${campaign.name} yet` : "No creators yet") : "No creators match"}

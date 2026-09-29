@@ -673,6 +673,22 @@ export function Field({
   );
 }
 
+/**
+ * A caption and hint around a row of buttons (Segmented). Not a <label>: a
+ * label hands its clicks to the first button inside, so clicking the caption
+ * would press it (review, 2026-09-28). The Segmented's own aria-label names
+ * the group for screen readers.
+ */
+export function FieldGroup({ label, hint, children, className = "" }: { label: ReactNode; hint?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("flex min-w-0 flex-col gap-1", className)}>
+      <span className="text-xs font-medium text-text-muted">{label}</span>
+      {children}
+      {hint ? <span className="text-xs text-text-faint">{hint}</span> : null}
+    </div>
+  );
+}
+
 /** Visually-hidden text for screen readers. */
 export function SrOnly({ children }: { children: ReactNode }) {
   return <span className="sr-only">{children}</span>;

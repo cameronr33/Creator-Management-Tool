@@ -66,6 +66,7 @@ import { TrackingLink } from "@/components/tracking-link";
 import { OwnerPicker } from "@/components/owner-controls";
 import { listTeammates } from "@/lib/owners";
 import { buildHistory, getStageHistory } from "@/lib/history";
+import { listedOnToday } from "@/lib/today";
 import { StageHistory } from "@/components/stage-history";
 import { statusNoteView } from "@/lib/status-note";
 
@@ -293,9 +294,9 @@ export default async function CreatorDetailPage({
                     </span>
                     <BringBackButton partnershipId={partnership.id} name={creator.name} />
                   </>
-                ) : (
+                ) : listedOnToday(partnership.stage) ? (
                   <SnoozeControl partnershipId={partnership.id} name={creator.name} label="Snooze on Today" />
-                )}
+                ) : null}
               </div>
               {partnership.clientApproval === "pending" ? (
                 <div className="mt-2">

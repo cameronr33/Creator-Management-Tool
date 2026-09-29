@@ -478,13 +478,15 @@ export async function recomputeEmailKinds(partnershipIds: string[]): Promise<num
  * stage. Transitions written before the `source` column existed count as a
  * person's — the conservative reading. The opening row (a creator being
  * added, from_stage null) is not a decision about their mail, so it never
- * blocks what the mailbox shows. Nor is Undo on a quick button (2026-09-28):
- * it puts things back as they were before the press, so the last say is
- * whatever it was before — a DM re-logged as "yesterday" after an Undo still
- * moves the stage. Undo of an email move still counts: that is a person
- * disagreeing with the email, and the same email must not move it again.
+ * blocks what the mailbox shows.
+ *
+ * Undo on a quick button counts here (review, 2026-09-28): a person undid it,
+ * so older mail must not redo it. Only the backdating rule for a message
+ * logged by hand (`forLogging`, logging.ts) skips it — an Undo puts things
+ * back as they were, so a DM re-logged as "yesterday" still moves the stage —
+ * and skips the one-time stage clean-up too, which was nobody's decision.
  */
-export async function lastManualChangeAt(partnershipIds: string[]): Promise<Map<string, Date>> {
+export async function lastManualChangeAt(partnershipIds: string[], opts: { forLogging?: boolean } = {}): Promise<Map<string, Date>> {
   const out = new Map<string, Date>();
   if (partnershipIds.length === 0) return out;
   const rows = await db
@@ -496,9 +498,9 @@ export async function lastManualChangeAt(partnershipIds: string[]): Promise<Map<
       and(
         inArray(cmStageTransitions.partnershipId, partnershipIds),
         isNotNull(cmStageTransitions.fromStage),
-        or(isNull(cmStageTransitions.source), inArray(cmStageTransitions.source, ["manual", "migration"])),
+        or(isNull(cmStageTransitions.source), inArray(cmStageTransitions.source, opts.forLogging ? ["manual"] : ["manual", "migration"])),
         isNull(cmStageTransitions.undoneAt),
-        sql`(${cmStageTransitions.meta} ->> 'quickActionId') is null`,
+        opts.forLogging ? sql`(${cmStageTransitions.meta} ->> 'quickActionId') is null` : undefined,
       ),
     )
     .groupBy(cmStageTransitions.partnershipId);

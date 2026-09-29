@@ -108,6 +108,9 @@ export function useSave() {
       () => ({ ok: false, status: 0, data: { error: "Couldn't reach the server" } }) as ApiResult<{ stage?: CmStage | null }>,
     );
     if (r.ok) toast(r.data.stage ? `Undone — back to ${stageLabel(r.data.stage)}` : "Undone", { tone: "good" });
+    else if (r.status === 0 || r.status >= 500)
+      // Nothing was changed (an undo is all or nothing), so it can simply be tried again.
+      toast(r.data.error ?? "Couldn't undo it", { tone: "bad", action: { label: "Try again", onClick: () => void undoPress(u) } });
     else toast(r.data.error ?? "Couldn't undo it", { tone: "bad" });
     router.refresh();
   }

@@ -17,7 +17,18 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "./db";
 import { LOG_MAX_PAST_DAYS, logMessage, resolveOccurredAt } from "../src/lib/logging";
 import { groupThreads, type ThreadEvent } from "../src/lib/conversation";
-import { assessPartnership, buildPrompt, partnershipsNeedingRead, type AssessFn, type PromptMessage } from "../src/lib/email-status";
+import {
+  assessPartnership,
+  buildPrompt,
+  decideEmailMove,
+  partnershipsNeedingRead,
+  verifiedAddress,
+  verifiedDeal,
+  verifiedPostUrl,
+  type Assessment,
+  type AssessFn,
+  type PromptMessage,
+} from "../src/lib/email-status";
 import { recomputeEmailKinds } from "../src/lib/email-ingest";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 import { changeStage } from "../src/lib/mutations";
@@ -113,6 +124,41 @@ function pure() {
   check("an email logged by hand says a teammate logged it", /Email logged by a teammate/.test(line(2)), line(2));
   check("a teammate's note is called a note, not an automatic message", /a teammate's internal note/.test(line(3)) && !/calendar invite/.test(line(3)), line(3));
   check("an invite in the mailbox is still called one", /calendar invite \/ automatic message/.test(line(4)), line(4));
+
+  // NEGATIVE (review, 2026-09-28): a teammate's typed note on a hand-logged "They replied" was read as the creator's own
+  // email — quotable to move a stage and to fill the address "from their email".
+  console.log("\n── Only mail the mailbox holds is anyone's own words ──");
+  const words = "Count me in, ship to 12 Oak Street, Austin TX 78701 please";
+  const reading: Assessment = {
+    stage: "fulfilling",
+    whose_turn: "us",
+    summary: "They're in.",
+    evidence_quote: "Count me in, ship to 12 Oak Street",
+    evidence_message: 1,
+    address: "12 Oak Street, Austin TX 78701",
+    post_url: "https://www.instagram.com/reel/__verify_lg/",
+    sounds_like_no: false,
+    confidence: "high",
+    products: [],
+    compensation_type: "flat_fee",
+    fee_amount: 500,
+    terms: null,
+    deal_quote: "Confirming $500 for one reel",
+    deal_message: 1,
+  };
+  const decide = (m: PromptMessage) =>
+    decideEmailMove({ current: "awaiting_address", assessment: reading, messages: [m], lastManualChangeAt: null, hasAddress: false, shipmentStatuses: [], automove: true });
+  const handEmail = msg(1, { synced: false, body: `${words} https://www.instagram.com/reel/__verify_lg/` });
+  const handDm = msg(1, { channel: "ig_dm", synced: undefined, body: `${words} https://www.instagram.com/reel/__verify_lg/` });
+  const mailbox = msg(1, { synced: true, body: `${words} https://www.instagram.com/reel/__verify_lg/` });
+  check("an email logged by hand can't be quoted to move the stage", decide(handEmail).move === null);
+  check("…nor a DM logged with text", decide(handDm).move === null);
+  check("control: the same words in mail the mailbox holds do move it", decide(mailbox).move?.to === "fulfilling");
+  check("an address typed on a hand log is never 'what the creator wrote'", verifiedAddress(reading, [handEmail]) === null && verifiedAddress(reading, [handDm]) === null && verifiedAddress(reading, [mailbox])?.text === "12 Oak Street, Austin TX 78701");
+  check("nor is a post link", verifiedPostUrl(reading, [handEmail]) === null && verifiedPostUrl(reading, [mailbox]) === "https://www.instagram.com/reel/__verify_lg/");
+  const ourHandLog = msg(1, { synced: false, direction: "outbound", senderRole: "team", kind: "reply", body: "Confirming $500 for one reel" });
+  const ourMail = msg(1, { synced: true, direction: "outbound", senderRole: "team", kind: "reply", body: "Confirming $500 for one reel" });
+  check("a fee typed on a hand log fills nothing; the same line in our sent mail does", verifiedDeal(reading, [ourHandLog], { agreed: true, brand: "HELLA" })?.facts.fee_amount == null && verifiedDeal(reading, [ourMail], { agreed: true, brand: "HELLA" })?.facts.fee_amount === 500);
 }
 
 async function live() {
@@ -170,6 +216,12 @@ async function live() {
     await backdate(closedEarlier, "no_response", daysAgo(3));
     const yest = await logMessage({ partnershipId: closedEarlier, direction: "inbound", channel: "ig_dm", kind: "reply", occurredAt: daysAgo(1).toISOString() }, me.id);
     check("a reply dated after the close (yesterday; closed 3 days ago) reopens it", yest.ok && yest.stageChanged?.to === "in_conversation" && !yest.stageSkipped);
+
+    // NEGATIVE (review, 2026-09-28): the one-time stage clean-up counted as "a person set the stage".
+    const migrated = await add("__verify_lg_migrated");
+    await db.insert(schema.cmStageTransitions).values({ partnershipId: migrated, fromStage: "researched", toStage: "shortlisted", source: "migration", reason: "stages simplified: researched → shortlisted", changedAt: daysAgo(6) });
+    const olderDm = await logMessage({ partnershipId: migrated, direction: "outbound", channel: "ig_dm", kind: "initial", occurredAt: daysAgo(8).toISOString() }, me.id);
+    check("the stage clean-up isn't a person's say: a DM dated before it still moves them", olderDm.ok && !olderDm.stageSkipped && olderDm.stageChanged?.to === "contacted", JSON.stringify(olderDm));
 
     // NEGATIVE: a first DM dated before a person's stage change doesn't move it.
     const decided = await add("__verify_lg_decided");

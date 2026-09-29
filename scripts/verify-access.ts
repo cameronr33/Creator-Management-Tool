@@ -40,14 +40,26 @@ function handlers(src: string): { method: string; body: string }[] {
 
 const COOKIE_SCOPED = /getSelectedClientSlug|resolveClient\(|InSelectedClient|getSelectedCampaignId|resolveCampaign\(|getSelectedView/;
 
-/** Exported functions whose body reads a cookie — each must be a known scope getter. */
-function cookieGetters(src: string): string[] {
-  const out: string[] = [];
-  for (const m of src.matchAll(/export\s+async\s+function\s+(\w+)\s*\([^)]*\)[^{]*\{([\s\S]*?)\n\}/g)) {
-    if (/cookies\(\)/.test(m[2]) && !/^set/.test(m[1])) out.push(m[1]);
-  }
-  return out;
+/** Source without comments, so a cookies() mentioned in prose doesn't count as a read. */
+function code(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
+
+/**
+ * Exported functions whose body reads a cookie — each must be a known scope
+ * getter. Any declaration style counts (review, 2026-09-28): `export async
+ * function`, `export function`, and `export const x = cache(async () => …)`.
+ */
+function cookieGetters(src: string): string[] {
+  const text = code(src);
+  const starts = [...text.matchAll(/export\s+(?:async\s+)?(?:function\s+(\w+)|const\s+(\w+)\s*=)/g)].map((m) => ({ name: m[1] ?? m[2], at: m.index! }));
+  return starts
+    .filter((s, i) => /\bcookies\(\)/.test(text.slice(s.at, starts[i + 1]?.at ?? text.length)) && !/^set/.test(s.name))
+    .map((s) => s.name);
+}
+
+/** The only modules that may read a cookie at all — anything new must be looked at and added here and to COOKIE_SCOPED. */
+const COOKIE_MODULES = new Set(["campaigns.ts", "client-cookie.ts", "view-cookie.ts"]);
 
 function main() {
   console.log("\n── Every API route states who may call it ──");
@@ -125,6 +137,12 @@ function main() {
   const probeGetters = cookieGetters("export async function getSecretScope() {\n  return (await cookies()).get(\"x\");\n}");
   check("…and that check catches a new one", probeGetters.length === 1 && !COOKIE_SCOPED.test(probeGetters[0]));
   check("the Mine / Everyone view cookie is one of them", cookieGetters(readFileSync(join(SRC, "lib", "view-cookie.ts"), "utf8")).includes("getSelectedView"));
+  const cachedProbe = cookieGetters("export const getOwnerFilter = cache(async () => {\n  return (await cookies()).get(\"x\");\n});\nexport function other() { return 1; }");
+  check("…a getter written as `export const x = cache(async …)` is seen too", cachedProbe.length === 1 && cachedProbe[0] === "getOwnerFilter");
+  const readers = libFiles.filter((f) => /\bcookies\(\)/.test(code(readFileSync(join(SRC, "lib", f), "utf8"))));
+  const strays = readers.filter((f) => !COOKIE_MODULES.has(f));
+  check(`only the known cookie modules read cookies (${[...COOKIE_MODULES].join(", ")})`, strays.length === 0 && readers.length > 0, strays.join(", "));
+  check("…and a cookie mentioned only in a comment doesn't count", !/\bcookies\(\)/.test(code("/** rejects later cookies() calls */\n// cookies() here too\nexport const a = 1;")));
 
   console.log("\n── A client login is re-checked every time ──");
   const clientPaths = [join(SRC, "lib", "api-helpers.ts"), join(SRC, "lib", "portal-data.ts"), join(SRC, "app", "api", "creators", "[id]", "photo", "route.ts")];

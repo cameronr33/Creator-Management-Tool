@@ -5,7 +5,7 @@
  *   npm run preview:verify -- scripts/verify-today.ts
  */
 import { latestActivity, type LastMessage } from "../src/lib/activity";
-import { placeOnToday, sortToday, TODAY_SECTIONS, type TodayFacts } from "../src/lib/today";
+import { placeOnToday, sortToday, TODAY_SECTIONS, type TodayFacts, listedOnToday } from "../src/lib/today";
 import { THRESHOLD_FIELDS, THRESHOLDS_SCHEMA } from "../src/lib/thresholds";
 import { SNOOZE_MAX_DAYS, parseSnoozeUntil, snoozeActive } from "../src/lib/snooze-rules";
 import { DEFAULT_THRESHOLDS } from "../src/lib/outreach";
@@ -68,7 +68,8 @@ console.log("\n── Nudges for quiet deals (2026-09-28) ──");
 const daysAfter = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000);
 const quiet = (stage: CmStage, over: Partial<TodayFacts> = {}) =>
   place({ stage, whoseTurn: "them", lastFrom: "us", lastMessageAt: at(20), now: daysAfter(at(20), DEFAULT_THRESHOLDS.nudgeAfterDays), ...over });
-check("Talking, we wrote, no reply for the nudge days → Follow up", quiet("in_conversation")?.section === "follow_up" && quiet("in_conversation")?.note === `No reply in ${DEFAULT_THRESHOLDS.nudgeAfterDays} days — nudge them.`);
+// Copy (review, 2026-09-28): "No reply in N days" was wrong when their promise was the last message — "Quiet" is true either way.
+check("Talking, we wrote, no reply for the nudge days → Follow up", quiet("in_conversation")?.section === "follow_up" && quiet("in_conversation")?.note === `Quiet for ${DEFAULT_THRESHOLDS.nudgeAfterDays} days — nudge them.`);
 check("Agreed gone quiet → Follow up, asking for the address", quiet("awaiting_address")?.section === "follow_up" && /for their address/.test(quiet("awaiting_address")?.note ?? ""));
 check("Finalizing gone quiet → Follow up, about what's open", quiet("finalizing")?.section === "follow_up" && /still open/.test(quiet("finalizing")?.note ?? ""));
 check("…a day earlier they stay where they were", quiet("in_conversation", { now: daysAfter(at(20), DEFAULT_THRESHOLDS.nudgeAfterDays - 1) })?.section === "waiting" && quiet("awaiting_address", { now: daysAfter(at(20), DEFAULT_THRESHOLDS.nudgeAfterDays - 1) })?.section === "get_address");
@@ -78,6 +79,11 @@ check("nothing pending (a thank-you) → no nudge", quiet("in_conversation", { w
 check("imported rows (no date) never get a nudge clock", quiet("in_conversation", { lastMessageAt: null })?.section === "waiting" && quiet("awaiting_address", { lastMessageAt: null })?.section === "get_address");
 check("fulfilment stages are never nudged", (["fulfilling", "shipped", "content_pending"] as CmStage[]).every((s) => quiet(s)?.section !== "follow_up"));
 check("a client's own nudge days are used", quiet("in_conversation", { thresholds: { ...DEFAULT_THRESHOLDS, nudgeAfterDays: 9 } })?.section === "waiting" && quiet("in_conversation", { thresholds: { ...DEFAULT_THRESHOLDS, nudgeAfterDays: 2 } })?.section === "follow_up");
+// NEGATIVE (review, 2026-09-28): moving a deal to Agreed after a long-quiet DM thread nudged it the same instant.
+const movedLate = daysAfter(at(20), DEFAULT_THRESHOLDS.nudgeAfterDays - 1);
+check("a stage move since restarts the quiet clock", quiet("awaiting_address", { stageSince: movedLate })?.section === "get_address" && quiet("finalizing", { stageSince: movedLate })?.section === "finalizing");
+const restarted = quiet("awaiting_address", { stageSince: movedLate, now: daysAfter(movedLate, DEFAULT_THRESHOLDS.nudgeAfterDays) });
+check("…and nudges once it has been quiet that long since the move", restarted?.section === "follow_up" && restarted.since?.getTime() === movedLate.getTime() && restarted.note === `Quiet for ${DEFAULT_THRESHOLDS.nudgeAfterDays} days — nudge them for their address.`);
 
 console.log("\n── Waiting since, Due and Late ──");
 check("Your turn waits since their message", place({ stage: "in_conversation", whoseTurn: "us", lastMessageAt: at(18) })?.since?.getTime() === at(18).getTime());
@@ -85,14 +91,19 @@ check("Follow up waits since our last message", place({ now: at(28) })?.since?.g
 check("Agreed / Ready to ship wait since the stage began", place({ stage: "awaiting_address", stageSince: at(15) })?.since?.getTime() === at(15).getTime() && place({ stage: "fulfilling", stageSince: at(16) })?.since?.getTime() === at(16).getTime());
 const toContact = (over: Partial<TodayFacts>) => place({ stage: "shortlisted", whoseTurn: null, ...over });
 check("To contact: due after the first-message days, with a Due badge", toContact({ stageSince: at(20), now: daysAfter(at(20), DEFAULT_THRESHOLDS.initialOutreachAfterDays) })?.badge === "due" && /first message is due/.test(toContact({ stageSince: at(20), now: daysAfter(at(20), 3) })?.note ?? ""));
+// Copy (review, 2026-09-28): "Added N days ago" was wrong when the clock started at approval or a move back.
+check("…saying how long they've been ready to contact", toContact({ stageSince: at(20), now: daysAfter(at(20), 3) })?.note === "Ready to contact for 3 days — the first message is due.");
 check("…not before", toContact({ stageSince: at(20), now: daysAfter(at(20), DEFAULT_THRESHOLDS.initialOutreachAfterDays - 1) })?.badge === null);
 check("…and the clock starts at the client's approval when that's later", toContact({ stageSince: at(10), approvalAt: at(20), now: daysAfter(at(20), 1) })?.badge === null);
 check("Shipped says when it went out", place({ stage: "shipped", shippedAt: at(18) })?.note === "Shipped 3 days ago." && place({ stage: "shipped", shippedAt: at(18) })?.since?.getTime() === at(18).getTime());
 check("…or that no ship date was recorded", /no ship date recorded/.test(place({ stage: "shipped", stageSince: at(18) })?.note ?? ""));
+check("one day reads as one day", place({ stage: "shipped", stageSince: at(20), now: daysAfter(at(20), 1) })?.note === "In Shipped for 1 day — no ship date recorded.");
 const video = (n: number, over: Partial<TodayFacts> = {}) => place({ stage: "content_pending", deliveredAt: at(1), now: daysAfter(at(1), n), ...over });
 check(`Waiting on video: late from ${DEFAULT_THRESHOLDS.videoDueAfterDays} days after delivery`, video(DEFAULT_THRESHOLDS.videoDueAfterDays)?.badge === "late" && /the video is late/.test(video(DEFAULT_THRESHOLDS.videoDueAfterDays)?.note ?? ""));
 check("…not a day before", video(DEFAULT_THRESHOLDS.videoDueAfterDays - 1)?.badge === null && video(DEFAULT_THRESHOLDS.videoDueAfterDays - 1)?.note === `Delivered ${DEFAULT_THRESHOLDS.videoDueAfterDays - 1} days ago.`);
 check("…a stage moved there by hand counts from when it moved", /no delivery date recorded/.test(video(3, { deliveredAt: null, stageSince: at(1) })?.note ?? ""));
+check("…one day of it reads as one day", video(1, { deliveredAt: null, stageSince: at(1) })?.note === "Waiting on the video for 1 day — no delivery date recorded.");
+check("what Today lists at all agrees with where it places them (Posted and closed never)", STAGE_VALUES.every((s) => listedOnToday(s) === (place({ stage: s }) !== null)) && !listedOnToday("posted") && !listedOnToday("no_response") && listedOnToday("shortlisted"));
 check("…and with no date at all there's no clock", video(30, { deliveredAt: null, stageSince: null })?.badge === null && video(30, { deliveredAt: null, stageSince: null })?.since === null);
 const sorted = sortToday([
   { name: "Cy", since: at(12).toISOString() },

@@ -70,12 +70,31 @@ export function splitByView<T extends { ownerId: string | null; ownerName: strin
   return { shown, hidden };
 }
 
-/** Pure: "7 of Kieran's not shown" — so nothing disappears without being mentioned. */
-export function hiddenSummary(hidden: { ownerName: string | null }[]): string | null {
+/**
+ * Pure: "7 of Kieran's not shown" — so nothing disappears without being
+ * mentioned. With a search, the hidden ones that match: "2 of Kieran's also
+ * match".
+ */
+export function hiddenSummary(hidden: { ownerName: string | null }[], opts: { matching?: boolean } = {}): string | null {
   if (!hidden.length) return null;
   const names = [...new Set(hidden.map((h) => (h.ownerName ?? "").split(" ")[0]).filter(Boolean))];
   const whose = names.length === 1 ? `${names[0]}'s` : names.length === 2 ? `${names[0]}'s and ${names[1]}'s` : "teammates'";
-  return `${hidden.length} of ${whose} not shown`;
+  return `${hidden.length} of ${whose} ${opts.matching ? "also match" : "not shown"}`;
+}
+
+/**
+ * Pure: a list on a view, with an optional search. The search looks through
+ * the hidden rows too, so a teammate's match is mentioned instead of "no
+ * creators match". `total` is how many the view shows before searching.
+ */
+export function splitForList<T extends { ownerId: string | null; ownerName: string | null }>(
+  rows: T[],
+  view: View,
+  userId: string | null | undefined,
+  matches: ((r: T) => boolean) | null,
+): { rows: T[]; total: number; hidden: T[] } {
+  const { shown, hidden } = splitByView(rows, view, userId);
+  return matches ? { rows: shown.filter(matches), total: shown.length, hidden: hidden.filter(matches) } : { rows: shown, total: shown.length, hidden };
 }
 
 /** Everyone with a Sentic login — id and name only (never the email or password hash). */

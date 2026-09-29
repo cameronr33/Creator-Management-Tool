@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Field, Input, Segmented } from "@/components/ui";
+import { Button, Field, FieldGroup, Input, Segmented } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
 import { LOG_MAX_PAST_DAYS } from "@/lib/log-time";
@@ -44,7 +44,7 @@ export function whenToIso(choice: WhenChoice, picked: string): string | undefine
 export function DateChoice({ choice, picked, onChoice, onPicked }: { choice: WhenChoice; picked: string; onChoice: (c: WhenChoice) => void; onPicked: (v: string) => void }) {
   return (
     <div className="flex flex-wrap items-end gap-2">
-      <Field label="When">
+      <FieldGroup label="When">
         <Segmented<WhenChoice>
           aria-label="When it happened"
           value={choice}
@@ -55,7 +55,7 @@ export function DateChoice({ choice, picked, onChoice, onPicked }: { choice: Whe
             { value: "pick", label: "Pick a date" },
           ]}
         />
-      </Field>
+      </FieldGroup>
       {choice === "pick" && (
         <Field label="Date">
           <Input compact type="date" className="w-40" value={picked} min={ymdDaysAgo(LOG_MAX_PAST_DAYS - 1)} max={ymdDaysAgo(0)} onChange={(e) => onPicked(e.target.value)} />
@@ -87,7 +87,8 @@ export function LogMessagePanel({
 }) {
   const { pending, run } = useSave();
   const [how, setHow] = useState<How>("ig_dm");
-  const [choice, setChoice] = useState<WhenChoice>("yesterday");
+  // Today by default: this panel is also the only way to log an email or a call that happened just now (review, 2026-09-28).
+  const [choice, setChoice] = useState<WhenChoice>("today");
   const [picked, setPicked] = useState(defaultPickedDate);
   const outbound = direction === "outbound";
 
@@ -111,7 +112,7 @@ export function LogMessagePanel({
 
   return (
     <div className="w-full space-y-2 rounded-lg border border-border bg-surface-2/60 p-2.5">
-      <Field label="How" hint={how === "email" ? "Only for email the connected mailbox can't see — it picks up the rest by itself." : undefined}>
+      <FieldGroup label="How" hint={how === "email" ? "Only for email the connected mailbox can't see — it picks up the rest by itself." : undefined}>
         <Segmented<How>
           aria-label="How"
           value={how}
@@ -122,10 +123,10 @@ export function LogMessagePanel({
             { value: "phone", label: "Call" },
           ]}
         />
-      </Field>
+      </FieldGroup>
       <DateChoice choice={choice} picked={picked} onChoice={setChoice} onPicked={setPicked} />
       <div className="flex gap-1.5">
-        <Button size="sm" variant="primary" pending={pending} onClick={save}>
+        <Button size="sm" variant="primary" pending={pending} disabled={choice === "pick" && !picked} onClick={save}>
           Log it
         </Button>
         <Button size="sm" variant="ghost" disabled={pending} onClick={onClose}>

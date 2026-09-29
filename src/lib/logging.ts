@@ -60,7 +60,7 @@ export async function logMessage(input: LogInput, userId: string, now = new Date
   let stageChanged: AutoStageResult | null = null;
   let stageSkipped = false;
   if (trigger && when.supplied) {
-    const decided = (await lastManualChangeAt([input.partnershipId])).get(input.partnershipId);
+    const decided = (await lastManualChangeAt([input.partnershipId], { forLogging: true })).get(input.partnershipId);
     stageSkipped = !!decided && when.at.getTime() <= decided.getTime();
   }
   if (trigger && !stageSkipped) stageChanged = await applyAutoStage(input.partnershipId, trigger, userId, { evidenceEventId: row.id });

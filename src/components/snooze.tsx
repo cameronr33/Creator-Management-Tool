@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { AlarmClock } from "lucide-react";
 import { Button, Field, Input, Segmented } from "@/components/ui";
@@ -23,6 +23,17 @@ export function snoozeDateLabel(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
+const noSubscribe = () => () => {};
+
+/**
+ * The snooze date in the teammate's own time zone — rendered in the browser
+ * only, since the day was picked there (review, 2026-09-28: the server's
+ * render kept its own zone's date through hydration).
+ */
+function useLocalDateLabel(iso: string): string {
+  return useSyncExternalStore(noSubscribe, () => snoozeDateLabel(iso), () => "");
+}
+
 type Choice = "3d" | "1w" | "pick";
 
 /**
@@ -39,6 +50,7 @@ export function SnoozeControl({ partnershipId, name, label = "Snooze" }: { partn
   const [why, setWhy] = useState("");
 
   const save = async () => {
+    if (choice === "pick" && !picked) return;
     const until = choice === "3d" ? startOfDay(3) : choice === "1w" ? startOfDay(7) : new Date(`${picked}T00:00`);
     const r = await run(() => api<{ until?: string }>(`/api/partnerships/${partnershipId}/snooze`, { until: until.toISOString(), reason: why.trim() || null }));
     if (!r.ok) return;
@@ -49,7 +61,9 @@ export function SnoozeControl({ partnershipId, name, label = "Snooze" }: { partn
       action: {
         label: "Undo",
         onClick: async () => {
-          await api(`/api/partnerships/${partnershipId}/snooze`, { until: null });
+          const u = await api(`/api/partnerships/${partnershipId}/snooze`, { until: null }).catch(() => null);
+          if (u?.ok) toast(`${name} is back on Today`, { tone: "good" });
+          else toast(u?.data.error ?? "Couldn't undo the snooze — use Bring back now", { tone: "bad" });
           router.refresh();
         },
       },
@@ -84,7 +98,7 @@ export function SnoozeControl({ partnershipId, name, label = "Snooze" }: { partn
         <Input compact maxLength={200} value={why} placeholder="e.g. back from SEMA on the 10th" onChange={(e) => setWhy(e.target.value)} />
       </Field>
       <div className="flex gap-1.5">
-        <Button size="sm" variant="primary" pending={pending} onClick={save}>
+        <Button size="sm" variant="primary" pending={pending} disabled={choice === "pick" && !picked} onClick={save}>
           Snooze
         </Button>
         <Button size="sm" variant="ghost" disabled={pending} onClick={() => setOpen(false)}>
@@ -107,10 +121,10 @@ export function BringBackButton({ partnershipId, name }: { partnershipId: string
 
 /** "Back Fri, Oct 3 · Kieran: back from SEMA on the 10th" */
 export function SnoozeLine({ until, by, reason }: { until: string; by: string | null; reason: string | null }) {
-  // The date is shown in the teammate's own time zone; the server's first render may differ by a day at the edges.
+  const day = useLocalDateLabel(until);
   return (
-    <span suppressHydrationWarning>
-      Back {snoozeDateLabel(until)}
+    <span>
+      Back {day}
       {by || reason ? " · " : ""}
       {by ? by.split(" ")[0] : ""}
       {by && reason ? ": " : ""}

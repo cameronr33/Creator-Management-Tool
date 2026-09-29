@@ -91,11 +91,24 @@ function ago(n: number): string {
   return n === 0 ? "today" : n === 1 ? "yesterday" : `${n} days ago`;
 }
 
-/** The nudge line for a deal gone quiet, by the stage it's stuck at. */
+function dayCount(n: number): string {
+  return n === 1 ? "1 day" : `${n} days`;
+}
+
+/** Posted and closed deals never show on Today; everything else has a section. */
+export function listedOnToday(stage: CmStage): boolean {
+  const s = canonicalStage(stage);
+  return !isTerminal(s) && s !== "posted";
+}
+
+/**
+ * The nudge line for a deal gone quiet, by the stage it's stuck at. "Quiet",
+ * not "no reply": the last message may be their promise that went unkept.
+ */
 export const NUDGE_LINES: Partial<Record<CmStage, (n: number) => string>> = {
-  in_conversation: (n) => `No reply in ${n} days — nudge them.`,
-  awaiting_address: (n) => `No reply in ${n} days — nudge them for their address.`,
-  finalizing: (n) => `No reply in ${n} days — nudge them about what's still open.`,
+  in_conversation: (n) => `Quiet for ${dayCount(n)} — nudge them.`,
+  awaiting_address: (n) => `Quiet for ${dayCount(n)} — nudge them for their address.`,
+  finalizing: (n) => `Quiet for ${dayCount(n)} — nudge them about what's still open.`,
 };
 
 function place(section: TodaySection, note: string | null, since: Date | null | undefined, badge: TodayPlacement["badge"] = null): TodayPlacement {
@@ -105,34 +118,37 @@ function place(section: TodaySection, note: string | null, since: Date | null | 
 /**
  * A quiet deal: we're waiting on them (they owe the next message — whether
  * we wrote last, or they promised something and went silent) and nothing has
- * come for the nudge days. Imported rows (no date) never get a clock.
+ * happened for the nudge days: no message, and no stage move either — a deal
+ * moved to Agreed this morning isn't quiet, however old the last DM.
+ * Imported rows (no date) never get a clock.
  */
 function nudge(f: TodayFacts, stage: CmStage, now: Date): TodayPlacement | null {
   const line = NUDGE_LINES[stage];
   if (!line || !f.lastMessageAt) return null;
   const waitingOnThem = f.whoseTurn === "them" || (f.whoseTurn == null && f.lastFrom === "us");
   if (!waitingOnThem) return null;
-  const n = days(f.lastMessageAt, now);
-  return n >= f.thresholds.nudgeAfterDays ? place("follow_up", line(n), f.lastMessageAt) : null;
+  const quietSince = f.stageSince && f.stageSince.getTime() > f.lastMessageAt.getTime() ? f.stageSince : f.lastMessageAt;
+  const n = days(quietSince, now);
+  return n >= f.thresholds.nudgeAfterDays ? place("follow_up", line(n), quietSince) : null;
 }
 
 export function placeOnToday(f: TodayFacts): TodayPlacement | null {
   const stage = canonicalStage(f.stage);
   const now = f.now ?? new Date();
-  if (isTerminal(stage) || stage === "posted") return null;
+  if (!listedOnToday(stage)) return null;
   switch (stage) {
     case "fulfilling":
       return place("ready_to_ship", null, f.stageSince);
     case "shipped": {
       if (f.shippedAt) return place("shipped", `Shipped ${ago(days(f.shippedAt, now))}.`, f.shippedAt);
-      return place("shipped", f.stageSince ? `In Shipped for ${days(f.stageSince, now)} days — no ship date recorded.` : null, f.stageSince);
+      return place("shipped", f.stageSince ? `In Shipped for ${dayCount(days(f.stageSince, now))} — no ship date recorded.` : null, f.stageSince);
     }
     case "content_pending": {
       const since = f.deliveredAt ?? f.stageSince ?? null;
       if (!since) return place("waiting_video", null, null);
       const n = days(since, now);
       const late = n >= f.thresholds.videoDueAfterDays;
-      const what = f.deliveredAt ? `Delivered ${ago(n)}` : `Waiting on the video for ${n} days — no delivery date recorded`;
+      const what = f.deliveredAt ? `Delivered ${ago(n)}` : `Waiting on the video for ${dayCount(n)} — no delivery date recorded`;
       return place("waiting_video", late ? `${what} — the video is late (due after ${f.thresholds.videoDueAfterDays} days).` : `${what}.`, since, late ? "late" : null);
     }
     case "awaiting_address":
@@ -146,7 +162,7 @@ export function placeOnToday(f: TodayFacts): TodayPlacement | null {
     // The clock starts when they could first be contacted: added, or approved by the client.
     const since = [f.stageSince, f.approvalAt].filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
     if (since && days(since, now) >= f.thresholds.initialOutreachAfterDays) {
-      return place("to_contact", `Added ${days(since, now)} days ago — the first message is due.`, since, "due");
+      return place("to_contact", `Ready to contact for ${dayCount(days(since, now))} — the first message is due.`, since, "due");
     }
     return place("to_contact", null, since);
   }

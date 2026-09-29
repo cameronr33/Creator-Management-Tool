@@ -10,7 +10,7 @@
  */
 import { eq, inArray } from "drizzle-orm";
 import { db, schema } from "./db";
-import { chipLabels, hiddenSummary, inView, parseView, setOwner, splitByView, takeUnassigned } from "../src/lib/owners";
+import { chipLabels, hiddenSummary, inView, parseView, setOwner, splitByView, splitForList, takeUnassigned } from "../src/lib/owners";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 import { moveToCampaign } from "../src/lib/campaigns";
 import { getCreatorRows } from "../src/lib/queries";
@@ -43,6 +43,17 @@ function pure() {
   check("split keeps the hidden ones", split.shown.length === 2 && split.hidden.length === 2);
   check("…and says whose they are", hiddenSummary(split.hidden) === "2 of Kieran's not shown" && hiddenSummary([]) === null);
   check("several owners are summed up", hiddenSummary([{ ownerName: "A One" }, { ownerName: "B Two" }, { ownerName: "C Three" }]) === "3 of teammates' not shown");
+  // NEGATIVE (review, 2026-09-28): a search on Mine only looked through what Mine shows — "No creators match" when Kieran's did.
+  const people = [
+    { ownerId: me, ownerName: "Me Person", name: "Alice" },
+    { ownerId: "k", ownerName: "Kieran Lee", name: "Bob" },
+    { ownerId: "k", ownerName: "Kieran Lee", name: "Bobby" },
+    { ownerId: null, ownerName: null, name: "Carl" },
+  ];
+  const bob = splitForList(people, "mine", me, (r) => r.name.toLowerCase().includes("bob"));
+  check("a search on Mine looks through teammates' too, and says so", bob.rows.length === 0 && bob.total === 2 && hiddenSummary(bob.hidden, { matching: true }) === "2 of Kieran's also match");
+  const plain = splitForList(people, "mine", me, null);
+  check("…without a search it's the plain split", plain.rows.length === 2 && plain.total === 2 && hiddenSummary(plain.hidden) === "2 of Kieran's not shown");
 
   console.log("\n── Owner chips (pure) ──");
   const labels = chipLabels([
@@ -108,10 +119,18 @@ async function live() {
         .returning({ id: schema.users.id });
       tempUserId = temp.id;
       await setOwner([c], tempUserId);
+      // NEGATIVE (review, 2026-09-28): their Posted and closed deals were counted as "not shown" though Today never lists them.
+      const posted = await add("__verify_ow_posted", campaignA);
+      const closed = await add("__verify_ow_closed", campaignA);
+      await db.insert(schema.cmDeliverables).values({ partnershipId: posted, url: "https://www.instagram.com/reel/__verify_ow/" });
+      await db.update(schema.cmPartnerships).set({ stage: "posted" }).where(eq(schema.cmPartnerships.id, posted));
+      await db.update(schema.cmPartnerships).set({ stage: "declined" }).where(eq(schema.cmPartnerships.id, closed));
+      await setOwner([posted, closed], tempUserId);
       const mine = await getTodayData({ clientId: client.id, campaignId: campaignA, view: "mine", userId: me.id });
       const everyone = await getTodayData({ clientId: client.id, campaignId: campaignA, view: "all", userId: me.id });
       check("Mine leaves out a teammate's deal and says so", !mine.rows.some((r) => r.partnershipId === c) && mine.hiddenSummary === "1 of __verify's not shown", mine.hiddenSummary ?? "none");
-      check("…and counts only what it shows", Object.values(mine.stageCounts).reduce((s, n) => s + (n ?? 0), 0) === Object.values(everyone.stageCounts).reduce((s, n) => s + (n ?? 0), 0) - 1);
+      check("…counting only what Today would have listed (not their Posted or closed deals)", mine.hiddenSummary === "1 of __verify's not shown");
+      check("…and counts only what it shows", Object.values(mine.stageCounts).reduce((s, n) => s + (n ?? 0), 0) === Object.values(everyone.stageCounts).reduce((s, n) => s + (n ?? 0), 0) - 3);
       check("Everyone shows it", everyone.rows.some((r) => r.partnershipId === c) && everyone.hiddenSummary === null);
       await db.delete(schema.users).where(eq(schema.users.id, tempUserId));
       tempUserId = null;
