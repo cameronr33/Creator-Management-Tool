@@ -37,6 +37,12 @@ export function StatusNote({
     onEditingChange?.(v);
   };
   const [draft, setDraft] = useState(note?.text ?? "");
+  // Opened from outside (a ⋯ menu): start from the saved note, never a draft someone cancelled or an older copy.
+  const [wasEditing, setWasEditing] = useState(editing);
+  if (editing !== wasEditing) {
+    setWasEditing(editing);
+    if (editing) setDraft(note?.text ?? "");
+  }
 
   const save = async (text: string) => {
     const r = await run(() => api(`/api/partnerships/${partnershipId}`, { statusNote: text.trim() || null }, "PATCH"), { success: text.trim() ? "Saved where things stand" : "Removed" });

@@ -482,7 +482,7 @@ export async function recomputeEmailKinds(partnershipIds: string[]): Promise<num
  *
  * Undo on a quick button counts here (review, 2026-09-28): a person undid it,
  * so older mail must not redo it. Only the backdating rule for a message
- * logged by hand and the stale-stage flag (`peopleOnly`) skip it — an Undo puts things
+ * logged by hand (`peopleOnly`) skips it (the stale-stage flag has its own, lastStageDecisionAt) — an Undo puts things
  * back as they were, so a DM re-logged as "yesterday" still moves the stage —
  * and skips the one-time stage clean-up too, which was nobody's decision.
  */
@@ -501,6 +501,31 @@ export async function lastManualChangeAt(partnershipIds: string[], opts: { peopl
         or(isNull(cmStageTransitions.source), inArray(cmStageTransitions.source, opts.peopleOnly ? ["manual"] : ["manual", "migration"])),
         isNull(cmStageTransitions.undoneAt),
         opts.peopleOnly ? sql`(${cmStageTransitions.meta} ->> 'quickActionId') is null` : undefined,
+      ),
+    )
+    .groupBy(cmStageTransitions.partnershipId);
+  for (const r of rows) if (r.at) out.set(r.partnershipId, r.at);
+  return out;
+}
+
+/**
+ * For the stale-stage flag (stage-flag.ts): the last time a person or a rule
+ * set each stage — not the email reader (the flag is how a person checks its
+ * moves), the one-time clean-up, the opening row, or a quick Undo.
+ */
+export async function lastStageDecisionAt(partnershipIds: string[]): Promise<Map<string, Date>> {
+  const out = new Map<string, Date>();
+  if (partnershipIds.length === 0) return out;
+  const rows = await db
+    .select({ partnershipId: cmStageTransitions.partnershipId, at: max(cmStageTransitions.changedAt) })
+    .from(cmStageTransitions)
+    .where(
+      and(
+        inArray(cmStageTransitions.partnershipId, partnershipIds),
+        isNotNull(cmStageTransitions.fromStage),
+        or(isNull(cmStageTransitions.source), inArray(cmStageTransitions.source, ["manual", "rule"])),
+        isNull(cmStageTransitions.undoneAt),
+        sql`(${cmStageTransitions.meta} ->> 'quickActionId') is null`,
       ),
     )
     .groupBy(cmStageTransitions.partnershipId);

@@ -3,15 +3,16 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MoreHorizontal } from "lucide-react";
-import { cn } from "@/components/ui";
+import { cn, SrOnly } from "@/components/ui";
 
 /**
  * A small pop-up menu — the ⋯ on Today rows and Pipeline cards, the owner
  * chip. It renders into document.body with fixed positioning, so a card with
  * overflow-hidden or a scrolling board can't clip it (review, 2026-09-29).
  * Escape, a click outside, or a scroll closes it, and focus goes back to the
- * button that opened it. Mouse-down never reaches the card underneath, so it
- * can't start a drag.
+ * button that opened it. The panel sits outside the card in the page, so it
+ * can't start a card's drag; a board card also ignores a drag that begins on
+ * the ⋯ button itself (pipeline-board.tsx, data-no-drag).
  */
 
 const CloseMenu = createContext<() => void>(() => {});
@@ -60,6 +61,11 @@ export function Menu({
     panel.current?.querySelector<HTMLElement>("[role=menuitem]:not([disabled])")?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
+      // The panel sits at the end of the page: Tab closes it and hands focus back to its button.
+      if (e.key === "Tab") {
+        e.preventDefault();
+        close();
+      }
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         const items = [...(panel.current?.querySelectorAll<HTMLElement>("[role=menuitem]:not([disabled])") ?? [])];
         const i = items.indexOf(document.activeElement as HTMLElement);
@@ -142,7 +148,6 @@ export function MenuItem({
       type="button"
       role="menuitem"
       disabled={disabled}
-      aria-current={active || undefined}
       onClick={() => {
         close();
         onSelect();
@@ -154,7 +159,10 @@ export function MenuItem({
       )}
     >
       {icon && <span className="shrink-0 text-text-faint">{icon}</span>}
-      <span className="min-w-0 flex-1 truncate">{children}</span>
+      <span className="min-w-0 flex-1 truncate">
+        {children}
+        {active && <SrOnly> (current)</SrOnly>}
+      </span>
     </button>
   );
 }

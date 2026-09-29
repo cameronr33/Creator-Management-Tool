@@ -121,7 +121,7 @@ check("whoever has waited longest comes first; unknown dates last; ties by name"
 // NEGATIVE (run-through, 2026-09-29): Michael Dey came in from the sheet as Agreed; his emails say talks are paused, and
 // the Next line asked for his address. The flag asks a person instead — automation never moves backward.
 console.log("\n── Stage looks out of date (2026-09-29) ──");
-const flagFacts = { stage: "awaiting_address" as CmStage, emailStage: "in_conversation" as CmStage | null, emailStageAt: at(20) as Date | null, lastManualChangeAt: at(10) as Date | null, dismissedAt: null as Date | null };
+const flagFacts = { stage: "awaiting_address" as CmStage, emailStage: "in_conversation" as CmStage | null, emailStageAt: at(20) as Date | null, decidedAt: at(10) as Date | null, dismissedAt: null as Date | null };
 check("Agreed while the emails read as Talking → suggest Talking", staleStage(flagFacts) === "in_conversation");
 check("Finalizing while they read as Agreed → suggest Agreed", staleStage({ ...flagFacts, stage: "finalizing", emailStage: "awaiting_address" }) === "awaiting_address");
 check("Talking while they read as Contacted → suggest Contacted", staleStage({ ...flagFacts, stage: "in_conversation", emailStage: "contacted" }) === "contacted");
@@ -130,9 +130,10 @@ check("never before Talking", staleStage({ ...flagFacts, stage: "contacted", ema
 check("never the same or a later stage", staleStage({ ...flagFacts, emailStage: "awaiting_address" }) === null && staleStage({ ...flagFacts, emailStage: "fulfilling" }) === null);
 check("never suggests closing a deal", staleStage({ ...flagFacts, emailStage: "no_response" }) === null && staleStage({ ...flagFacts, emailStage: "declined" }) === null);
 check("never on a closed deal", staleStage({ ...flagFacts, stage: "no_response", emailStage: "in_conversation" }) === null);
-check("a person's stage change after that message wins", staleStage({ ...flagFacts, lastManualChangeAt: at(21) }) === null);
+check("a person's or a rule's stage change after that message wins", staleStage({ ...flagFacts, decidedAt: at(21) }) === null);
 check("'Keep' after that message stops asking…", staleStage({ ...flagFacts, dismissedAt: at(21) }) === null);
 check("…until a newer message reads differently", staleStage({ ...flagFacts, dismissedAt: at(19) }) === "in_conversation");
+check("never once a shipment exists", staleStage({ ...flagFacts, hasShipment: true }) === null);
 check("no verified line, no flag", staleStage({ ...flagFacts, emailStageAt: null }) === null && staleStage({ ...flagFacts, emailStage: null }) === null);
 const flaggedRow = place({ stage: "awaiting_address", staleStage: "in_conversation", staleStageAt: at(20) });
 check("Today lists it first, under Stage looks out of date", flaggedRow?.section === "check_stage" && flaggedRow.note === "Their emails read as Talking, not Agreed." && TODAY_SECTIONS[0].key === "check_stage", flaggedRow?.note ?? "");

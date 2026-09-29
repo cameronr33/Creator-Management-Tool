@@ -63,7 +63,7 @@ import { StatusNote } from "@/components/status-note";
 import { ArchiveControl, ArchiveLine, RestoreButton } from "@/components/archive";
 import { archiveActive } from "@/lib/archive-rules";
 import { staleStage, staleStageLine } from "@/lib/stage-flag";
-import { lastManualChangeAt } from "@/lib/email-ingest";
+import { lastStageDecisionAt } from "@/lib/email-ingest";
 import { StageFlagButtons } from "@/components/stage-flag";
 import { TrackingLink } from "@/components/tracking-link";
 import { OwnerPicker } from "@/components/owner-controls";
@@ -167,7 +167,8 @@ export default async function CreatorDetailPage({
     stage: partnership.stage,
     emailStage: partnership.emailStage,
     emailStageAt: partnership.emailStageAt,
-    lastManualChangeAt: (await lastManualChangeAt([partnership.id], { peopleOnly: true })).get(partnership.id) ?? null,
+    decidedAt: (await lastStageDecisionAt([partnership.id])).get(partnership.id) ?? null,
+    hasShipment: shipments.length > 0,
     dismissedAt: partnership.stageFlagDismissedAt,
   });
   const step = nextStep({

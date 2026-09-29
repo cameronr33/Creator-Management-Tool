@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cmPartnerships, type CmStage } from "@/lib/db/schema";
-import { lastManualChangeAt } from "@/lib/email-ingest";
+import { cmPartnerships, cmShipments, type CmStage } from "@/lib/db/schema";
+import { lastStageDecisionAt } from "@/lib/email-ingest";
 import { moveStage } from "@/lib/stage-moves";
 import { staleStage } from "@/lib/stage-flag";
 import { stageLabel } from "@/lib/stages";
@@ -33,11 +33,13 @@ export async function answerStageFlag(partnershipId: string, action: "move" | "k
     await db.update(cmPartnerships).set({ stageFlagDismissedAt: new Date() }).where(eq(cmPartnerships.id, partnershipId));
     return { ok: true, stage: p.stage };
   }
+  const [shipment] = await db.select({ id: cmShipments.id }).from(cmShipments).where(eq(cmShipments.partnershipId, partnershipId)).limit(1);
   const suggested = staleStage({
     stage: p.stage,
     emailStage: p.emailStage,
     emailStageAt: p.emailStageAt,
-    lastManualChangeAt: (await lastManualChangeAt([partnershipId], { peopleOnly: true })).get(partnershipId) ?? null,
+    decidedAt: (await lastStageDecisionAt([partnershipId])).get(partnershipId) ?? null,
+    hasShipment: !!shipment,
     dismissedAt: p.stageFlagDismissedAt,
   });
   if (!suggested) return { ok: false, error: "Nothing to move — the stage and their emails agree now" };

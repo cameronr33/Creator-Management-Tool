@@ -13,7 +13,7 @@
  * and a teammate removed leaves their deals unassigned. The shared users
  * table is only read — never written — by this check.
  */
-import { and, eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, isNull, like } from "drizzle-orm";
 import { db, schema } from "./db";
 import {
   addTeammate,
@@ -108,6 +108,16 @@ async function live() {
   const madeMembers: string[] = [];
   let brandLogin: string | null = null;
   const [preexisting] = await db.select({ id: schema.cmTeamMembers.id }).from(schema.cmTeamMembers).where(eq(schema.cmTeamMembers.userId, login.id));
+  // Review 2026-09-29: linking this login hands its old login-owned deals to the new
+  // member; deleting that member afterwards must hand them back, not leave them unowned.
+  const legacyBefore = (
+    await db
+      .select({ id: schema.cmPartnerships.id })
+      .from(schema.cmPartnerships)
+      .where(and(eq(schema.cmPartnerships.legacyOwnerUserId, login.id), isNull(schema.cmPartnerships.ownerId)))
+  ).map((r) => r.id);
+  let planted: string | null = null;
+  let plantedBack = false;
   const add = async (h: string, campaignId: string) => {
     const r = await createCreatorWithPartnership({ clientId: client.id, name: h, links: [`https://www.instagram.com/${h}`], campaignId, userId: login.id });
     creatorIds.push(r.creatorId);
@@ -120,6 +130,11 @@ async function live() {
     campaignB = await ensureCampaignByName(client.id, "__verify_owners_b__");
 
     console.log("\n── The team list ──");
+    if (!preexisting) {
+      planted = await add("__verify_owner_legacy", campaignA);
+      await db.update(schema.cmPartnerships).set({ ownerId: null, legacyOwnerUserId: login.id }).where(eq(schema.cmPartnerships.id, planted));
+      legacyBefore.push(planted);
+    }
     if (!preexisting && login.email) {
       // Added by hand with the login's email, before they ever signed in.
       const linked = await addTeammate({ name: "__verify Linked", email: login.email.toUpperCase() });
@@ -207,11 +222,21 @@ async function live() {
     madeMembers.splice(madeMembers.indexOf(kieran.id), 1);
     check("a teammate removed from the list leaves their deals unassigned", (await ownerOf(c)) === null && (await ownerOf(a)) === null);
   } finally {
+    if (madeMembers.length) await db.delete(schema.cmTeamMembers).where(inArray(schema.cmTeamMembers.id, madeMembers));
+    // Hand back what the test's member adopted (the FK left those deals with no owner).
+    if (!preexisting && legacyBefore.length) {
+      await db
+        .update(schema.cmPartnerships)
+        .set({ legacyOwnerUserId: login.id })
+        .where(and(inArray(schema.cmPartnerships.id, legacyBefore), isNull(schema.cmPartnerships.ownerId), isNull(schema.cmPartnerships.legacyOwnerUserId)));
+    }
+    if (planted) plantedBack = (await row(planted))?.legacyOwnerUserId === login.id;
     if (creatorIds.length) await db.delete(schema.cmCreators).where(inArray(schema.cmCreators.id, creatorIds));
     await db.delete(schema.cmCampaigns).where(inArray(schema.cmCampaigns.id, [campaignA, campaignB]));
     if (madeMembers.length) await db.delete(schema.cmTeamMembers).where(inArray(schema.cmTeamMembers.id, madeMembers));
     if (brandLogin) await db.delete(schema.cmClientUsers).where(eq(schema.cmClientUsers.id, brandLogin));
   }
+  if (planted) check("a login-owned deal the test's member adopted goes back to that login afterwards", plantedBack);
   check("test rows cleaned up", (await db.select().from(schema.cmCampaigns).where(inArray(schema.cmCampaigns.id, [campaignA, campaignB]))).length === 0);
   check(
     "no test teammates left, and the login is on the team only if it was before",

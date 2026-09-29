@@ -144,7 +144,7 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
               <StatusNote partnershipId={r.partnershipId} note={r.statusNote} editing={noteOpen} onEditingChange={setNoteOpen} hideWhenEmpty />
             </div>
           )}
-          {r.section === "get_address" && r.suggestedAddress && (
+          {(r.section === "get_address" || r.stageFlag?.beneath === "get_address") && r.suggestedAddress && (
             <p className="mt-1 text-xs text-text-muted">
               <MapPin size={12} className="mr-1 inline align-[-1px] text-text-faint" />
               Found in their email: <span className="font-medium text-text">{r.suggestedAddress}</span>
@@ -193,7 +193,13 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
 function NextAction({ row: r }: { row: TodayRow }) {
   switch (r.section) {
     case "check_stage":
-      return r.stageFlag ? <StageFlagButtons partnershipId={r.partnershipId} name={r.name} stage={r.stage} suggested={r.stageFlag.suggested} /> : null;
+      // Move / Keep first, then the row's own next step — a flagged creator who just wrote still gets "Open conversation".
+      return r.stageFlag ? (
+        <>
+          <StageFlagButtons partnershipId={r.partnershipId} name={r.name} stage={r.stage} suggested={r.stageFlag.suggested} />
+          {r.stageFlag.beneath && r.stageFlag.beneath !== "check_stage" && <NextAction row={{ ...r, section: r.stageFlag.beneath }} />}
+        </>
+      ) : null;
     case "your_turn":
       return (
         <>

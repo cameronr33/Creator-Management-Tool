@@ -19,8 +19,15 @@ export interface StageFlagFacts {
   emailStage: CmStage | null;
   /** When the message behind that was sent. */
   emailStageAt: Date | null;
-  /** The last time a person set the stage (not the email reader, a rule, the one-time clean-up, or a quick Undo). */
-  lastManualChangeAt: Date | null;
+  /**
+   * The last time a person or a rule set the stage (lastStageDecisionAt) — a
+   * contract or an address can know more than the emails do. The email
+   * reader's own moves, the one-time clean-up and a quick Undo don't count:
+   * the flag is how a person checks those.
+   */
+  decidedAt: Date | null;
+  /** Any shipment on file: moving back would leave it behind, so never ask. */
+  hasShipment?: boolean;
   /** "Keep …" pressed: the flag stays away until a newer message reads differently. */
   dismissedAt: Date | null;
 }
@@ -30,10 +37,10 @@ export function staleStage(f: StageFlagFacts): CmStage | null {
   if (!f.emailStage || !f.emailStageAt) return null;
   const current = canonicalStage(f.stage);
   const suggested = canonicalStage(f.emailStage);
-  if (!FLAGGABLE_STAGES.includes(current)) return null;
+  if (!FLAGGABLE_STAGES.includes(current) || f.hasShipment) return null;
   if (isTerminal(suggested) || stageIndex(suggested) >= stageIndex(current)) return null;
-  // A person's decision after that message wins, and so does "Keep" after it.
-  if (f.lastManualChangeAt && f.emailStageAt.getTime() <= f.lastManualChangeAt.getTime()) return null;
+  // A person's or a rule's move after that message wins, and so does "Keep" after it.
+  if (f.decidedAt && f.emailStageAt.getTime() <= f.decidedAt.getTime()) return null;
   if (f.dismissedAt && f.emailStageAt.getTime() <= f.dismissedAt.getTime()) return null;
   return suggested;
 }

@@ -100,6 +100,9 @@ function main() {
     check(`menu.tsx exports ${name}`, new RegExp(`export function ${name}\\b`).test(menu));
   }
   check("the menu renders outside clipping cards (a portal to document.body)", /createPortal\(/.test(menu) && /document\.body/.test(menu));
+  // Review 2026-09-29: the panel sits at the end of the page, so Tab would leave it open behind you.
+  check("Tab closes the menu and hands focus back to its button", /e\.key === "Tab"/.test(menu));
+  check("the current choice is told to screen readers in words (aria-current isn't for menu items)", !/aria-current/.test(menu) && /SrOnly/.test(menu));
   const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
   for (const token of ["--accent", "--accent-hover", "--good", "--warn", "--bad", "--info", "--sidebar-bg", "--brand-lime", "--text-faint"]) {
     check(`globals.css defines ${token}`, new RegExp(`${token}:`).test(css));

@@ -18,6 +18,7 @@ import { DEFAULT_THRESHOLDS } from "../src/lib/thresholds";
 import { restoreArchived, setArchived, getLastInboundStoredAt } from "../src/lib/archive";
 import { splitArchived } from "../src/lib/archive-rules";
 import { answerStageFlag } from "../src/lib/stage-flag-answer";
+import { moveStage } from "../src/lib/stage-moves";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail?: string) {
@@ -99,6 +100,8 @@ async function main() {
     const flagRow = async () => (await getTodayData({ clientId: client.id, campaignId })).rows.find((r) => r.partnershipId === dey);
     const f1 = await flagRow();
     check("Today asks, with the line from their emails", f1?.section === "check_stage" && f1.stageFlag?.suggested === "in_conversation" && f1.stageFlag.quote === "We can't move forward on that build", JSON.stringify(f1 && { s: f1.section, f: f1.stageFlag }));
+    // Review 2026-09-29: asking about the stage mustn't hide the row's own next step.
+    check("…and still knows the row's own next step (their address)", f1?.stageFlag?.beneath === "get_address", String(f1?.stageFlag?.beneath));
     const kept = await answerStageFlag(dey, "keep", "awaiting_address", null);
     check("Keep: the stage stays and Today stops asking", kept.ok && (await flagRow())?.section === "get_address");
     await db.update(schema.cmPartnerships).set({ emailStageAt: readAt(60_000) }).where(eq(schema.cmPartnerships.id, dey));
@@ -111,6 +114,27 @@ async function main() {
     check("Move: back to Talking, as a person's move with the reason and the line", moved2.ok && afterMove.stage === "in_conversation" && flagMove?.source === "manual" && (flagMove.meta as { quote?: string } | null)?.quote === "We can't move forward on that build");
     check("…and Today stops asking", (await flagRow())?.section !== "check_stage");
 
+    // Review 2026-09-29: the flag must not undo automation that knew more than the emails.
+    const flagged = async (h: string) => {
+      const id = await add(h);
+      await changeStage(id, "awaiting_address");
+      await db.update(schema.cmStageTransitions).set({ changedAt: new Date(Date.now() - 3_600_000) }).where(eq(schema.cmStageTransitions.partnershipId, id));
+      await db.update(schema.cmPartnerships).set({ emailStage: "in_conversation", emailStageQuote: "Let's talk about it", emailStageAt: readAt(-60_000) }).where(eq(schema.cmPartnerships.id, id));
+      return id;
+    };
+    const sectionOf = async (id: string) => (await getTodayData({ clientId: client.id, campaignId })).rows.find((r) => r.partnershipId === id)?.section;
+    const byRule = await flagged("__verify_td_flag_rule");
+    await moveStage({ partnershipId: byRule, to: "finalizing", source: "rule", expectFrom: "awaiting_address", reason: "an unsigned contract" });
+    check("a rule's move after that message wins (an unsigned contract moved them to Finalizing)", (await sectionOf(byRule)) !== "check_stage", String(await sectionOf(byRule)));
+    const byEmail = await flagged("__verify_td_flag_email");
+    await moveStage({ partnershipId: byEmail, to: "finalizing", source: "email", expectFrom: "awaiting_address", reason: "I'll be here when you're ready!" });
+    check("…but the email reader's own move doesn't: a person is still asked", (await sectionOf(byEmail)) === "check_stage", String(await sectionOf(byEmail)));
+    const shipping = await flagged("__verify_td_flag_ship");
+    await db.insert(schema.cmShipments).values({ partnershipId: shipping, status: "ready" });
+    check("never once a shipment exists (moved back from Ready to ship to fix the address)", (await sectionOf(shipping)) !== "check_stage", String(await sectionOf(shipping)));
+    const refused = await answerStageFlag(shipping, "move", "awaiting_address", null);
+    check("…and Move is refused there too", !refused.ok);
+
     console.log("\n── Archive ──");
     const put = await add("__verify_td_archive");
     await changeStage(put, "in_conversation");
@@ -120,6 +144,9 @@ async function main() {
     const todayNow = () => getTodayData({ clientId: client.id, campaignId });
     const t1 = await todayNow();
     check("an archived creator isn't on Today at all — and is counted", !t1.rows.some((r) => r.partnershipId === put) && t1.archivedCount === 1, `${t1.archivedCount}`);
+    // Review 2026-09-29: a campaign whose creators are all archived is "all caught up", not "no creators yet".
+    const onCampaign = (await getCreatorRows(client.id, { campaignId, withOutreach: false })).length;
+    check("…and still counts as a creator on the campaign", t1.totalCreators === onCampaign, `${t1.totalCreators} of ${onCampaign}`);
     const lists = async () => {
       const rows = await getCreatorRows(client.id, { campaignId, withOutreach: false });
       return splitArchived(rows, await getLastInboundStoredAt(rows.map((r) => r.partnershipId)));

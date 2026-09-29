@@ -10,7 +10,7 @@ import { statusNoteView, type StatusNoteView } from "@/lib/status-note";
 import { hiddenSummary, splitByView, type MemberId, type View } from "@/lib/owners";
 import { archiveWoke, splitArchived } from "@/lib/archive-rules";
 import { staleStage } from "@/lib/stage-flag";
-import { lastManualChangeAt } from "@/lib/email-ingest";
+import { lastStageDecisionAt } from "@/lib/email-ingest";
 import { getLastInboundStoredAt } from "@/lib/archive";
 
 /** One Today row — plain values only, so it can go straight to the client list. */
@@ -44,7 +44,8 @@ export interface TodayRow {
   /** "due" (first message) or "late" (video). */
   badge: "due" | "late" | null;
   /** Their emails read as an earlier stage (stage-flag.ts): what to suggest, and the line behind it. */
-  stageFlag: { suggested: CmStage; quote: string | null } | null;
+  /** Their emails read as an earlier stage; `beneath` is where the row would sit otherwise, so its own next step still shows. */
+  stageFlag: { suggested: CmStage; quote: string | null; beneath: TodaySection | null } | null;
   /** Back from the archive: because the reminder date came or they wrote, with who archived it and why. */
   backFromArchive: { why: "reminder" | "wrote"; by: string | null; reason: string | null } | null;
 }
@@ -79,7 +80,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
   const stageCounts: Partial<Record<CmStage, number>> = {};
   for (const c of creators) stageCounts[c.stage] = (stageCounts[c.stage] ?? 0) + 1;
   // "N of Kieran's not shown" counts only what Today would have listed — never their Posted or closed deals.
-  const base = { stageCounts, hiddenSummary: hiddenSummary(hidden.filter((h) => listedOnToday(h.stage))), totalCreators: all.length, archivedCount };
+  const base = { stageCounts, hiddenSummary: hiddenSummary(hidden.filter((h) => listedOnToday(h.stage))), totalCreators: everything.length, archivedCount };
   if (creators.length === 0) return { rows: [], ...base };
 
   const ids = creators.map((c) => c.partnershipId);
@@ -103,7 +104,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       .where(inArray(cmShipments.partnershipId, ids))
       .orderBy(desc(cmShipments.createdAt)),
     getStageSince(ids),
-    lastManualChangeAt(ids, { peopleOnly: true }),
+    lastStageDecisionAt(ids),
   ]);
   const detailById = new Map(details.map((d) => [d.id, d]));
   const latestShipment = new Map<string, (typeof shipments)[number]>();
@@ -116,11 +117,11 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       stage: c.stage,
       emailStage: c.emailStage,
       emailStageAt: c.emailStageAt,
-      lastManualChangeAt: decided.get(c.partnershipId) ?? null,
+      decidedAt: decided.get(c.partnershipId) ?? null,
+      hasShipment: latestShipment.has(c.partnershipId),
       dismissedAt: c.stageFlagDismissedAt,
     });
-    const placed = placeOnToday({
-      staleStage: suggested,
+    const facts = {
       staleStageAt: c.emailStageAt,
       stage: c.stage,
       whoseTurn: c.activity.whoseTurn,
@@ -135,8 +136,10 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       approvalAt: c.approvalAt,
       shippedAt: latestShipment.get(c.partnershipId)?.shippedAt ?? null,
       deliveredAt: latestShipment.get(c.partnershipId)?.deliveredAt ?? null,
-    });
+    };
+    const placed = placeOnToday({ ...facts, staleStage: suggested });
     if (!placed) continue;
+    const beneath = suggested ? (placeOnToday({ ...facts, staleStage: null })?.section ?? null) : null;
     const woke = archiveWoke({ ...c, lastInboundStoredAt: lastInbound.get(c.partnershipId) ?? null });
     const d = detailById.get(c.partnershipId);
     rows.push({
@@ -164,7 +167,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       since: placed.since?.toISOString() ?? null,
       badge: placed.badge,
       backFromArchive: woke ? { why: woke, by: c.archivedByName, reason: c.archiveReason } : null,
-      stageFlag: suggested ? { suggested, quote: c.emailStageQuote } : null,
+      stageFlag: suggested ? { suggested, quote: c.emailStageQuote, beneath } : null,
     });
   }
   return { rows: sortToday(rows), ...base };

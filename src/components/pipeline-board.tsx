@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Archive, ArrowRight, CalendarClock, Mail, MessageCircle, MoveRight, NotebookPen, X } from "lucide-react";
@@ -278,8 +278,13 @@ export function PipelineBoard({
   );
 }
 
-/** Keeps a click inside a card's controls from starting a drag. */
-const noDrag = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation(), draggable: false } as const;
+/**
+ * Marks a card's controls: a press that starts there (the owner chip, the ⋯
+ * button, the note, a panel's inputs) never drags the card. The browser drags
+ * the nearest draggable ancestor whatever the child says, so the card checks
+ * where the press began (review 2026-09-29).
+ */
+const noDrag = { "data-no-drag": "" } as const;
 
 function PipelineCard({
   card: c,
@@ -307,6 +312,7 @@ function PipelineCard({
   videoPrompt: React.ReactNode;
 }) {
   const router = useRouter();
+  const pressedOnControl = useRef(false);
   const [panel, setPanel] = useState<"move" | "log" | "archive" | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
   const href = `/creators/${c.partnershipId}?returnTo=/pipeline`;
@@ -315,7 +321,14 @@ function PipelineCard({
   return (
     <div
       draggable
+      onPointerDownCapture={(e) => {
+        pressedOnControl.current = e.target instanceof Element && !!e.target.closest("[data-no-drag]");
+      }}
       onDragStart={(e) => {
+        if (pressedOnControl.current || (e.target instanceof Element && e.target !== e.currentTarget && !!e.target.closest("[data-no-drag]"))) {
+          e.preventDefault();
+          return;
+        }
         e.dataTransfer.effectAllowed = "move";
         onDragStart();
       }}
