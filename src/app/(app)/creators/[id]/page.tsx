@@ -16,6 +16,7 @@ import {
   FlaskConical,
   User,
   TriangleAlert,
+  History as HistoryIcon,
 } from "lucide-react";
 import { getPartnershipDetail, getClients, getPhotoUrl, getCampaigns, getFollowUpThresholds } from "@/lib/queries";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
@@ -64,6 +65,8 @@ import { snoozeActive } from "@/lib/snooze-rules";
 import { TrackingLink } from "@/components/tracking-link";
 import { OwnerPicker } from "@/components/owner-controls";
 import { listTeammates } from "@/lib/owners";
+import { buildHistory, getStageHistory } from "@/lib/history";
+import { StageHistory } from "@/components/stage-history";
 import { statusNoteView } from "@/lib/status-note";
 
 /** Where the Next: line's link goes, named for where it lands. */
@@ -101,7 +104,7 @@ export default async function CreatorDetailPage({
 
   const { creator, partnership, campaign, socials, events, products, shipments, deliverables, outreach, otherPartnerships } =
     detail;
-  const [clients, creatorEmails, gmailAccount, undoable, photo, campaigns, contracts, teammates, thresholds] = await Promise.all([
+  const [clients, creatorEmails, gmailAccount, undoable, photo, campaigns, contracts, teammates, thresholds, historyRows] = await Promise.all([
     getClients(),
     getCreatorEmails(creator.id),
     getActiveGmailAccount(),
@@ -111,6 +114,7 @@ export default async function CreatorDetailPage({
     listContracts(partnership.id),
     listTeammates(),
     getFollowUpThresholds(creator.clientId),
+    getStageHistory(partnership.id),
   ]);
 
   // Contracts and their email: where they disagree with what's recorded (blanks were filled already).
@@ -141,6 +145,9 @@ export default async function CreatorDetailPage({
     for (const d of dealDifferences(dealNow, emailDeal.facts, { dismissed })) if (!differences.some((x) => x.label === d.label && (x.key === d.key || d.label !== "Product"))) differences.push({ ...d, from: "Their email" });
   }
   const client = clients.find((item) => item.id === creator.clientId);
+  const history = buildHistory(historyRows, { clientName: client?.name ?? "the client", undoableId: undoable.get(partnership.id)?.id ?? null });
+  // "· by Kieran" on what a teammate logged by hand.
+  const teammateNames = new Map(teammates.map((t) => [t.id, t.name]));
 
   const hasAddress = !!(partnership.addressLine1 && partnership.city && partnership.region && partnership.postalCode);
   // Snoozed off Today? The same rule Today uses, over the messages already loaded.
@@ -317,6 +324,7 @@ export default async function CreatorDetailPage({
             ["agreement", "Deal"],
             ["shipping", "Shipping"],
             ["content", "Content"],
+            ["history", "History"],
             ["profile", "Profile"],
           ].map(([key, label]) => (
             <a key={key} href={`#${key}`} className="text-text-muted hover:text-accent">
@@ -372,14 +380,14 @@ export default async function CreatorDetailPage({
                             <summary className="cursor-pointer text-xs font-medium text-text-muted hover:text-accent">Show {earlier.length} earlier</summary>
                             <ul className="mt-3 space-y-3">
                               {earlier.map((e) => (
-                                <TimelineEvent key={e.id} e={e} clientName={client?.name ?? "the client"} />
+                                <TimelineEvent key={e.id} e={e} clientName={client?.name ?? "the client"} names={teammateNames} />
                               ))}
                             </ul>
                           </details>
                         </li>
                       )}
                       {recent.map((e) => (
-                        <TimelineEvent key={e.id} e={e} clientName={client?.name ?? "the client"} />
+                        <TimelineEvent key={e.id} e={e} clientName={client?.name ?? "the client"} names={teammateNames} />
                       ))}
                     </ul>
                   </section>
@@ -509,6 +517,19 @@ export default async function CreatorDetailPage({
           </div>
         </Card>
 
+        {/* Stage history — every move, who or what made it; folded */}
+        <Card id="history" className="scroll-mt-4 p-4">
+          <details>
+            <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-text">
+              <HistoryIcon size={14} /> Stage history{history.length ? ` (${history.length})` : ""}
+              <span className="text-xs font-normal text-text-muted">Every move, who or what made it, and anything undone</span>
+            </summary>
+            <div className="mt-4">
+              <StageHistory partnershipId={partnership.id} items={history} />
+            </div>
+          </details>
+        </Card>
+
         {/* Profile — folded unless something's missing */}
         <Card id="profile" className="scroll-mt-4 p-4">
           <details open={!creator.profileUrl}>
@@ -575,8 +596,10 @@ export default async function CreatorDetailPage({
   );
 }
 
-function TimelineEvent({ e, clientName }: { e: CmOutreachEvent; clientName: string }) {
+function TimelineEvent({ e, clientName, names }: { e: CmOutreachEvent; clientName: string; names: Map<string, string> }) {
   const inbound = e.direction === "inbound";
+  // Logged in the app by a teammate (never on mail the mailbox holds or rows from the old sheet).
+  const loggedBy = !e.externalId && !e.isMigrated && e.createdBy ? names.get(e.createdBy) ?? null : null;
   const fromClient = e.senderRole === "client";
   const label = e.fromAddress
     ? null
@@ -605,6 +628,7 @@ function TimelineEvent({ e, clientName }: { e: CmOutreachEvent; clientName: stri
           )}
           <span className="text-xs text-text-faint">
             {e.isMigrated ? "date not recorded" : `${shortDate(e.occurredAt)} · ${relativeDays(e.occurredAt)}`} · {channelLabel(e.channel)}
+            {loggedBy && ` · by ${loggedBy}`}
           </span>
           {fromClient ? (
             <Badge tone="info">From {clientName}</Badge>

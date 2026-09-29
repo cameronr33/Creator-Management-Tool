@@ -5,6 +5,7 @@ export const CREATOR_SECTIONS = [
   { value: "agreement", label: "Deal" },
   { value: "shipping", label: "Shipping" },
   { value: "content", label: "Content" },
+  { value: "history", label: "History" },
   { value: "profile", label: "Profile" },
 ] as const;
 

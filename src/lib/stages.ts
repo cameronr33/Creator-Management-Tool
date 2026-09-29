@@ -263,6 +263,22 @@ export const AUTO_TRIGGER_LABELS: Record<AutoStageTrigger, string> = {
   deliverable_added: "a posted video is added",
 };
 
+/**
+ * The same triggers after the fact, for a creator's stage history ("By itself
+ * when they replied"). Typed by the trigger union, so a new rule can't ship
+ * without its line (src/lib/history.ts).
+ */
+export const AUTO_TRIGGER_PAST: Record<AutoStageTrigger, string> = {
+  outbound_message: "a first message went out",
+  inbound_message: "they replied",
+  address_complete: "their full shipping address was saved",
+  contract_unsigned: "a contract came in that wasn't signed yet",
+  deal_ready: "the deal was signed with the address on file",
+  shipment_shipped: "it was marked shipped",
+  shipment_delivered: "it was marked delivered",
+  deliverable_added: "a posted video was added",
+};
+
 /** Tailwind classes per group — semantic tokens only, never raw palette colours. */
 export const STAGE_GROUP_STYLES: Record<StageGroup, string> = {
   outreach: "bg-info-soft text-info ring-info-line",
