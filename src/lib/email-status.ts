@@ -98,8 +98,8 @@ export interface PromptMessage {
   eventId: string;
   occurredAt: Date;
   channel: string;
-  /** False for email a teammate logged by hand (from their own inbox) — not a message the mailbox holds. */
-  synced?: boolean;
+  /** True only for a message the connected mailbox holds; false for anything a teammate logged by hand. Required, so no caller can forget it. */
+  synced: boolean;
   direction: "inbound" | "outbound";
   senderRole: "team" | "creator" | "client" | "other" | null;
   kind: string;
@@ -165,9 +165,9 @@ Return:
             : "from the creator";
     const channel =
       m.channel === "email"
-        ? m.synced === false
-          ? "Email logged by a teammate (from their own inbox — text may be missing)"
-          : "Email"
+        ? m.synced
+          ? "Email"
+          : "Email logged by a teammate (from their own inbox — text may be missing)"
         : m.channel === "ig_dm"
           ? m.body
             ? "Instagram DM logged by a teammate (their summary, not the creator's words)"
@@ -177,7 +177,7 @@ Return:
     const kind =
       m.kind !== "note" || m.senderRole === "client"
         ? ""
-        : m.channel === "email" && m.synced !== false
+        : m.channel === "email" && m.synced
           ? " · calendar invite / automatic message"
           : " · a teammate's internal note";
     const subject = m.subject ? `\nSubject: ${m.subject}` : "";
@@ -248,7 +248,8 @@ export function isCreatorsOwn(m: Pick<PromptMessage, "direction" | "senderRole" 
  * fill the deal.
  */
 export function fromMailbox(m: Pick<PromptMessage, "channel" | "synced">): boolean {
-  return m.channel === "email" && m.synced !== false;
+  // Fails closed: only a message positively known to be in the mailbox.
+  return m.channel === "email" && m.synced === true;
 }
 
 /** Pure: an address the creator wrote in their own message, or null. */
@@ -433,7 +434,7 @@ async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentCont
     eventId: e.id,
     occurredAt: e.occurredAt,
     channel: e.channel,
-    synced: e.channel === "email" ? !!e.externalId : undefined,
+    synced: e.channel === "email" && !!e.externalId,
     direction: e.direction,
     senderRole: (e.senderRole as PromptMessage["senderRole"]) ?? (e.direction === "outbound" ? "team" : "creator"),
     kind: e.kind,
@@ -456,7 +457,7 @@ async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentCont
       messages,
     },
     // Only mail the mailbox holds counts — an email logged by hand has nothing to read.
-    hasEmail: messages.some((m) => m.channel === "email" && m.synced),
+    hasEmail: messages.some(fromMailbox),
     latestAt: latest?.occurredAt ?? null,
     dealEditedAt: p.dealEditedAt,
   };

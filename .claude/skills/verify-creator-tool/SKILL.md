@@ -85,15 +85,19 @@ What the scripts anchor:
 - **undo** — the planner matrix (who, ten minutes, once, never synced mail,
   never after the stage or shipment changed) and the four quick buttons there
   and back, a created shipment, undo B then A, a doubled click; a change
-  landing between the checks and the write leaves nothing written; with two
-  shipments only the pressed one changes; the email reader still respects a
-  quick Undo; a tracking number saved later keeps the ship date; the portal's
-  presses are never undoable.
+  landing between the checks and the write (a stage move, a bounce away and
+  back, a tracking number, a status) leaves nothing written; with two
+  shipments only the rows the press touched change (the pressed one, and one
+  its move to Shipped marked); the email reader still respects a quick Undo;
+  a tracking number saved later keeps the ship date; the portal's presses are
+  never undoable.
 - **history** — every move's line (added, a person, a rule and what set it
   off, the email reader, a client's pass, the stage clean-up) and undo folded
   into the move it undid, read back with names.
 - **owners** — Mine / Everyone, take never steals, assigning checks the
-  teammate exists, the owner survives a campaign move, Today's hidden counts.
+  teammate exists, the owner survives a campaign move, Today's hidden counts
+  (only what Today would list), and the Creators list's search and empty
+  states on Mine.
 - **photos** — Instagram hosts only, image type from the bytes (never SVG),
   size cap, the refresh → store → cascade round trip, name-only creators skipped.
 - **csv-import** — header aliases, one spelling per campaign, preview writes
@@ -103,7 +107,8 @@ What the scripts anchor:
   between campaigns (conflicts skipped), deleting a campaign.
 - **access** — every API handler calls a guard (agency, portal, cron, or the
   invite token for `/api/invite` only), portal routes never read the agency's
-  client cookie, every agency server action refuses a client login.
+  client cookie, every agency server action refuses a client login, and only
+  the three cookie modules anywhere in `src` read a cookie.
 - **client-users / approvals / portal** — invites work once and expire, only
   the hash is stored; approvals only for the right brand and only what's
   waiting; the portal returns exactly the agreed fields and never a planted

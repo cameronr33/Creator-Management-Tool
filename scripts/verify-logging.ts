@@ -95,6 +95,7 @@ function pure() {
     eventId: String(n),
     occurredAt: new Date("2026-09-20T12:00:00Z"),
     channel: "email",
+    synced: true,
     direction: "inbound",
     senderRole: "creator",
     kind: "reply",
@@ -115,7 +116,7 @@ function pure() {
     messages: [
       msg(1, { synced: true }),
       msg(2, { synced: false, direction: "outbound", senderRole: "team", kind: "follow_up", body: null }),
-      msg(3, { channel: "other", direction: "outbound", senderRole: "team", kind: "note", body: "Called — they want the red one" }),
+      msg(3, { channel: "other", synced: false, direction: "outbound", senderRole: "team", kind: "note", body: "Called — they want the red one" }),
       msg(4, { synced: true, senderRole: "other", kind: "note", body: "Invitation: call" }),
     ],
   });
@@ -149,7 +150,7 @@ function pure() {
   const decide = (m: PromptMessage) =>
     decideEmailMove({ current: "awaiting_address", assessment: reading, messages: [m], lastManualChangeAt: null, hasAddress: false, shipmentStatuses: [], automove: true });
   const handEmail = msg(1, { synced: false, body: `${words} https://www.instagram.com/reel/__verify_lg/` });
-  const handDm = msg(1, { channel: "ig_dm", synced: undefined, body: `${words} https://www.instagram.com/reel/__verify_lg/` });
+  const handDm = msg(1, { channel: "ig_dm", synced: false, body: `${words} https://www.instagram.com/reel/__verify_lg/` });
   const mailbox = msg(1, { synced: true, body: `${words} https://www.instagram.com/reel/__verify_lg/` });
   check("an email logged by hand can't be quoted to move the stage", decide(handEmail).move === null);
   check("…nor a DM logged with text", decide(handDm).move === null);

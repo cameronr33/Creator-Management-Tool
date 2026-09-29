@@ -24,8 +24,14 @@ export interface TeammateOption {
  */
 export function OwnerSlot({ partnershipId, owner, meId }: { partnershipId: string; owner: OwnerInfo | null; meId: string | null }) {
   const { pending, run } = useSave();
-  // Yours from the moment it's taken, until the refreshed page shows your chip (review, 2026-09-28).
+  // Yours from the moment it's taken, until the refreshed page shows your chip (review, 2026-09-28) —
+  // and reset whenever the owner changes, so a deal handed back to nobody offers Take it again.
   const [claimed, setClaimed] = useState(false);
+  const [seenOwner, setSeenOwner] = useState(owner?.id ?? null);
+  if ((owner?.id ?? null) !== seenOwner) {
+    setSeenOwner(owner?.id ?? null);
+    setClaimed(false);
+  }
   if (owner) return <OwnerChip label={owner.label} name={owner.name} mine={owner.id === meId} />;
   return (
     <ChipButton

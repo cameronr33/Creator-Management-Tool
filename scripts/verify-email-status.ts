@@ -53,7 +53,7 @@ const EXPECTED: Partial<Record<CmStage, CmStage[]>> = {
 
 const day = (n: number) => new Date(Date.UTC(2026, 8, n, 12));
 function m(n: number, over: Partial<PromptMessage>): PromptMessage {
-  return { n, eventId: `e${n}`, occurredAt: day(n), channel: "email", direction: "inbound", senderRole: "creator", kind: "reply", from: null, subject: null, body: null, ...over };
+  return { n, eventId: `e${n}`, occurredAt: day(n), channel: "email", synced: true, direction: "inbound", senderRole: "creator", kind: "reply", from: null, subject: null, body: null, ...over };
 }
 const convo: PromptMessage[] = [
   m(1, { direction: "outbound", senderRole: "team", kind: "initial", body: "Would you like to work with HELLA on a lighting install video?" }),

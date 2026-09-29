@@ -1,6 +1,6 @@
 import { MineToggle } from "@/components/mine-toggle";
 import { getSelectedView } from "@/lib/view-cookie";
-import { chipLabels, hiddenSummary, listTeammates, splitForList } from "@/lib/owners";
+import { chipLabels, emptyListMessage, listTeammates, listViewLine, splitForList } from "@/lib/owners";
 import { requireAgencyPage } from "@/lib/page-guards";
 import type { Metadata } from "next";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
@@ -52,8 +52,9 @@ export default async function CreatorsPage({
         (r.businessEmail ?? "").toLowerCase().includes(q)
     : null;
   // The search looks through teammates' too, so their match is mentioned rather than lost.
-  const { rows, total, hidden } = splitForList(scoped, view, meId, matches);
-  const hiddenLine = hiddenSummary(hidden, { matching: !!q });
+  const { rows, total, hidden, hiddenAll } = splitForList(scoped, view, meId, matches);
+  const hiddenLine = listViewLine({ searching: !!q, hiddenAll, hiddenMatching: hidden });
+  const empty = emptyListMessage({ searching: !!q, total, hiddenAll, hiddenMatching: hidden });
 
   const addButton = (
     <Button href="/creators/new" variant="primary" icon={<Plus size={15} />}>
@@ -85,18 +86,22 @@ export default async function CreatorsPage({
         <CreatorsFilterBar />
       </PageHeader>
       <div className="p-4 sm:p-6">
-        {rows.length === 0 && hidden.length > 0 ? (
-          <EmptyState title={q ? "None of yours match" : "Nothing of yours here"} hint={`${hiddenLine} — switch to Everyone to see them.`} />
-        ) : rows.length === 0 ? (
+        {rows.length === 0 ? (
           <EmptyState
-            title={total === 0 ? (campaign ? `No creators in ${campaign.name} yet` : "No creators yet") : "No creators match"}
-            hint={
-              total === 0
-                ? "Import a CSV with their names and a Campaign column, or add one by pasting their profile link."
-                : "Try clearing the search or the stage filter."
+            title={
+              empty.kind === "teammates_match"
+                ? "None of yours match"
+                : empty.kind === "only_teammates"
+                  ? "Nothing of yours here"
+                  : empty.kind === "no_match"
+                    ? "No creators match"
+                    : campaign
+                      ? `No creators in ${campaign.name} yet`
+                      : "No creators yet"
             }
+            hint={empty.hint}
             action={
-              total === 0 ? (
+              empty.kind === "empty" ? (
                 <div className="flex gap-2">
                   {importButton}
                   {addButton}

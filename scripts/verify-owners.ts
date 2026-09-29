@@ -10,7 +10,7 @@
  */
 import { eq, inArray } from "drizzle-orm";
 import { db, schema } from "./db";
-import { chipLabels, hiddenSummary, inView, parseView, setOwner, splitByView, splitForList, takeUnassigned } from "../src/lib/owners";
+import { chipLabels, emptyListMessage, hiddenSummary, inView, listViewLine, parseView, setOwner, splitByView, splitForList, takeUnassigned } from "../src/lib/owners";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 import { moveToCampaign } from "../src/lib/campaigns";
 import { getCreatorRows } from "../src/lib/queries";
@@ -54,6 +54,15 @@ function pure() {
   check("a search on Mine looks through teammates' too, and says so", bob.rows.length === 0 && bob.total === 2 && hiddenSummary(bob.hidden, { matching: true }) === "2 of Kieran's also match");
   const plain = splitForList(people, "mine", me, null);
   check("…without a search it's the plain split", plain.rows.length === 2 && plain.total === 2 && hiddenSummary(plain.hidden) === "2 of Kieran's not shown");
+  // NEGATIVE (second review, 2026-09-28): on Mine with none of your own, a search with no match said "No creators yet" and dropped the hidden count.
+  const kierans = Array.from({ length: 7 }, (_, i) => ({ ownerId: "k", ownerName: "Kieran Lee", name: `K${i}` }));
+  const zzz = splitForList(kierans, "mine", me, (r) => r.name.includes("zzz"));
+  check("a search that matches nothing says so — not 'no creators yet'", emptyListMessage({ searching: true, total: zzz.total, hiddenAll: zzz.hiddenAll, hiddenMatching: zzz.hidden }).kind === "no_match");
+  check("…and still says how many of Kieran's aren't shown", listViewLine({ searching: true, hiddenAll: zzz.hiddenAll, hiddenMatching: zzz.hidden }) === "7 of Kieran's not shown");
+  const noSearch = splitForList(kierans, "mine", me, null);
+  check("without a search: nothing of yours, and whose there are", emptyListMessage({ searching: false, total: noSearch.total, hiddenAll: noSearch.hiddenAll, hiddenMatching: noSearch.hidden }).kind === "only_teammates");
+  check("a search matching only theirs points to Everyone", emptyListMessage({ searching: true, total: bob.total, hiddenAll: bob.hiddenAll, hiddenMatching: bob.hidden }).kind === "teammates_match" && listViewLine({ searching: true, hiddenAll: bob.hiddenAll, hiddenMatching: bob.hidden }) === "2 of Kieran's also match");
+  check("truly empty is 'no creators yet'", emptyListMessage({ searching: false, total: 0, hiddenAll: [], hiddenMatching: [] }).kind === "empty");
 
   console.log("\n── Owner chips (pure) ──");
   const labels = chipLabels([

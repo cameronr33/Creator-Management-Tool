@@ -59,7 +59,22 @@ function cookieGetters(src: string): string[] {
 }
 
 /** The only modules that may read a cookie at all — anything new must be looked at and added here and to COOKIE_SCOPED. */
-const COOKIE_MODULES = new Set(["campaigns.ts", "client-cookie.ts", "view-cookie.ts"]);
+const COOKIE_MODULES = new Set(["lib/campaigns.ts", "lib/client-cookie.ts", "lib/view-cookie.ts"]);
+
+/** Every .ts/.tsx file under a folder. */
+function sourceFiles(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) sourceFiles(p, out);
+    else if (/\.tsx?$/.test(name)) out.push(p);
+  }
+  return out;
+}
+
+/** Files (paths relative to src) that call cookies() and aren't one of the cookie modules. */
+function strayCookieReaders(files: { rel: string; src: string }[]): string[] {
+  return files.filter((f) => /\bcookies\(\)/.test(code(f.src)) && !COOKIE_MODULES.has(f.rel)).map((f) => f.rel);
+}
 
 function main() {
   console.log("\n── Every API route states who may call it ──");
@@ -139,9 +154,14 @@ function main() {
   check("the Mine / Everyone view cookie is one of them", cookieGetters(readFileSync(join(SRC, "lib", "view-cookie.ts"), "utf8")).includes("getSelectedView"));
   const cachedProbe = cookieGetters("export const getOwnerFilter = cache(async () => {\n  return (await cookies()).get(\"x\");\n});\nexport function other() { return 1; }");
   check("…a getter written as `export const x = cache(async …)` is seen too", cachedProbe.length === 1 && cachedProbe[0] === "getOwnerFilter");
-  const readers = libFiles.filter((f) => /\bcookies\(\)/.test(code(readFileSync(join(SRC, "lib", f), "utf8"))));
-  const strays = readers.filter((f) => !COOKIE_MODULES.has(f));
-  check(`only the known cookie modules read cookies (${[...COOKIE_MODULES].join(", ")})`, strays.length === 0 && readers.length > 0, strays.join(", "));
+  // Second review (2026-09-28): over all of src — app routes, pages, .tsx and lib subfolders — not just src/lib/*.ts.
+  const everyFile = sourceFiles(SRC).map((p) => ({ rel: relative(SRC, p).split(sep).join("/"), src: readFileSync(p, "utf8") }));
+  const strays = strayCookieReaders(everyFile);
+  check(`only the known cookie modules in all of src (${everyFile.length} files) read cookies`, strays.length === 0 && everyFile.some((f) => COOKIE_MODULES.has(f.rel)), strays.join(", "));
+  check(
+    "…and that check catches a route or page reading one itself",
+    strayCookieReaders([{ rel: "app/api/client/x/route.ts", src: "export async function POST() { const c = await cookies(); }" }, { rel: "app/(app)/page.tsx", src: "const v = (await cookies()).get('x');" }]).length === 2,
+  );
   check("…and a cookie mentioned only in a comment doesn't count", !/\bcookies\(\)/.test(code("/** rejects later cookies() calls */\n// cookies() here too\nexport const a = 1;")));
 
   console.log("\n── A client login is re-checked every time ──");

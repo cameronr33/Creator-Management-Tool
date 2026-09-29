@@ -85,16 +85,42 @@ export function hiddenSummary(hidden: { ownerName: string | null }[], opts: { ma
 /**
  * Pure: a list on a view, with an optional search. The search looks through
  * the hidden rows too, so a teammate's match is mentioned instead of "no
- * creators match". `total` is how many the view shows before searching.
+ * creators match". `total` is how many the view shows before searching;
+ * `hidden` the hidden ones that match (all of them without a search);
+ * `hiddenAll` every hidden one.
  */
 export function splitForList<T extends { ownerId: string | null; ownerName: string | null }>(
   rows: T[],
   view: View,
   userId: string | null | undefined,
   matches: ((r: T) => boolean) | null,
-): { rows: T[]; total: number; hidden: T[] } {
+): { rows: T[]; total: number; hidden: T[]; hiddenAll: T[] } {
   const { shown, hidden } = splitByView(rows, view, userId);
-  return matches ? { rows: shown.filter(matches), total: shown.length, hidden: hidden.filter(matches) } : { rows: shown, total: shown.length, hidden };
+  return matches
+    ? { rows: shown.filter(matches), total: shown.length, hidden: hidden.filter(matches), hiddenAll: hidden }
+    : { rows: shown, total: shown.length, hidden, hiddenAll: hidden };
+}
+
+type Owned = { ownerName: string | null };
+
+/** Pure: the list's "(…)" line on Mine — teammates' matches when searching, else how many of theirs aren't shown. */
+export function listViewLine(o: { searching: boolean; hiddenAll: Owned[]; hiddenMatching: Owned[] }): string | null {
+  return o.searching && o.hiddenMatching.length ? hiddenSummary(o.hiddenMatching, { matching: true }) : hiddenSummary(o.hiddenAll);
+}
+
+/**
+ * Pure: why nothing is listed (second review, 2026-09-28 — a search with no
+ * match on Mine said "No creators yet"): only teammates' match, nothing
+ * matches, nothing of yours at all, or truly none yet.
+ */
+export function emptyListMessage(o: { searching: boolean; total: number; hiddenAll: Owned[]; hiddenMatching: Owned[] }): {
+  kind: "teammates_match" | "no_match" | "only_teammates" | "empty";
+  hint: string;
+} {
+  if (o.searching && o.hiddenMatching.length) return { kind: "teammates_match", hint: `${hiddenSummary(o.hiddenMatching, { matching: true })} — switch to Everyone to see them.` };
+  if (o.searching || o.total > 0) return { kind: "no_match", hint: "Try clearing the search or the stage filter." };
+  if (o.hiddenAll.length) return { kind: "only_teammates", hint: `${hiddenSummary(o.hiddenAll)} — switch to Everyone to see them.` };
+  return { kind: "empty", hint: "Import a CSV with their names and a Campaign column, or add one by pasting their profile link." };
 }
 
 /** Everyone with a Sentic login — id and name only (never the email or password hash). */

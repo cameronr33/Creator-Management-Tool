@@ -59,7 +59,7 @@ function pure() {
     userId: me,
     now: new Date(T0.getTime() + 5_000),
     event: { externalId: null },
-    transition: { id: "t1", fromStage: "shortlisted", toStage: "contacted", undoneAt: null, meta: {} },
+    transition: { id: "t1", fromStage: "shortlisted", toStage: "contacted", undoneAt: null, meta: {}, changedAt: T0 },
     latestRealMoveId: "t1",
     stage: "contacted",
     shipment: null,
@@ -85,14 +85,14 @@ function pure() {
   check("the press's move is gone or undone some other way: refused", err({}, { transition: null }) === UNDO_MESSAGES.stageMoved && err({}, { transition: { ...st.transition!, undoneAt: T0 } }) === UNDO_MESSAGES.stageMoved);
   const noMove = plan({ transitionId: null }, { transition: null, latestRealMoveId: "t9" });
   check("a press that moved nothing: only the message goes", noMove.ok && noMove.moveBack === null && noMove.backTo === null && noMove.deleteEvent);
-  const reason = plan({}, { transition: { id: "t1", fromStage: "no_response", toStage: "in_conversation", undoneAt: null, meta: { priorExitReason: "went_dark" } }, stage: "in_conversation" });
+  const reason = plan({}, { transition: { id: "t1", fromStage: "no_response", toStage: "in_conversation", undoneAt: null, meta: { priorExitReason: "went_dark" }, changedAt: T0 }, stage: "in_conversation" });
   check("back to No response brings its reason back", reason.ok && reason.moveBack?.to === "no_response" && reason.moveBack.exitReason === "went_dark");
   check("back to an open stage carries no exit reason", ok.ok && ok.moveBack?.exitReason === null);
 
   console.log("\n── The shipment must be as the press left it ──");
   const snap = (x: Partial<ShipmentSnapshot>): ShipmentSnapshot => ({ status: "shipped", carrier: null, trackingNumber: null, shippedAt: "2026-09-28T12:00:00.000Z", deliveredAt: null, notes: null, updatedAt: "2026-09-28T12:00:00.500Z", ...x });
   const ship: Partial<QuickActionFacts> = { kind: "shipment", outreachEventId: null, shipmentId: "s1", prior: snap({ status: "ready", shippedAt: null, updatedAt: "2026-09-27T10:00:00.000Z" }), applied: snap({}) };
-  const shipState: Partial<UndoState> = { event: null, transition: { id: "t1", fromStage: "fulfilling", toStage: "shipped", undoneAt: null, meta: {} }, stage: "shipped", shipment: snap({}) };
+  const shipState: Partial<UndoState> = { event: null, transition: { id: "t1", fromStage: "fulfilling", toStage: "shipped", undoneAt: null, meta: {}, changedAt: T0 }, stage: "shipped", shipment: snap({}) };
   const s1 = plan(ship, shipState);
   check(
     "untouched since: put back as it was, and only if it's still as the press left it",
@@ -101,11 +101,16 @@ function pure() {
   check("tracking added since: refused", err(ship, { ...shipState, shipment: snap({ trackingNumber: "1Z", updatedAt: "2026-09-28T12:03:00.000Z" }) }) === UNDO_MESSAGES.shipmentChanged);
   check("the shipment is gone: refused", err(ship, { ...shipState, shipment: null }) === UNDO_MESSAGES.shipmentChanged);
   const created: Partial<QuickActionFacts> = { ...ship, prior: null, createdShipment: true };
-  const atAgreed: Partial<UndoState> = { ...shipState, transition: { id: "t1", fromStage: "awaiting_address", toStage: "shipped", undoneAt: null, meta: {} } };
+  const atAgreed: Partial<UndoState> = { ...shipState, transition: { id: "t1", fromStage: "awaiting_address", toStage: "shipped", undoneAt: null, meta: {}, changedAt: T0 } };
   const gone = plan(created, atAgreed);
   check("a shipment the press created goes, when the stage no longer needs one", gone.ok && gone.shipment?.mode === "delete");
   const kept = plan(created, { ...atAgreed, shipment: snap({ trackingNumber: "1Z" }) });
   check("…unless it has tracking: then it stays, back to not sent yet", kept.ok && kept.shipment?.mode === "restore" && kept.shipment.to.status === "ready");
+  // Second review (2026-09-28): the press's own move to Shipped also marks "the latest shipment" — that one goes back too.
+  const side = plan(ship, { ...shipState, transition: { ...(shipState.transition as NonNullable<UndoState["transition"]>), meta: { markedShippedId: "s2" } } });
+  check("a second shipment the press's move marked shipped is put back too", side.ok && side.alsoUnmark?.id === "s2" && side.alsoUnmark.markedAt === T0.toISOString());
+  const same = plan(ship, { ...shipState, transition: { ...(shipState.transition as NonNullable<UndoState["transition"]>), meta: { markedShippedId: "s1" } } });
+  check("…but not the pressed one twice", same.ok && same.alsoUnmark === null);
 }
 
 async function live() {
@@ -302,6 +307,70 @@ async function live() {
       "with two shipments, only the one pressed is put back; the other is untouched",
       !!undoTwo?.ok && (await stageOf(two)) === "shipped" && olderNow?.status === "shipped" && olderNow.deliveredAt === null && newerNow?.status === "ready" && newerNow.shippedAt === null,
       JSON.stringify({ undoTwo, older: olderNow?.status, newer: newerNow?.status, newerShipped: newerNow?.shippedAt }),
+    );
+
+    // NEGATIVE (second review, 2026-09-28): with two "ready" shipments, the press's move to Shipped marked the newer one too — and Undo left it shipped.
+    const tr2 = await add("__verify_un_two_ready");
+    await changeStage(tr2, "fulfilling", me.id);
+    const [firstShip] = await shipmentsOf(tr2);
+    await db.insert(schema.cmShipments).values({ partnershipId: tr2, status: "ready" });
+    const pressTr2 = await recordShipment({ id: firstShip.id, partnershipId: tr2, status: "shipped" }, agency);
+    const bothShipped = (await shipmentsOf(tr2)).every((x) => x.status === "shipped");
+    const undoTr2 = pressTr2.ok && pressTr2.undo ? await undoQuickAction(pressTr2.undo.actionId, me.id) : null;
+    const afterTr2 = await shipmentsOf(tr2);
+    check(
+      "with two shipments, the one the stage move marked shipped goes back too",
+      bothShipped && !!undoTr2?.ok && (await stageOf(tr2)) === "fulfilling" && afterTr2.length === 2 && afterTr2.every((x) => x.status === "ready" && x.shippedAt === null),
+      JSON.stringify({ bothShipped, undoTr2, after: afterTr2.map((x) => x.status) }),
+    );
+
+    // NEGATIVE (second review): the write only compared status and dates, so a tracking number saved in the gap slipped through.
+    const tg = await add("__verify_un_gap_tracking");
+    await changeStage(tg, "fulfilling", me.id);
+    const [shipTg] = await shipmentsOf(tg);
+    const pressTg = await recordShipment({ id: shipTg.id, partnershipId: tg, status: "shipped" }, agency);
+    const racedTg =
+      pressTg.ok && pressTg.undo
+        ? await undoQuickAction(pressTg.undo.actionId, me.id, new Date(), {
+            beforeWrite: async () => void (await recordShipment({ id: shipTg.id, partnershipId: tg, status: "shipped", trackingNumber: "1ZGAP" }, agency)),
+          })
+        : null;
+    const [afterTg] = await shipmentsOf(tg);
+    check(
+      "a tracking number saved in that gap: refused too — still shipped, tracking kept",
+      !!racedTg && !racedTg.ok && racedTg.error === UNDO_MESSAGES.shipmentChanged && (await stageOf(tg)) === "shipped" && afterTg.status === "shipped" && afterTg.trackingNumber === "1ZGAP",
+      JSON.stringify(racedTg),
+    );
+
+    // NEGATIVE (second review): a stage moved away and back in the gap looked unchanged to the write.
+    const bounce = await add("__verify_un_gap_bounce");
+    const pressBounce = await logMessage({ partnershipId: bounce, direction: "outbound", channel: "ig_dm", kind: "initial" }, me.id);
+    const racedBounce = pressBounce.ok
+      ? await undoQuickAction(pressBounce.undo.actionId, me.id, new Date(), {
+          beforeWrite: async () => {
+            await changeStage(bounce, "in_conversation", me.id);
+            await changeStage(bounce, "contacted", me.id);
+          },
+        })
+      : null;
+    check(
+      "the stage moved away and back in that gap: refused, their moves stand",
+      !!racedBounce && !racedBounce.ok && racedBounce.error === UNDO_MESSAGES.stageMoved && (await stageOf(bounce)) === "contacted" && (await eventsOf(bounce)).length === 1,
+      JSON.stringify(racedBounce),
+    );
+
+    // NEGATIVE (second review): an undo that moves no stage decided "delete the shipment" on the stage it read — even if the deal moved to Ready to ship meanwhile.
+    const talk = await add("__verify_un_gap_nomove");
+    await changeStage(talk, "in_conversation", me.id);
+    const pressTalk = await recordShipment({ partnershipId: talk, status: "shipped" }, agency);
+    const racedTalk =
+      pressTalk.ok && pressTalk.undo && pressTalk.stageChanged === null
+        ? await undoQuickAction(pressTalk.undo.actionId, me.id, new Date(), { beforeWrite: async () => void (await changeStage(talk, "fulfilling", me.id)) })
+        : null;
+    check(
+      "the deal moved on in that gap: nothing is written — Ready to ship keeps its shipment",
+      !!racedTalk && !racedTalk.ok && racedTalk.error === UNDO_MESSAGES.stageMoved && (await stageOf(talk)) === "fulfilling" && (await shipmentsOf(talk)).length === 1,
+      JSON.stringify(racedTalk),
     );
 
     // Review, 2026-09-28: a quick Undo is a person's decision to the email reader — older mail must not redo it.

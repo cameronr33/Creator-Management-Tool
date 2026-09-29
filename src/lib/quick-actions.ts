@@ -26,7 +26,10 @@ import { isTerminal, stageIndex } from "@/lib/stages";
  * put back, the logged message removed, and both marked undone — all of it or
  * none, each guarded by a compare-and-set, so a race or a dropped connection
  * can't leave half an undo. Only the rows the press touched are changed —
- * never "the latest shipment" by side effect. Tested in scripts/verify-undo.ts.
+ * the pressed shipment, and a second one its own move to Shipped marked
+ * (`markedShippedId`) — never "the latest shipment" by side effect. Rows
+ * are locked partnership first, like every stage move, so it can't deadlock
+ * with one. Tested in scripts/verify-undo.ts.
  */
 
 export const UNDO_WINDOW_MS = 10 * 60_000;
@@ -118,7 +121,7 @@ export interface UndoState {
   /** The message it logged, as it is now (null when it's gone). */
   event: { externalId: string | null } | null;
   /** The move the press caused, as it is now. */
-  transition: { id: string; fromStage: CmStage | null; toStage: CmStage; undoneAt: Date | null; meta: unknown } | null;
+  transition: { id: string; fromStage: CmStage | null; toStage: CmStage; undoneAt: Date | null; meta: unknown; changedAt: Date } | null;
   /** The partnership's latest move that isn't undone and isn't itself an undo. */
   latestRealMoveId: string | null;
   stage: CmStage;
@@ -147,6 +150,10 @@ export type UndoPlan =
       deleteEvent: boolean;
       /** What happens to the shipment the press touched (carrier, tracking and notes are always kept). */
       shipment: ShipmentUndo | null;
+      /** Another shipment the press's own move to Shipped marked shipped, put back to not sent yet if nobody touched it since. */
+      alsoUnmark: { id: string; markedAt: string } | null;
+      /** The stage everything above was decided on — the write goes ahead only while it still is. */
+      stageNow: CmStage;
     }
   | { ok: false; error: string };
 
@@ -166,13 +173,16 @@ export function planQuickUndo(a: QuickActionFacts, s: UndoState): UndoPlan {
 
   let moveBack: { from: CmStage; to: CmStage; exitReason: ExitReason | null } | null = null;
   let backTo: CmStage | null = null;
+  let alsoUnmark: { id: string; markedAt: string } | null = null;
   if (a.transitionId) {
     const t = s.transition;
     if (!t || t.undoneAt || !t.fromStage || s.latestRealMoveId !== t.id || s.stage !== t.toStage) return { ok: false, error: UNDO_MESSAGES.stageMoved };
+    const meta = (t.meta ?? {}) as { priorExitReason?: ExitReason; markedShippedId?: string };
     // Back to a closed stage brings its reason back ("Stopped replying"); an open one has none.
-    const prior = (t.meta as { priorExitReason?: ExitReason } | null)?.priorExitReason ?? null;
-    moveBack = { from: t.toStage, to: t.fromStage, exitReason: isTerminal(t.fromStage) ? prior : null };
+    moveBack = { from: t.toStage, to: t.fromStage, exitReason: isTerminal(t.fromStage) ? (meta.priorExitReason ?? null) : null };
     backTo = t.fromStage;
+    // The move to Shipped also marked "the latest shipment" shipped when it wasn't the pressed one.
+    if (a.kind === "shipment" && meta.markedShippedId && meta.markedShippedId !== a.shipmentId) alsoUnmark = { id: meta.markedShippedId, markedAt: t.changedAt.toISOString() };
   }
 
   let shipment: ShipmentUndo | null = null;
@@ -187,7 +197,7 @@ export function planQuickUndo(a: QuickActionFacts, s: UndoState): UndoPlan {
         : { mode: "restore", expect: stateOf(a.applied), to: a.prior ? stateOf(a.prior) : { status: "ready", shippedAt: null, deliveredAt: null } };
   }
 
-  return { ok: true, moveBack, backTo, deleteEvent, shipment };
+  return { ok: true, moveBack, backTo, deleteEvent, shipment, alsoUnmark, stageNow: s.stage };
 }
 
 /* ── Doing it: one statement ────────────────────────────────────── */
@@ -197,25 +207,45 @@ function sameTime(column: SQL, iso: string | null): SQL {
   return iso === null ? sql`${column} is null` : sql`(${column} is not null and abs(extract(epoch from (${column} - ${iso}::timestamp))) < 0.001)`;
 }
 
-async function writeUndo(a: { id: string; partnershipId: string; transitionId: string | null; outreachEventId: string | null; shipmentId: string | null }, plan: Extract<UndoPlan, { ok: true }>, userId: string): Promise<boolean> {
+async function writeUndo(
+  a: { id: string; partnershipId: string; transitionId: string | null; outreachEventId: string | null; shipmentId: string | null },
+  plan: Extract<UndoPlan, { ok: true }>,
+  applied: ShipmentSnapshot | null,
+  userId: string,
+): Promise<boolean> {
   const move = plan.moveBack;
   const ship = a.shipmentId ? plan.shipment : null;
   const hasShipment = !!ship;
   const deleting = ship?.mode === "delete";
   const restoring = ship?.mode === "restore";
   const to = ship?.mode === "restore" ? ship.to : null;
+  // Exactly as the press left it — updated_at included, so a tracking number saved since counts as a change.
   const expected = ship
-    ? sql`s.status = ${ship.expect.status}::cm_shipment_status and ${sameTime(sql`s.shipped_at`, ship.expect.shippedAt)} and ${sameTime(sql`s.delivered_at`, ship.expect.deliveredAt)}`
+    ? sql`s.status = ${ship.expect.status}::cm_shipment_status and ${sameTime(sql`s.shipped_at`, ship.expect.shippedAt)} and ${sameTime(sql`s.delivered_at`, ship.expect.deliveredAt)} and ${sameTime(sql`s.updated_at`, applied?.updatedAt ?? null)}`
     : sql`false`;
+  const side = plan.alsoUnmark;
   const res = await db.execute(sql`
-    with gate as (
+    with p_lock as (
+      -- The partnership first (every stage move locks it first too, so the two can't deadlock), still at the stage the
+      -- checks saw and with no real move since the press's own.
+      select p.id from ${cmPartnerships} p
+      where p.id = ${a.partnershipId} and p.stage = ${plan.stageNow}::cm_stage
+        and (not ${!!move} or not exists (
+          select 1 from cm_stage_transitions t2
+          where t2.partnership_id = ${a.partnershipId} and t2.id <> ${a.transitionId} and t2.undone_at is null
+            and coalesce(t2.reason, '') <> 'undo'
+            and t2.changed_at >= (select t1.changed_at from cm_stage_transitions t1 where t1.id = ${a.transitionId})
+        ))
+      for no key update
+    ), gate as (
       -- The press, still not undone: locked, so a doubled click waits and then finds it done.
-      select id from ${cmQuickActions} where id = ${a.id} and undone_at is null for update
+      select id from ${cmQuickActions} where id = ${a.id} and undone_at is null and exists (select 1 from p_lock) for update
     ), ship_lock as (
       -- The shipment exactly as the press left it (and, to delete it, still without tracking).
       select s.id from ${cmShipments} s
-      where ${hasShipment} and s.id = ${a.shipmentId} and ${expected}
+      where ${hasShipment} and s.id = ${a.shipmentId} and s.partnership_id = ${a.partnershipId} and ${expected}
         and (not ${deleting} or (s.carrier is null and s.tracking_number is null))
+        and exists (select 1 from gate)
       for update
     ), moved as (
       update ${cmPartnerships}
@@ -231,14 +261,21 @@ async function writeUndo(a: { id: string; partnershipId: string; transitionId: s
       update ${cmShipments}
       set status = ${to?.status ?? "ready"}::cm_shipment_status, shipped_at = ${to?.shippedAt ?? null}::timestamp,
           delivered_at = ${to?.deliveredAt ?? null}::timestamp, updated_at = now()
-      where ${restoring} and id = ${a.shipmentId} and exists (select 1 from go)
+      where ${restoring} and id = ${a.shipmentId} and partnership_id = ${a.partnershipId} and exists (select 1 from go)
       returning id
     ), removed as (
-      delete from ${cmShipments} where ${deleting} and id = ${a.shipmentId} and exists (select 1 from go)
+      delete from ${cmShipments} where ${deleting} and id = ${a.shipmentId} and partnership_id = ${a.partnershipId} and exists (select 1 from go)
+      returning id
+    ), side_unmarked as (
+      -- The other shipment the move to Shipped marked: back to not sent yet, only if untouched since that move.
+      update ${cmShipments}
+      set status = 'ready', shipped_at = null, updated_at = now()
+      where ${!!side} and id = ${side?.id ?? null} and partnership_id = ${a.partnershipId} and status = 'shipped'
+        and ${sameTime(sql`updated_at`, side?.markedAt ?? null)} and exists (select 1 from go)
       returning id
     ), unlogged as (
       delete from ${cmOutreachEvents}
-      where ${plan.deleteEvent} and id = ${a.outreachEventId} and external_id is null and exists (select 1 from go)
+      where ${plan.deleteEvent} and id = ${a.outreachEventId} and partnership_id = ${a.partnershipId} and external_id is null and exists (select 1 from go)
       returning id
     ), undone_move as (
       update cm_stage_transitions set undone_at = now()
@@ -304,14 +341,21 @@ export async function undoQuickAction(actionId: string, userId: string, now = ne
   if (!plan.ok) return plan;
 
   await hooks.beforeWrite?.();
-  if (await writeUndo(a, plan, userId)) return { ok: true, stage: plan.backTo };
+  if (await writeUndo(a, plan, facts.applied, userId)) return { ok: true, stage: plan.backTo };
 
   // Nothing was written: something changed between the checks and the write. Say what.
   const [again] = await db.select({ undoneAt: cmQuickActions.undoneAt }).from(cmQuickActions).where(eq(cmQuickActions.id, a.id)).limit(1);
   if (again?.undoneAt) return { ok: false, error: UNDO_MESSAGES.already };
-  if (plan.moveBack) {
-    const [q] = await db.select({ stage: cmPartnerships.stage }).from(cmPartnerships).where(eq(cmPartnerships.id, a.partnershipId)).limit(1);
-    if (q?.stage !== plan.moveBack.from) return { ok: false, error: UNDO_MESSAGES.stageMoved };
+  const [q] = await db.select({ stage: cmPartnerships.stage }).from(cmPartnerships).where(eq(cmPartnerships.id, a.partnershipId)).limit(1);
+  if (q?.stage !== plan.stageNow) return { ok: false, error: UNDO_MESSAGES.stageMoved };
+  if (plan.shipment) {
+    const [s2] = a.shipmentId ? await db.select().from(cmShipments).where(eq(cmShipments.id, a.shipmentId)).limit(1) : [];
+    const cur = s2 ? snapshotShipment(s2) : null;
+    const was = facts.applied;
+    if (!cur || !was || cur.updatedAt !== was.updatedAt || cur.status !== was.status || cur.shippedAt !== was.shippedAt || cur.deliveredAt !== was.deliveredAt) {
+      return { ok: false, error: UNDO_MESSAGES.shipmentChanged };
+    }
   }
-  return { ok: false, error: plan.shipment ? UNDO_MESSAGES.shipmentChanged : UNDO_MESSAGES.stageMoved };
+  // The stage is where it was but someone moved it away and back since.
+  return { ok: false, error: UNDO_MESSAGES.stageMoved };
 }
