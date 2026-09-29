@@ -43,6 +43,13 @@ function main() {
   }
 
   console.log("\n── nextStep: the facts the stage summarises change the answer ──");
+  // NEGATIVE (run-through, 2026-09-29): Michael Dey at Agreed from the sheet, emails say talks are paused — the line asked for his address.
+  const stale = nextStep({ ...base, stage: "awaiting_address", staleStage: "in_conversation" });
+  check(
+    "when their emails read as an earlier stage, the line says so and starts from there — not 'get their address'",
+    /^Their emails read as Talking — check the stage first\./.test(stale.text) && !/shipping address/i.test(stale.text) && stale.anchor === "stage",
+    stale.text,
+  );
   check(
     "a reply alone never implies positive interest",
     !/they're interested/i.test(nextStep({ ...base, stage: "in_conversation", hasReplied: true }).text),

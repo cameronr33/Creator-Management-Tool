@@ -8,6 +8,7 @@ import { latestActivity, type LastMessage } from "../src/lib/activity";
 import { placeOnToday, sortToday, TODAY_SECTIONS, type TodayFacts, listedOnToday } from "../src/lib/today";
 import { THRESHOLD_FIELDS, THRESHOLDS_SCHEMA } from "../src/lib/thresholds";
 import { ARCHIVE_REMIND_MAX_DAYS, archiveActive, archiveWoke, parseRemindOn, splitArchived } from "../src/lib/archive-rules";
+import { staleStage } from "../src/lib/stage-flag";
 import { DEFAULT_THRESHOLDS } from "../src/lib/outreach";
 import { ACTIVE_STAGES, STAGE_VALUES, isTerminal } from "../src/lib/stages";
 import type { CmStage } from "../src/lib/db/schema";
@@ -116,6 +117,25 @@ const sorted = sortToday([
   { name: "Ab", since: at(12).toISOString() },
 ]);
 check("whoever has waited longest comes first; unknown dates last; ties by name", sorted.map((r) => r.name).join(",") === "Bo,Ab,Cy,Al", sorted.map((r) => r.name).join(","));
+
+// NEGATIVE (run-through, 2026-09-29): Michael Dey came in from the sheet as Agreed; his emails say talks are paused, and
+// the Next line asked for his address. The flag asks a person instead — automation never moves backward.
+console.log("\n── Stage looks out of date (2026-09-29) ──");
+const flagFacts = { stage: "awaiting_address" as CmStage, emailStage: "in_conversation" as CmStage | null, emailStageAt: at(20) as Date | null, lastManualChangeAt: at(10) as Date | null, dismissedAt: null as Date | null };
+check("Agreed while the emails read as Talking → suggest Talking", staleStage(flagFacts) === "in_conversation");
+check("Finalizing while they read as Agreed → suggest Agreed", staleStage({ ...flagFacts, stage: "finalizing", emailStage: "awaiting_address" }) === "awaiting_address");
+check("Talking while they read as Contacted → suggest Contacted", staleStage({ ...flagFacts, stage: "in_conversation", emailStage: "contacted" }) === "contacted");
+check("never once shipping has begun (Ready to ship always has a shipment)", staleStage({ ...flagFacts, stage: "fulfilling" }) === null && staleStage({ ...flagFacts, stage: "shipped" }) === null && staleStage({ ...flagFacts, stage: "content_pending" }) === null);
+check("never before Talking", staleStage({ ...flagFacts, stage: "contacted", emailStage: "shortlisted" }) === null);
+check("never the same or a later stage", staleStage({ ...flagFacts, emailStage: "awaiting_address" }) === null && staleStage({ ...flagFacts, emailStage: "fulfilling" }) === null);
+check("never suggests closing a deal", staleStage({ ...flagFacts, emailStage: "no_response" }) === null && staleStage({ ...flagFacts, emailStage: "declined" }) === null);
+check("never on a closed deal", staleStage({ ...flagFacts, stage: "no_response", emailStage: "in_conversation" }) === null);
+check("a person's stage change after that message wins", staleStage({ ...flagFacts, lastManualChangeAt: at(21) }) === null);
+check("'Keep' after that message stops asking…", staleStage({ ...flagFacts, dismissedAt: at(21) }) === null);
+check("…until a newer message reads differently", staleStage({ ...flagFacts, dismissedAt: at(19) }) === "in_conversation");
+check("no verified line, no flag", staleStage({ ...flagFacts, emailStageAt: null }) === null && staleStage({ ...flagFacts, emailStage: null }) === null);
+const flaggedRow = place({ stage: "awaiting_address", staleStage: "in_conversation", staleStageAt: at(20) });
+check("Today lists it first, under Stage looks out of date", flaggedRow?.section === "check_stage" && flaggedRow.note === "Their emails read as Talking, not Agreed." && TODAY_SECTIONS[0].key === "check_stage", flaggedRow?.note ?? "");
 
 // Archive replaced Snooze (owner, 2026-09-29): the same bring-back rules under the new names, plus archives with no date.
 console.log("\n── Archive (2026-09-29) ──");

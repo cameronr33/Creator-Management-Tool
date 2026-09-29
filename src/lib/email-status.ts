@@ -90,6 +90,11 @@ export const AssessmentSchema = z.object({
   terms: z.string().nullable(),
   deal_quote: z.string().nullable(),
   deal_message: z.number().int().nullable(),
+  // Where the deal stands from the messages alone (2026-09-29) — may be EARLIER than the current stage. Never
+  // moves anything: an earlier one is shown to a person as "their emails read as …" (stage-flag.ts).
+  stage_from_messages: z.enum(STAGES.map((s) => s.value) as [CmStage, ...CmStage[]]).nullable(),
+  stage_from_messages_quote: z.string().nullable(),
+  stage_from_messages_message: z.number().int().nullable(),
 });
 export type Assessment = z.infer<typeof AssessmentSchema>;
 
@@ -146,7 +151,10 @@ Return:
 - fee_amount: the money agreed for the creator in US dollars, only if both sides agreed to it; otherwise null.
 - terms: at most 40 plain words on what the creator agreed to deliver (videos, platforms, timing), only if agreed; otherwise null.
 - deal_quote: a short quote (at most 25 words) copied exactly from one message that states the fee or terms — our message stating the fee if there is one, otherwise the creator's; null if there are none.
-- deal_message: the number of the message deal_quote comes from; null if none.`;
+- deal_message: the number of the message deal_quote comes from; null if none.
+- stage_from_messages: where the deal stands judged ONLY from what the messages say — ignore the current stage and the facts below. It may be earlier than the current stage (for example: nothing agreed yet, or talks paused). null if the messages don't show.
+- stage_from_messages_quote: a short quote (at most 25 words) copied exactly, character for character, from one message — the creator's, ours or the brand's — that best shows stage_from_messages; null if none.
+- stage_from_messages_message: the number of the message stage_from_messages_quote comes from; null if none.`;
 
   const facts = [
     `Shipping address on file: ${ctx.hasAddress ? "yes" : "no"}`,
@@ -513,6 +521,11 @@ export async function assessPartnership(
   outcome.dealFound = dealFor(decision.move?.to ?? ctx.stage)?.facts ?? null;
   if (!opts.apply) return outcome;
 
+  // The messages' own stage, kept only with a line found word for word in mail the mailbox holds (stage-flag.ts).
+  const fromMessages = assessment.confidence === "low" ? null : assessment.stage_from_messages;
+  const stageCited = assessment.stage_from_messages_message != null ? ctx.messages.find((m) => m.n === assessment.stage_from_messages_message) : undefined;
+  const stageQuote = assessment.stage_from_messages_quote?.trim() ?? "";
+  const stageQuoted = !!fromMessages && !!stageCited && fromMailbox(stageCited) && !!stageQuote && quoteFoundIn(stageQuote, stageCited);
   await db
     .update(cmPartnerships)
     .set({
@@ -520,6 +533,10 @@ export async function assessPartnership(
       emailSummaryAt: loaded.latestAt,
       emailWhoseTurn: assessment.whose_turn,
       emailAssessedAt: readAt,
+      emailStage: fromMessages ?? null,
+      emailStageQuote: stageQuoted ? stageQuote.slice(0, 300) : null,
+      emailStageEventId: stageQuoted ? stageCited!.eventId : null,
+      emailStageAt: stageQuoted ? stageCited!.occurredAt : null,
       emailSoundsLikeNo: assessment.sounds_like_no && !isTerminal(ctx.stage),
       ...(address ? { suggestedAddress: address.text, suggestedAddressEventId: address.eventId } : {}),
     })

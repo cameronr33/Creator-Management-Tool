@@ -151,6 +151,11 @@ export interface CreatorRow {
   /** Who looks after the deal (null = unassigned) and their name. */
   ownerId: string | null;
   ownerName: string | null;
+  /** Where the messages alone put the deal, and the line behind it (stage-flag.ts). */
+  emailStage: CmStage | null;
+  emailStageQuote: string | null;
+  emailStageAt: Date | null;
+  stageFlagDismissedAt: Date | null;
   /** Archived off the lists (see archive-rules.ts). */
   archivedUntil: Date | null;
   archivedAt: Date | null;
@@ -218,6 +223,10 @@ export async function getCreatorRows(
       ownerName: cmTeamMembers.name,
       createdAt: cmPartnerships.createdAt,
       approvalAt: cmPartnerships.approvalAt,
+      emailStage: cmPartnerships.emailStage,
+      emailStageQuote: cmPartnerships.emailStageQuote,
+      emailStageAt: cmPartnerships.emailStageAt,
+      stageFlagDismissedAt: cmPartnerships.stageFlagDismissedAt,
       archivedUntil: cmPartnerships.archivedUntil,
       archivedAt: cmPartnerships.archivedAt,
       archiveStage: cmPartnerships.archiveStage,

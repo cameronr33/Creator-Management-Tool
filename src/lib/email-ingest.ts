@@ -482,11 +482,11 @@ export async function recomputeEmailKinds(partnershipIds: string[]): Promise<num
  *
  * Undo on a quick button counts here (review, 2026-09-28): a person undid it,
  * so older mail must not redo it. Only the backdating rule for a message
- * logged by hand (`forLogging`, logging.ts) skips it — an Undo puts things
+ * logged by hand and the stale-stage flag (`peopleOnly`) skip it — an Undo puts things
  * back as they were, so a DM re-logged as "yesterday" still moves the stage —
  * and skips the one-time stage clean-up too, which was nobody's decision.
  */
-export async function lastManualChangeAt(partnershipIds: string[], opts: { forLogging?: boolean } = {}): Promise<Map<string, Date>> {
+export async function lastManualChangeAt(partnershipIds: string[], opts: { peopleOnly?: boolean } = {}): Promise<Map<string, Date>> {
   const out = new Map<string, Date>();
   if (partnershipIds.length === 0) return out;
   const rows = await db
@@ -498,9 +498,9 @@ export async function lastManualChangeAt(partnershipIds: string[], opts: { forLo
       and(
         inArray(cmStageTransitions.partnershipId, partnershipIds),
         isNotNull(cmStageTransitions.fromStage),
-        or(isNull(cmStageTransitions.source), inArray(cmStageTransitions.source, opts.forLogging ? ["manual"] : ["manual", "migration"])),
+        or(isNull(cmStageTransitions.source), inArray(cmStageTransitions.source, opts.peopleOnly ? ["manual"] : ["manual", "migration"])),
         isNull(cmStageTransitions.undoneAt),
-        opts.forLogging ? sql`(${cmStageTransitions.meta} ->> 'quickActionId') is null` : undefined,
+        opts.peopleOnly ? sql`(${cmStageTransitions.meta} ->> 'quickActionId') is null` : undefined,
       ),
     )
     .groupBy(cmStageTransitions.partnershipId);

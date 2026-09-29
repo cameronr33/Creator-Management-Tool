@@ -62,6 +62,9 @@ import { Contracts, type ContractRow, type OfferedDifference } from "@/component
 import { StatusNote } from "@/components/status-note";
 import { ArchiveControl, ArchiveLine, RestoreButton } from "@/components/archive";
 import { archiveActive } from "@/lib/archive-rules";
+import { staleStage, staleStageLine } from "@/lib/stage-flag";
+import { lastManualChangeAt } from "@/lib/email-ingest";
+import { StageFlagButtons } from "@/components/stage-flag";
 import { TrackingLink } from "@/components/tracking-link";
 import { OwnerPicker } from "@/components/owner-controls";
 import { chipLabels, listLoginNames, listTeammates, memberForUser } from "@/lib/owners";
@@ -159,7 +162,16 @@ export default async function CreatorDetailPage({
     .filter((e) => e.direction === "inbound" && e.kind !== "note")
     .reduce<Date | null>((latest, e) => (!latest || e.createdAt > latest ? e.createdAt : latest), null);
   const archived = archiveActive({ ...partnership, lastInboundStoredAt });
+  // Their emails read as an earlier stage? (Michael Dey, 2026-09-29.) A person decides; the Next line follows the emails.
+  const flagged = staleStage({
+    stage: partnership.stage,
+    emailStage: partnership.emailStage,
+    emailStageAt: partnership.emailStageAt,
+    lastManualChangeAt: (await lastManualChangeAt([partnership.id], { peopleOnly: true })).get(partnership.id) ?? null,
+    dismissedAt: partnership.stageFlagDismissedAt,
+  });
   const step = nextStep({
+    staleStage: flagged,
     stage: partnership.stage,
     hasAddress,
     signed: partnership.agreementType === "signed",
@@ -277,6 +289,17 @@ export default async function CreatorDetailPage({
                   )}
                 </span>
               </div>
+              {flagged && (
+                <div className="mt-2">
+                  <Callout
+                    tone="warn"
+                    title={staleStageLine(partnership.stage, flagged)}
+                    actions={<StageFlagButtons partnershipId={partnership.id} name={creator.name} stage={partnership.stage} suggested={flagged} />}
+                  >
+                    {partnership.emailStageQuote ? <>&ldquo;{partnership.emailStageQuote}&rdquo;</> : "From their latest emails."} Nothing moves backward by itself — move them, or keep the stage.
+                  </Callout>
+                </div>
+              )}
               <EmailStatusLines
                 partnershipId={partnership.id}
                 stage={partnership.stage}

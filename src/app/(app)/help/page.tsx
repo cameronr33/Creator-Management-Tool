@@ -197,7 +197,9 @@ export default async function HelpPage() {
             their own message, never one from us or someone cc&apos;d, and never anything older than your last change to
             the stage. Nothing automatic ever closes a deal: if an email sounds like a no, it&apos;s flagged for you to
             close. A creator closed as {stageLabel("no_response")} is the one exception the other way — their own reply
-            reopens them.
+            reopens them. When their emails read as an earlier stage than the one set (say {stageLabel("in_conversation")},
+            while the stage says {stageLabel("awaiting_address")}), Today asks under &ldquo;Stage looks out of date&rdquo;:
+            move them back, or keep the stage. Nothing moves backward by itself.
           </p>
         </Card>
 

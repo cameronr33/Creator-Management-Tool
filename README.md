@@ -228,6 +228,12 @@ what moved it, the email quote, anything undone).
   email from your own inbox or a call. Email logged by hand is never read,
   queued or re-labelled by the email reader (synced = `channel email` with an
   `external_id`).
+- **Stage looks out of date** (`src/lib/stage-flag.ts`): the email reader
+  also reads where the deal stands from the messages alone. When that's an
+  earlier stage than the one set (a creator imported as Agreed whose emails
+  say talks are paused), Today lists them first and the creator page asks —
+  Move to Talking, or Keep Agreed — and the Next line follows the emails.
+  Nothing moves backward by itself.
 - **Undo** (`src/lib/quick-actions.ts`, table `cm_quick_actions`): each quick
   press records what it did; its toast offers Undo for ten seconds, and the
   server allows it only for whoever pressed it, within ten minutes, once,

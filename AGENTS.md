@@ -78,6 +78,14 @@ them. Changing one requires a human decision and an explanation in the commit.
    email a teammate logged by hand is their summary, never the creator's
    own words (`fromMailbox`, review 2026-09-28). Anchors: `verify-undo.ts`,
    `verify-logging.ts`.
+   (2026-09-29, owner: "flag it, one click to fix".) The email reader may
+   also say where the deal stands from the messages alone
+   (`stage_from_messages`, with a line verified in mailbox mail). When that
+   is an earlier stage than Talking / Agreed / Finalizing and newer than a
+   person's last move, Today and the creator page ASK a person ("Their
+   emails read as Talking, not Agreed" — Move / Keep); nothing moves
+   backward by itself, and never once a shipment exists. `stage-flag.ts`;
+   anchors: `verify-today.ts`, `verify-today-data.ts`, `verify-email-status.ts`.
    Matrices: `verify-auto-stage.ts` and `verify-email-status.ts`; edit the
    code and its matrix together, or neither.
 3. **Verification leaves nothing behind.** Every live check cleans up in

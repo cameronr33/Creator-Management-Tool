@@ -17,6 +17,7 @@ import { getTodayData } from "../src/lib/today-data";
 import { DEFAULT_THRESHOLDS } from "../src/lib/thresholds";
 import { restoreArchived, setArchived, getLastInboundStoredAt } from "../src/lib/archive";
 import { splitArchived } from "../src/lib/archive-rules";
+import { answerStageFlag } from "../src/lib/stage-flag-answer";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail?: string) {
@@ -87,6 +88,28 @@ async function main() {
     const nudged = today.rows.find((r) => r.partnershipId === quiet);
     check("a deal gone quiet at Talking is back on Follow up", nudged?.section === "follow_up" && /nudge them/.test(nudged?.note ?? ""), JSON.stringify(nudged && { s: nudged.section, n: nudged.note }));
     check("…but not one moved there this morning", today.rows.find((r) => r.partnershipId === fresh2)?.section === "waiting");
+
+    console.log("\n── Stage looks out of date: Move or Keep ──");
+    const dey = await add("__verify_td_flag");
+    await changeStage(dey, "awaiting_address");
+    // Set Agreed an hour ago (like the sheet import); the email that reads as Talking came a minute ago.
+    await db.update(schema.cmStageTransitions).set({ changedAt: new Date(Date.now() - 3_600_000) }).where(and(eq(schema.cmStageTransitions.partnershipId, dey), eq(schema.cmStageTransitions.toStage, "awaiting_address")));
+    const readAt = (ms: number) => new Date(Date.now() + ms);
+    await db.update(schema.cmPartnerships).set({ emailStage: "in_conversation", emailStageQuote: "We can't move forward on that build", emailStageAt: readAt(-60_000) }).where(eq(schema.cmPartnerships.id, dey));
+    const flagRow = async () => (await getTodayData({ clientId: client.id, campaignId })).rows.find((r) => r.partnershipId === dey);
+    const f1 = await flagRow();
+    check("Today asks, with the line from their emails", f1?.section === "check_stage" && f1.stageFlag?.suggested === "in_conversation" && f1.stageFlag.quote === "We can't move forward on that build", JSON.stringify(f1 && { s: f1.section, f: f1.stageFlag }));
+    const kept = await answerStageFlag(dey, "keep", "awaiting_address", null);
+    check("Keep: the stage stays and Today stops asking", kept.ok && (await flagRow())?.section === "get_address");
+    await db.update(schema.cmPartnerships).set({ emailStageAt: readAt(60_000) }).where(eq(schema.cmPartnerships.id, dey));
+    check("…until a newer message reads differently", (await flagRow())?.section === "check_stage");
+    const stale = await answerStageFlag(dey, "move", "finalizing", null);
+    check("Move on a page that's out of date: refused as stale, nothing moves", !stale.ok && !!stale.stale && (await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, dey)))[0].stage === "awaiting_address");
+    const moved2 = await answerStageFlag(dey, "move", "awaiting_address", null);
+    const [afterMove] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, dey));
+    const [flagMove] = (await db.select().from(schema.cmStageTransitions).where(eq(schema.cmStageTransitions.partnershipId, dey))).filter((t) => t.reason === "their emails read as Talking");
+    check("Move: back to Talking, as a person's move with the reason and the line", moved2.ok && afterMove.stage === "in_conversation" && flagMove?.source === "manual" && (flagMove.meta as { quote?: string } | null)?.quote === "We can't move forward on that build");
+    check("…and Today stops asking", (await flagRow())?.section !== "check_stage");
 
     console.log("\n── Archive ──");
     const put = await add("__verify_td_archive");

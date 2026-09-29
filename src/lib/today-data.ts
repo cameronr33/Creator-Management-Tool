@@ -9,6 +9,8 @@ import type { WhoseTurn } from "@/lib/activity";
 import { statusNoteView, type StatusNoteView } from "@/lib/status-note";
 import { hiddenSummary, splitByView, type MemberId, type View } from "@/lib/owners";
 import { archiveWoke, splitArchived } from "@/lib/archive-rules";
+import { staleStage } from "@/lib/stage-flag";
+import { lastManualChangeAt } from "@/lib/email-ingest";
 import { getLastInboundStoredAt } from "@/lib/archive";
 
 /** One Today row — plain values only, so it can go straight to the client list. */
@@ -41,6 +43,8 @@ export interface TodayRow {
   since: string | null;
   /** "due" (first message) or "late" (video). */
   badge: "due" | "late" | null;
+  /** Their emails read as an earlier stage (stage-flag.ts): what to suggest, and the line behind it. */
+  stageFlag: { suggested: CmStage; quote: string | null } | null;
   /** Back from the archive: because the reminder date came or they wrote, with who archived it and why. */
   backFromArchive: { why: "reminder" | "wrote"; by: string | null; reason: string | null } | null;
 }
@@ -79,7 +83,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
   if (creators.length === 0) return { rows: [], ...base };
 
   const ids = creators.map((c) => c.partnershipId);
-  const [outreach, thresholds, details, shipments, stageSince] = await Promise.all([
+  const [outreach, thresholds, details, shipments, stageSince, decided] = await Promise.all([
     getOutreachStates(ids),
     getFollowUpThresholds(clientId),
     db
@@ -99,6 +103,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       .where(inArray(cmShipments.partnershipId, ids))
       .orderBy(desc(cmShipments.createdAt)),
     getStageSince(ids),
+    lastManualChangeAt(ids, { peopleOnly: true }),
   ]);
   const detailById = new Map(details.map((d) => [d.id, d]));
   const latestShipment = new Map<string, (typeof shipments)[number]>();
@@ -107,7 +112,16 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
   const rows: TodayRow[] = [];
   for (const c of creators) {
     const o = outreach.get(c.partnershipId) ?? deriveOutreachState([]);
+    const suggested = staleStage({
+      stage: c.stage,
+      emailStage: c.emailStage,
+      emailStageAt: c.emailStageAt,
+      lastManualChangeAt: decided.get(c.partnershipId) ?? null,
+      dismissedAt: c.stageFlagDismissedAt,
+    });
     const placed = placeOnToday({
+      staleStage: suggested,
+      staleStageAt: c.emailStageAt,
       stage: c.stage,
       whoseTurn: c.activity.whoseTurn,
       lastOutboundAt: o.lastOutboundAt,
@@ -150,6 +164,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       since: placed.since?.toISOString() ?? null,
       badge: placed.badge,
       backFromArchive: woke ? { why: woke, by: c.archivedByName, reason: c.archiveReason } : null,
+      stageFlag: suggested ? { suggested, quote: c.emailStageQuote } : null,
     });
   }
   return { rows: sortToday(rows), ...base };

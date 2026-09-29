@@ -15,6 +15,7 @@ import { Menu, MenuItem } from "@/components/menu";
 import { CloseAsDeclinedButton, NoReplyNeededButton } from "@/components/email-status";
 import { VideoLinkPrompt } from "@/components/partnership-actions";
 import { ApprovalButtons } from "@/components/approval-buttons";
+import { StageFlagButtons } from "@/components/stage-flag";
 import { TODAY_SECTIONS, type TodaySection } from "@/lib/today";
 import type { TodayRow } from "@/lib/today-data";
 import { whoseTurnText } from "@/lib/activity";
@@ -137,6 +138,7 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
             {r.section === "waiting" && turn && <span className="text-text-faint"> · {turn.label}</span>}
           </p>
           {r.note && <p className="mt-0.5 text-xs text-text-faint">{r.note}</p>}
+          {r.stageFlag?.quote && <p className="mt-0.5 text-xs text-text-muted">&ldquo;{r.stageFlag.quote}&rdquo;</p>}
           {(r.statusNote || noteOpen) && (
             <div className="mt-1.5">
               <StatusNote partnershipId={r.partnershipId} note={r.statusNote} editing={noteOpen} onEditingChange={setNoteOpen} hideWhenEmpty />
@@ -190,6 +192,8 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
 /** The one button for this row's next step. */
 function NextAction({ row: r }: { row: TodayRow }) {
   switch (r.section) {
+    case "check_stage":
+      return r.stageFlag ? <StageFlagButtons partnershipId={r.partnershipId} name={r.name} stage={r.stage} suggested={r.stageFlag.suggested} /> : null;
     case "your_turn":
       return (
         <>

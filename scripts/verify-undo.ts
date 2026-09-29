@@ -380,7 +380,7 @@ async function live() {
     const beforeUndo = new Date();
     if (pressR2.ok && pressR2.undo) await undoQuickAction(pressR2.undo.actionId, me.id);
     const readerSays = (await lastManualChangeAt([r2])).get(r2);
-    const loggingSays = (await lastManualChangeAt([r2], { forLogging: true })).get(r2);
+    const loggingSays = (await lastManualChangeAt([r2], { peopleOnly: true })).get(r2);
     check("to the email reader, the Undo is the last say (older mail can't redo it)", !!readerSays && readerSays.getTime() >= beforeUndo.getTime() - 1_000, readerSays?.toISOString());
     check("…while a message logged with an earlier date looks past it", !!loggingSays && loggingSays.getTime() < beforeUndo.getTime() - 1, loggingSays?.toISOString());
 

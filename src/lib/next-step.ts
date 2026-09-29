@@ -23,6 +23,8 @@ export interface NextStepInput {
   daysSinceLastOutbound: number | null;
   datesAreMigrated: boolean;
   exitReason: string | null;
+  /** The earlier stage their emails read as (stage-flag.ts) — the line then starts from there. */
+  staleStage?: CmStage | null;
 }
 
 export interface NextStep {
@@ -32,6 +34,11 @@ export interface NextStep {
 }
 
 export function nextStep(i: NextStepInput): NextStep {
+  if (i.staleStage) {
+    // Michael Dey (2026-09-29): imported as Agreed, emails say talks paused — "get their address" was the wrong advice.
+    const from = baseStep({ ...i, stage: i.staleStage });
+    return { text: `Their emails read as ${stageLabel(i.staleStage)} — check the stage first. From there: ${from.text.charAt(0).toLowerCase()}${from.text.slice(1)}`, anchor: "stage" };
+  }
   const step = baseStep(i);
   const stage = canonicalStage(i.stage);
   if (i.nudgeAfterDays && (stage === "in_conversation" || stage === "awaiting_address" || stage === "finalizing")) {

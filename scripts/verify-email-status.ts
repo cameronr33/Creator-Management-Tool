@@ -83,6 +83,9 @@ const reading = (over: Partial<Assessment>): Assessment => ({
   terms: null,
   deal_quote: null,
   deal_message: null,
+  stage_from_messages: null,
+  stage_from_messages_quote: null,
+  stage_from_messages_message: null,
   ...over,
 });
 const base: Omit<DecisionInput, "current" | "assessment"> = { messages: convo, lastManualChangeAt: null, hasAddress: false, shipmentStatuses: [], automove: true };
@@ -243,6 +246,7 @@ async function main() {
     stage: "shortlisted",
   });
   const stageOf = async () => (await db.select({ s: schema.cmPartnerships.stage }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId)))[0]?.s;
+  let flagCreatorId: string | null = null;
   try {
     await changeStage(partnershipId, "in_conversation");
     // Messages sent after that manual change (and before the Undo below).
@@ -352,6 +356,24 @@ async function main() {
     // New mail again, for the failing reading below.
     await db.insert(schema.cmOutreachEvents).values({ partnershipId, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", subject: "Re: HELLA", body: "And one more.", occurredAt: new Date(Date.now() + 3000), externalId: "__verify_es_6" });
 
+    // The messages' own stage (2026-09-29): kept with a line verified in mailbox mail, and it never moves anything.
+    const flag = await createCreatorWithPartnership({ clientId: client.id, name: "Verify Stage Flag", links: ["https://www.instagram.com/__verify_es_flag__"], campaignId, stage: "awaiting_address" });
+    flagCreatorId = flag.creatorId;
+    await db.insert(schema.cmOutreachEvents).values([
+      { partnershipId: flag.partnershipId, direction: "outbound", channel: "email", kind: "reply", senderRole: "team", subject: "HELLA follow up", body: "We can't move forward on that specific build this round.", occurredAt: new Date(Date.now() + 4000), externalId: "__verify_es_flag_1" },
+      { partnershipId: flag.partnershipId, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", subject: "Re: HELLA follow up", body: "I'll be here when you're ready!", occurredAt: new Date(Date.now() + 5000), externalId: "__verify_es_flag_2" },
+    ]);
+    const flagReading = (quote: string): AssessFn => async () =>
+      reading({ stage: "awaiting_address", whose_turn: "them", evidence_quote: "I'll be here when you're ready!", evidence_message: 2, stage_from_messages: "in_conversation", stage_from_messages_quote: quote, stage_from_messages_message: 1 });
+    await assessPartnership(flag.partnershipId, { apply: true, model: flagReading("We can't move forward on that specific build"), automove: true });
+    const [f1] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, flag.partnershipId));
+    check("the messages' own stage is kept, with the line behind it — from our email is fine", f1.emailStage === "in_conversation" && f1.emailStageQuote === "We can't move forward on that specific build" && !!f1.emailStageEventId && !!f1.emailStageAt);
+    check("…and nothing moves backward, even with automatic moves on", f1.stage === "awaiting_address");
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId: flag.partnershipId, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", body: "Thanks!", occurredAt: new Date(Date.now() + 6000), externalId: "__verify_es_flag_3" });
+    await assessPartnership(flag.partnershipId, { apply: true, model: flagReading("Talks are totally off forever"), automove: true });
+    const [f2] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, flag.partnershipId));
+    check("a line that isn't in the cited message is never kept — no line, no date, so no flag", f2.emailStage === "in_conversation" && f2.emailStageQuote === null && f2.emailStageEventId === null && f2.emailStageAt === null);
+
     // No API credit: every conversation stays unread, to be read once it's back (regression, 2026-09-24).
     const noCredit: AssessFn = async () => {
       throw Object.assign(new Error("Your credit balance is too low to access the Anthropic API."), { status: 400 });
@@ -365,6 +387,7 @@ async function main() {
     const r = await readPendingConversations({ model: failing });
     check("a reading that fails is counted, and marked read so it can't hold the queue", r.errors >= 1 && !(await partnershipsNeedingRead(500)).includes(partnershipId));
   } finally {
+    if (flagCreatorId) await db.delete(schema.cmCreators).where(eq(schema.cmCreators.id, flagCreatorId));
     await db.delete(schema.cmCreators).where(eq(schema.cmCreators.id, creatorId));
     await db.delete(schema.cmCampaigns).where(eq(schema.cmCampaigns.id, campaignId));
   }

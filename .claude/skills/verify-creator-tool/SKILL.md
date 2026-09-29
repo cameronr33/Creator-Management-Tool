@@ -93,6 +93,12 @@ What the scripts anchor:
   its move to Shipped marked); the email reader still respects a quick Undo;
   a tracking number saved later keeps the ship date; the portal's presses are
   never undoable.
+- **stale stage** (verify-today, verify-today-data, verify-email-status) — the
+  staleStage matrix (only Talking / Agreed / Finalizing, never closing, a
+  person's later move and Keep win), Today lists it first, Move is a
+  compare-and-set person's move and Keep dismisses until newer mail, the
+  reader keeps the messages' own stage only with a verified line and never
+  moves backward.
 - **history** — every move's line (added, a person, a rule and what set it
   off, the email reader, a client's pass, the stage clean-up) and undo folded
   into the move it undid, read back with names.

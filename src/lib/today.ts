@@ -1,4 +1,5 @@
 import type { CmStage } from "@/lib/db/schema";
+import { staleStageLine } from "@/lib/stage-flag";
 import type { WhoseTurn } from "@/lib/activity";
 import type { FollowUpThresholds } from "@/lib/outreach";
 import { canonicalStage, isTerminal, stageAction } from "@/lib/stages";
@@ -18,6 +19,7 @@ import { canonicalStage, isTerminal, stageAction } from "@/lib/stages";
  */
 
 export type TodaySection =
+  | "check_stage"
   | "your_turn"
   | "follow_up"
   | "to_contact"
@@ -30,6 +32,11 @@ export type TodaySection =
   | "waiting";
 
 export const TODAY_SECTIONS: { key: TodaySection; title: string; hint: string }[] = [
+  {
+    key: "check_stage",
+    title: "Stage looks out of date",
+    hint: "Their emails read as an earlier stage than the one set. Move them back, or keep the stage — nothing moves backward by itself.",
+  },
   { key: "your_turn", title: "Your turn", hint: "They wrote last. Reply, or mark it as needing no reply." },
   {
     key: "follow_up",
@@ -67,6 +74,10 @@ export interface TodayFacts {
   approvalAt?: Date | null;
   shippedAt?: Date | null;
   deliveredAt?: Date | null;
+  /** The earlier stage their emails read as (stage-flag.ts staleStage), when a person should look. */
+  staleStage?: CmStage | null;
+  /** When the message behind it was sent. */
+  staleStageAt?: Date | null;
 }
 
 export interface TodayPlacement {
@@ -134,6 +145,7 @@ export function placeOnToday(f: TodayFacts): TodayPlacement | null {
   const stage = canonicalStage(f.stage);
   const now = f.now ?? new Date();
   if (!listedOnToday(stage)) return null;
+  if (f.staleStage) return place("check_stage", `${staleStageLine(stage, f.staleStage)}.`, f.staleStageAt ?? null);
   switch (stage) {
     case "fulfilling":
       return place("ready_to_ship", null, f.stageSince);

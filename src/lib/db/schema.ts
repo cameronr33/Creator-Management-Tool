@@ -15,6 +15,7 @@ import {
   unique,
   uniqueIndex,
   check,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 // ─────────────────────────────────────────────────────────────────
@@ -342,6 +343,21 @@ export const cmPartnerships = pgTable(
     emailAssessedAt: timestamp("email_assessed_at"),
     /** Their latest message sounds like a no. Flagged; a person closes the deal. */
     emailSoundsLikeNo: boolean("email_sounds_like_no").default(false).notNull(),
+    /**
+     * Where the deal stands judged from the messages alone (2026-09-29, owner:
+     * "flag it, one click to fix") — when it's an earlier stage than the
+     * current one, Today and the creator page ask a person (stage-flag.ts).
+     * Nothing moves backward by itself (frozen node 2).
+     */
+    emailStage: cmStageEnum("email_stage"),
+    /** A verbatim line from a message the mailbox holds that supports emailStage. */
+    emailStageQuote: text("email_stage_quote"),
+    // Typed explicitly: events point back at partnerships, and TS can't infer the loop.
+    emailStageEventId: uuid("email_stage_event_id").references((): AnyPgColumn => cmOutreachEvents.id, { onDelete: "set null" }),
+    /** When that message was sent. */
+    emailStageAt: timestamp("email_stage_at"),
+    /** "Keep Agreed": the flag stays away until a newer message reads differently. */
+    stageFlagDismissedAt: timestamp("stage_flag_dismissed_at"),
     /** A shipping address the creator wrote in an email, offered as "Use it". */
     suggestedAddress: text("suggested_address"),
     suggestedAddressEventId: uuid("suggested_address_event_id"),
