@@ -1,7 +1,7 @@
 import { TrackingLink } from "@/components/tracking-link";
 import { redirect } from "next/navigation";
 import { Badge, Card, EmptyState } from "@/components/ui";
-import { PortalCreatorHeader } from "@/components/portal";
+import { PortalCreatorHeader, VideoViews } from "@/components/portal";
 import { getPortalContext, getPortalCreators } from "@/lib/portal-data";
 import { shortDate } from "@/lib/format";
 import { isTerminal } from "@/lib/stages";
@@ -23,10 +23,13 @@ export default async function PortalCreators() {
             {c.shipment?.status === "shipped" && <span>Shipped{c.shipment.shippedAt ? ` ${shortDate(c.shipment.shippedAt)}` : ""}{c.shipment.trackingNumber ? <> · <TrackingLink carrier={c.shipment.carrier} number={c.shipment.trackingNumber} /></> : ""}</span>}
             {c.shipment?.status === "delivered" && <span>Delivered{c.shipment.deliveredAt ? ` ${shortDate(c.shipment.deliveredAt)}` : ""}</span>}
             {c.videos.map((v, i) => (
-              <a key={v.url} href={v.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
-                Video {c.videos.length > 1 ? i + 1 : ""}
-                {v.postedAt ? ` · ${shortDate(v.postedAt)}` : ""}
-              </a>
+              <span key={v.url} className="inline-flex flex-wrap items-center gap-1.5">
+                <a href={v.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                  Video {c.videos.length > 1 ? i + 1 : ""}
+                  {v.postedAt ? ` · ${shortDate(v.postedAt)}` : ""}
+                </a>
+                <VideoViews views={v.views} kind={v.viewsKind} />
+              </span>
             ))}
           </div>
         </li>

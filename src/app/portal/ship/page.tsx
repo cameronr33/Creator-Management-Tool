@@ -2,8 +2,9 @@ import { TrackingLink } from "@/components/tracking-link";
 import { redirect } from "next/navigation";
 import { MapPin, Package } from "lucide-react";
 import { Card, CardHeader, EmptyState } from "@/components/ui";
-import { PortalCreatorHeader, PortalShipForm } from "@/components/portal";
+import { PortalCreatorHeader, PortalShipForm, ShipListActions } from "@/components/portal";
 import { getPortalContext, getPortalCreators } from "@/lib/portal-data";
+import { shippingListCsv } from "@/lib/portal-export";
 import { shortDate } from "@/lib/format";
 
 /** Product to send, with the confirmed address; then what's on its way. */
@@ -13,11 +14,17 @@ export default async function PortalShip() {
   const creators = await getPortalCreators(ctx.clientId);
   const ready = creators.filter((c) => c.stage === "fulfilling");
   const onTheWay = creators.filter((c) => c.stage === "shipped");
+  const fileStem = `${ctx.clientName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "creators"}-shipping-list`;
   return (
     <>
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight text-text">Ship product</h1>
-        <p className="text-sm text-text-muted">These creators have agreed and confirmed their address. Mark each one shipped with the tracking number — we&apos;ll take it from there.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight text-text">
+            Ship product<span className="hidden print:inline"> · {ctx.clientName}</span>
+          </h1>
+          <p className="text-sm text-text-muted print:hidden">These creators have agreed and confirmed their address. Mark each one shipped with the tracking number — we&apos;ll take it from there.</p>
+        </div>
+        {ready.length > 0 && <ShipListActions csv={shippingListCsv(ready)} fileStem={fileStem} />}
       </div>
       {ready.length === 0 ? (
         <EmptyState title="Nothing to ship right now" hint="Creators appear here once they've agreed and their address is confirmed." />
@@ -47,7 +54,7 @@ export default async function PortalShip() {
         </Card>
       )}
       {onTheWay.length > 0 && (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden print:hidden">
           <CardHeader title={`On the way (${onTheWay.length})`} description="Mark it delivered when it arrives, if we haven't already." />
           <ul className="divide-y divide-border">
             {onTheWay.map((c) => (

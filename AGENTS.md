@@ -31,6 +31,12 @@ them. Changing one requires a human decision and an explanation in the commit.
    `apify` is provisional; `ig_public_chrome` is authoritative. Nothing
    automated may overwrite an `ig_public_chrome` value with an `apify` one
    (see `csv-import.ts`, `writeNumbers`).
+   (2026-09-28, owner: portal views "both, clearly labelled".) The client
+   portal may show a video's estimated views, always labelled: only
+   `ig_public_chrome` is called verified; `apify` and a missing source are
+   estimated. Verified and estimated totals are never added together
+   (`portal-data.ts` `viewsKindOf`, `portal-export.ts` `portalViewTotals`).
+   `verify-portal.ts` is the anchor.
 2. **Automation moves a stage only forward and never closes a deal.**
    (Rewritten by the owner's decision of 2026-09-22 — "the status should be
    based off of the last email", and Claude may move it.) Two engines may

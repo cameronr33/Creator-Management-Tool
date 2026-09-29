@@ -8,10 +8,17 @@
  * searching the output) — the address only while it's theirs to ship, and
  * nothing of another client. A client's shipment moves the stage through the
  * same rule as ours, with who did it recorded.
+ *
+ * Views and the shipping list (owner, 2026-09-28): each video's views go out
+ * labelled — verified only for Instagram's public count, everything else
+ * estimated — and the two totals never mix (frozen node 1). The shipping list
+ * holds Ready-to-ship creators only, exactly its header, nothing private, and
+ * no cell a spreadsheet would run as a formula.
  */
 import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "./db";
-import { getPortalCreators, partnershipOfClient, PORTAL_CREATOR_KEYS } from "../src/lib/portal-data";
+import { getPortalCreators, partnershipOfClient, PORTAL_CREATOR_KEYS, PORTAL_VIDEO_KEYS, viewsKindOf } from "../src/lib/portal-data";
+import { SHIPPING_LIST_HEADER, csvCell, portalViewTotals, shippingListCsv } from "../src/lib/portal-export";
 import { clientMayShip, recordShipment } from "../src/lib/shipments";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 import { changeStage } from "../src/lib/mutations";
@@ -38,6 +45,15 @@ async function main() {
     const a = await createCreatorWithPartnership({ clientId: client.id, name: "Verify Portal", links: ["https://www.instagram.com/__verify_portal__"], campaignId, businessEmail: "secret-creator@example.test", notes: "SECRET_CREATOR_NOTE_7731" });
     const b = await createCreatorWithPartnership({ clientId: other.id, name: "Verify Portal Other", links: ["https://www.instagram.com/__verify_portal_o__"], campaignId: otherCampaign });
     creatorIds.push(a.creatorId, b.creatorId);
+    // Two more of this client's: one with a hostile address at Ready to ship, one with an address that isn't there yet.
+    const evil = await createCreatorWithPartnership({ clientId: client.id, name: "Verify Portal Evil", links: ["https://www.instagram.com/__verify_portal_evil__"], campaignId });
+    const early = await createCreatorWithPartnership({ clientId: client.id, name: "Verify Portal Early", links: ["https://www.instagram.com/__verify_portal_early__"], campaignId });
+    creatorIds.push(evil.creatorId, early.creatorId);
+    await db
+      .update(schema.cmPartnerships)
+      .set({ recipientName: '=HYPERLINK("http://x.test","click")', addressLine1: "+1 Evil St", addressLine2: "@SUM(A1)", city: "-Town", region: "CA", postalCode: "90001" })
+      .where(eq(schema.cmPartnerships.id, evil.partnershipId));
+    await db.update(schema.cmPartnerships).set({ recipientName: "Early Bird", addressLine1: "9 Not Yet Rd", city: "Soonville", region: "CA", postalCode: "90002" }).where(eq(schema.cmPartnerships.id, early.partnershipId));
     await db
       .update(schema.cmPartnerships)
       .set({ emailSummary: "SECRET_SUMMARY_7731", agreedTerms: "SECRET_TERMS_7731", notes: "SECRET_NOTE_7731", feeAmount: "4242.00", addressLine1: "1 Test St", city: "Testville", region: "CA", postalCode: "90000", recipientName: "Verify Portal" })
@@ -59,11 +75,67 @@ async function main() {
     check("another client's creators never appear", !mine.some((c) => c.partnershipId === b.partnershipId));
     const [owner] = await db.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).limit(1);
     check("who owns the deal on our side never reaches the portal", !!owner && !dump.includes(owner.id) && !JSON.stringify(mine).includes(`"${owner.name}"`));
-    check("no address before it's theirs to ship", row?.shipTo === null);
+    check("no address before it's theirs to ship", row?.shipTo === null && row?.shipToParts === null);
 
     await changeStage(a.partnershipId, "fulfilling");
     const ready = (await getPortalCreators(client.id)).find((c) => c.partnershipId === a.partnershipId)!;
     check("Ready to ship: the address is shown so they can send it", ready.stage === "fulfilling" && /1 Test St/.test(ready.shipTo ?? ""));
+    check("…and in parts, for the shipping list", ready.shipToParts?.line1 === "1 Test St" && ready.shipToParts.city === "Testville" && ready.shipToParts.postalCode === "90000");
+    check(
+      "the address parts are exactly these keys",
+      JSON.stringify(Object.keys(ready.shipToParts ?? {}).sort()) === JSON.stringify(["city", "country", "line1", "line2", "postalCode", "recipient", "region"]),
+    );
+
+    console.log("\n── Views: labelled, and never added together ──");
+    await db.insert(schema.cmDeliverables).values([
+      { partnershipId: a.partnershipId, url: "https://www.instagram.com/reel/__verify_v1/", views: 1000, metricsSource: "ig_public_chrome" },
+      { partnershipId: a.partnershipId, url: "https://www.instagram.com/reel/__verify_v2/", views: 300, metricsSource: "apify" },
+      { partnershipId: a.partnershipId, url: "https://www.instagram.com/reel/__verify_v3/", views: 50, metricsSource: null },
+      { partnershipId: a.partnershipId, url: "https://www.instagram.com/reel/__verify_v4/", views: null, metricsSource: null },
+    ]);
+    const withVideos = (await getPortalCreators(client.id)).find((c) => c.partnershipId === a.partnershipId)!;
+    const byUrl = (part: string) => withVideos.videos.find((v) => v.url.includes(part));
+    check(
+      "each video carries exactly url, postedAt, views and viewsKind",
+      withVideos.videos.length === 4 &&
+        withVideos.videos.every((v) => JSON.stringify(Object.keys(v).sort()) === JSON.stringify([...PORTAL_VIDEO_KEYS].sort())) &&
+        JSON.stringify([...PORTAL_VIDEO_KEYS].sort()) === JSON.stringify(["postedAt", "url", "views", "viewsKind"]),
+    );
+    check("Instagram's public count is verified", byUrl("__verify_v1")?.viewsKind === "verified");
+    check("the automated count is estimated", byUrl("__verify_v2")?.viewsKind === "estimated");
+    check("a count with no source is never verified", byUrl("__verify_v3")?.viewsKind === "estimated");
+    check("no count, no label", byUrl("__verify_v4")?.views === null && byUrl("__verify_v4")?.viewsKind === null);
+    check(
+      "the labelling rule, on its own",
+      viewsKindOf(5, "ig_public_chrome") === "verified" && viewsKindOf(5, "apify") === "estimated" && viewsKindOf(5, null) === "estimated" && viewsKindOf(null, "ig_public_chrome") === null,
+    );
+    const totals = portalViewTotals([withVideos]);
+    check(
+      "totals keep verified and estimated apart, with no combined figure",
+      totals.verified === 1000 && totals.verifiedVideos === 1 && totals.estimated === 350 && totals.estimatedVideos === 2 &&
+        JSON.stringify(Object.keys(totals).sort()) === JSON.stringify(["estimated", "estimatedVideos", "verified", "verifiedVideos"]),
+      JSON.stringify(totals),
+    );
+
+    console.log("\n── The shipping list ──");
+    await changeStage(evil.partnershipId, "fulfilling");
+    const everyone = await getPortalCreators(client.id);
+    const csv = shippingListCsv(everyone);
+    const lines = csv.replace(/^\uFEFF/, "").trimEnd().split("\r\n");
+    check("opens as UTF-8 in Excel (byte-order mark) with exactly the agreed header", csv.startsWith("\uFEFF") && lines[0] === SHIPPING_LIST_HEADER.map((h) => `"${h}"`).join(","), lines[0]);
+    check("Ready-to-ship creators are on it", lines.some((l) => l.startsWith('"Verify Portal",')) && lines.some((l) => l.startsWith('"Verify Portal Evil",')));
+    const readyNames = new Set(everyone.filter((c) => c.stage === "fulfilling" && c.shipToParts).map((c) => csvCell(c.name)));
+    check("…and only them: nobody whose address isn't theirs to ship yet", !csv.includes("Verify Portal Early") && !csv.includes("9 Not Yet Rd") && lines.slice(1).every((l) => readyNames.has((l.match(/^"(?:[^"]|"")*"/) ?? [""])[0])));
+    const csvLeaks = SECRETS.filter((s) => csv.includes(s));
+    check("nothing private is on it", csvLeaks.length === 0, csvLeaks.join(", "));
+    check(
+      "no cell a spreadsheet would run as a formula",
+      csv.includes(`"'=HYPERLINK(""http://x.test"",""click"")"`) && csv.includes(`"'+1 Evil St"`) && csv.includes(`"'@SUM(A1)"`) && csv.includes(`"'-Town"`),
+    );
+    check(
+      "the cell rule, on its own",
+      csvCell("=1+1") === `"'=1+1"` && csvCell("\tx") === `"'\tx"` && csvCell('He said "hi"') === `"He said ""hi"""` && csvCell(null) === `""` && csvCell("a\r\nb") === `"a\nb"` && csvCell("Plain") === `"Plain"`,
+    );
 
     console.log("\n── What the portal can do ──");
     const matrix = (["shortlisted", "awaiting_address", "fulfilling", "shipped", "content_pending", "posted", "passed"] as const).map((s) => [s, clientMayShip(s, "shipped"), clientMayShip(s, "delivered")] as const);
@@ -82,7 +154,8 @@ async function main() {
     const notes = await db.select().from(schema.cmOutreachEvents).where(and(eq(schema.cmOutreachEvents.partnershipId, a.partnershipId), eq(schema.cmOutreachEvents.kind, "note")));
     check("…and noted on the timeline with the tracking number", notes.some((n) => /Marked shipped by Rob Client · UPS 1ZVERIFY/.test(n.body ?? "")));
     const after = (await getPortalCreators(client.id)).find((c) => c.partnershipId === a.partnershipId)!;
-    check("once shipped, the address is no longer shown", after.shipTo === null && after.shipment?.trackingNumber === "1ZVERIFY");
+    check("once shipped, the address is no longer shown", after.shipTo === null && after.shipToParts === null && after.shipment?.trackingNumber === "1ZVERIFY");
+    check("…and they're off the shipping list", !shippingListCsv(await getPortalCreators(client.id)).includes('"Verify Portal",'));
   } finally {
     if (creatorIds.length) await db.delete(schema.cmCreators).where(inArray(schema.cmCreators.id, creatorIds));
     await db.delete(schema.cmCampaigns).where(inArray(schema.cmCampaigns.id, [campaignId, otherCampaign]));

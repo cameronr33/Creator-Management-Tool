@@ -232,8 +232,9 @@ export default async function HelpPage() {
               came from a scraper that under-reports Instagram&apos;s public views, sometimes by a lot on viral posts.
             </p>
             <p>
-              Nothing automatic ever overwrites a verified number with an estimate. Don&apos;t put an estimated number in a
-              client report.
+              Nothing automatic ever overwrites a verified number with an estimate. The client&apos;s portal shows estimates
+              only labelled as estimated, and never adds them to verified views — keep them apart the same way in anything
+              you send a client.
             </p>
           </div>
         </Card>

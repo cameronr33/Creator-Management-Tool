@@ -161,7 +161,9 @@ export const cmShipmentStatusEnum = pgEnum("cm_shipment_status", [
  * Which pipeline produced a view count. Step 5 of the creator-research
  * skill is explicit that Apify's videoPlayCount is NOT Instagram's public
  * Views number — on viral reels they differ by 100x. Anything labelled
- * "apify" is provisional and must not go into a client-facing report.
+ * "apify" is provisional: it may reach the client portal only labelled
+ * estimated, and is never added to verified counts (owner decision,
+ * 2026-09-28; AGENTS.md frozen node 1).
  */
 export const cmMetricsSourceEnum = pgEnum("cm_metrics_source", [
   "ig_public_chrome",

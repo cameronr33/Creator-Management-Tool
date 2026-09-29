@@ -25,7 +25,7 @@ export default async function PortalLayout({ children }: { children: React.React
   return (
     <div className="min-h-screen bg-bg">
       {ctx.readOnly && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-info-line bg-info-soft px-4 py-2 text-xs text-info sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-info-line bg-info-soft px-4 py-2 text-xs text-info sm:px-6 print:hidden">
           <span>
             You&apos;re seeing {ctx.clientName}&apos;s portal exactly as they do. Nothing can be changed from here.
           </span>
@@ -34,7 +34,7 @@ export default async function PortalLayout({ children }: { children: React.React
           </Link>
         </div>
       )}
-      <header className="border-b border-sidebar-line bg-sidebar-bg px-4 sm:px-6">
+      <header className="border-b border-sidebar-line bg-sidebar-bg px-4 sm:px-6 print:hidden">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 py-3">
           <div className="flex items-center gap-3">
             <BrandMark size={28} />

@@ -24,6 +24,11 @@ import { activeClientPerson } from "@/lib/client-session";
  * notes, no other client. The shipping address appears only while the
  * product is theirs to send (Ready to ship). verify-portal asserts the exact
  * key sets below, so adding a field is a deliberate decision.
+ *
+ * Views (owner, 2026-09-28): each video's count goes out labelled verified
+ * (read from Instagram's public count) or estimated — anything else, a
+ * missing source included, is estimated. The two are never added together
+ * (frozen node 1; portal-export.ts keeps the totals apart).
  */
 
 export const PORTAL_CREATOR_KEYS = [
@@ -40,9 +45,32 @@ export const PORTAL_CREATOR_KEYS = [
   "photoUrl",
   "shipment",
   "shipTo",
+  "shipToParts",
   "products",
   "videos",
 ] as const;
+
+/** A video as the portal shows it — verify-portal asserts exactly these keys. */
+export const PORTAL_VIDEO_KEYS = ["url", "postedAt", "views", "viewsKind"] as const;
+
+export type ViewsKind = "verified" | "estimated";
+
+/** Pure: how a view count may be described to the client. Only Instagram's public count is verified. */
+export function viewsKindOf(views: number | null, metricsSource: string | null): ViewsKind | null {
+  if (views == null) return null;
+  return metricsSource === "ig_public_chrome" ? "verified" : "estimated";
+}
+
+/** The address in parts, for the shipping list (same rule as shipTo: Ready to ship only). */
+export interface ShipToParts {
+  recipient: string | null;
+  line1: string | null;
+  line2: string | null;
+  city: string | null;
+  region: string | null;
+  postalCode: string | null;
+  country: string | null;
+}
 
 export interface PortalCreator {
   partnershipId: string;
@@ -59,8 +87,9 @@ export interface PortalCreator {
   shipment: { id: string; status: string; carrier: string | null; trackingNumber: string | null; shippedAt: string | null; deliveredAt: string | null } | null;
   /** Only while it's theirs to ship (Ready to ship). */
   shipTo: string | null;
+  shipToParts: ShipToParts | null;
   products: string[];
-  videos: { url: string; postedAt: string | null }[];
+  videos: { url: string; postedAt: string | null; views: number | null; viewsKind: ViewsKind | null }[];
 }
 
 export interface PortalContext {
@@ -131,7 +160,10 @@ export async function getPortalCreators(clientId: string): Promise<PortalCreator
       .where(inArray(cmShipments.partnershipId, ids))
       .orderBy(desc(cmShipments.createdAt)),
     db.select({ partnershipId: cmProductsRequested.partnershipId, name: cmProductsRequested.productName, quantity: cmProductsRequested.quantity }).from(cmProductsRequested).where(inArray(cmProductsRequested.partnershipId, ids)),
-    db.select({ partnershipId: cmDeliverables.partnershipId, url: cmDeliverables.url, postedAt: cmDeliverables.postedAt }).from(cmDeliverables).where(and(inArray(cmDeliverables.partnershipId, ids))),
+    db
+      .select({ partnershipId: cmDeliverables.partnershipId, url: cmDeliverables.url, postedAt: cmDeliverables.postedAt, views: cmDeliverables.views, metricsSource: cmDeliverables.metricsSource })
+      .from(cmDeliverables)
+      .where(and(inArray(cmDeliverables.partnershipId, ids))),
   ]);
   return rows.map((r): PortalCreator => {
     const stage = canonicalStage(r.stage);
@@ -152,8 +184,14 @@ export async function getPortalCreators(clientId: string): Promise<PortalCreator
         ? { id: s.id, status: s.status, carrier: s.carrier, trackingNumber: s.trackingNumber, shippedAt: s.shippedAt?.toISOString() ?? null, deliveredAt: s.deliveredAt?.toISOString() ?? null }
         : null,
       shipTo: stage === "fulfilling" ? formatAddress(r) || null : null,
+      shipToParts:
+        stage === "fulfilling" && formatAddress(r)
+          ? { recipient: r.recipientName, line1: r.addressLine1, line2: r.addressLine2, city: r.city, region: r.region, postalCode: r.postalCode, country: r.country }
+          : null,
       products: products.filter((p) => p.partnershipId === r.partnershipId).map((p) => (p.quantity > 1 ? `${p.quantity} × ${p.name}` : p.name)),
-      videos: videos.filter((v) => v.partnershipId === r.partnershipId).map((v) => ({ url: v.url, postedAt: v.postedAt?.toISOString() ?? null })),
+      videos: videos
+        .filter((v) => v.partnershipId === r.partnershipId)
+        .map((v) => ({ url: v.url, postedAt: v.postedAt?.toISOString() ?? null, views: v.views, viewsKind: viewsKindOf(v.views, v.metricsSource) })),
     };
   });
 }
