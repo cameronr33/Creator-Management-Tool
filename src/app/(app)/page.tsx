@@ -23,7 +23,7 @@ export default async function TodayPage() {
   const [campaign, view] = await Promise.all([resolveCampaign(client.id), getSelectedView()]);
   const me = await memberForUser(session.user);
   const meId = me?.id ?? null;
-  const [{ rows, stageCounts, hiddenSummary, totalCreators, snoozedCount }, account, teammates] = await Promise.all([
+  const [{ rows, stageCounts, hiddenSummary, totalCreators, archivedCount }, account, teammates] = await Promise.all([
     getTodayData({ clientId: client.id, campaignId: campaign?.id, view, me: meId }),
     getActiveGmailAccount(),
     listTeammates(),
@@ -31,12 +31,12 @@ export default async function TodayPage() {
   const labels = chipLabels(teammates);
   const team = teammates.map((t) => ({ ...t, label: labels.get(t.id) ?? "?" }));
   const health = summarizeGmailHealth(account);
-  const toDo = rows.filter((r) => r.section !== "waiting" && r.section !== "snoozed").length;
+  const toDo = rows.filter((r) => r.section !== "waiting").length;
   const waiting = rows.filter((r) => r.section === "waiting").length;
   const scope = view === "mine" ? ` · yours and unassigned${hiddenSummary ? ` (${hiddenSummary})` : ""}` : "";
   return <>
     <PageHeader title="Today" client={client.name} campaign={campaign?.name ?? null}
-      subtitle={`${toDo ? `${toDo} thing${toDo === 1 ? "" : "s"} to do · ${waiting} waiting on others` : "Nothing to do right now"}${snoozedCount ? ` · ${snoozedCount} snoozed` : ""}${scope}`}
+      subtitle={`${toDo ? `${toDo} thing${toDo === 1 ? "" : "s"} to do · ${waiting} waiting on others` : "Nothing to do right now"}${archivedCount ? ` · ${archivedCount} archived` : ""}${scope}`}
       help="Everyone who needs something from you, grouped by what to do next. Each row shows the campaign, the latest message and whose turn it is. Fix a stage with the menu on the right; the button under the name does the next step. Mine shows yours and unassigned ones."
       helpAnchor="daily-loop" actions={<><MineToggle view={view} /><Button href="/creators/new" variant="primary" icon={<Plus size={15} />}>Add creator</Button></>} />
     <div className="space-y-4 p-4 sm:p-6">

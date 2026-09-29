@@ -60,8 +60,8 @@ import { governingContract, isStaleRead, listContracts } from "@/lib/contracts";
 import { dealDifferences, type DealFacts, type EmailDeal } from "@/lib/deal-facts";
 import { Contracts, type ContractRow, type OfferedDifference } from "@/components/contracts";
 import { StatusNote } from "@/components/status-note";
-import { BringBackButton, SnoozeControl, SnoozeLine } from "@/components/snooze";
-import { snoozeActive } from "@/lib/snooze-rules";
+import { ArchiveControl, ArchiveLine, RestoreButton } from "@/components/archive";
+import { archiveActive } from "@/lib/archive-rules";
 import { TrackingLink } from "@/components/tracking-link";
 import { OwnerPicker } from "@/components/owner-controls";
 import { chipLabels, listLoginNames, listTeammates, memberForUser } from "@/lib/owners";
@@ -154,11 +154,11 @@ export default async function CreatorDetailPage({
   const team = teammates.map((t) => ({ ...t, label: chip.get(t.id) ?? "?" }));
 
   const hasAddress = !!(partnership.addressLine1 && partnership.city && partnership.region && partnership.postalCode);
-  // Snoozed off Today? The same rule Today uses, over the messages already loaded.
+  // Archived? The same rule the lists use, over the messages already loaded.
   const lastInboundStoredAt = events
     .filter((e) => e.direction === "inbound" && e.kind !== "note")
     .reduce<Date | null>((latest, e) => (!latest || e.createdAt > latest ? e.createdAt : latest), null);
-  const asleep = snoozeActive({ ...partnership, lastInboundStoredAt });
+  const archived = archiveActive({ ...partnership, lastInboundStoredAt });
   const step = nextStep({
     stage: partnership.stage,
     hasAddress,
@@ -290,15 +290,15 @@ export default async function CreatorDetailPage({
                 <StatusNote partnershipId={partnership.id} note={statusNoteView(partnership)} />
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted">
-                {asleep && partnership.snoozedUntil ? (
+                {archived ? (
                   <>
                     <span>
-                      Off Today · <SnoozeLine until={partnership.snoozedUntil.toISOString()} by={partnership.snoozedByName} reason={partnership.snoozeReason} />
+                      <ArchiveLine until={partnership.archivedUntil?.toISOString() ?? null} by={partnership.archivedByName} reason={partnership.archiveReason} />
                     </span>
-                    <BringBackButton partnershipId={partnership.id} name={creator.name} />
+                    <RestoreButton partnershipId={partnership.id} name={creator.name} />
                   </>
                 ) : listedOnToday(partnership.stage) ? (
-                  <SnoozeControl partnershipId={partnership.id} name={creator.name} label="Snooze on Today" />
+                  <ArchiveControl partnershipId={partnership.id} name={creator.name} label="Archive" />
                 ) : null}
               </div>
               {partnership.clientApproval === "pending" ? (

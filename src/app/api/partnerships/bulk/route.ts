@@ -17,6 +17,7 @@ import { changeStage } from "@/lib/mutations";
 import { moveToCampaign, removePartnerships } from "@/lib/campaigns";
 import { STAGE_VALUES } from "@/lib/stages";
 import { memberForUser, restoreOwners, setOwner, takeUnassigned } from "@/lib/owners";
+import { restoreArchived, setArchived } from "@/lib/archive";
 import { cmExitReasonEnum } from "@/lib/db/schema";
 
 const schema = z.discriminatedUnion("action", [
@@ -33,6 +34,9 @@ const schema = z.discriminatedUnion("action", [
   // Owners (2026-09-28): assign to a teammate (null = nobody), or take unassigned ones yourself.
   z.object({ action: z.literal("set_owner"), ids: z.array(z.string()).min(1).max(500), ownerId: z.string().uuid().nullable() }),
   z.object({ action: z.literal("take"), ids: z.array(z.string()).min(1).max(500) }),
+  // Archive (2026-09-29): off Today, the Pipeline and the Creators list until they write or the stage moves.
+  z.object({ action: z.literal("archive"), ids: z.array(z.string()).min(1).max(500), reason: z.string().max(200).nullable().optional() }),
+  z.object({ action: z.literal("unarchive"), ids: z.array(z.string()).min(1).max(500) }),
   // The owner toast's Undo (2026-09-29): back to who owned each before — only where the owner is still `expected`.
   z.object({
     action: z.literal("restore_owner"),
@@ -82,6 +86,14 @@ export async function POST(req: NextRequest) {
     if (!me) return badRequest("You're not on the team list — add yourself under Settings → Team");
     const r = await takeUnassigned([...new Set(d.ids)], me.id);
     return NextResponse.json({ ok: true, ...r });
+  }
+  if (d.action === "archive") {
+    const archived = await setArchived([...new Set(d.ids)], { until: null, reason: d.reason ?? null, byName: session.user.name ?? session.user.email ?? null });
+    return NextResponse.json({ ok: true, archived });
+  }
+  if (d.action === "unarchive") {
+    const restored = await restoreArchived([...new Set(d.ids)]);
+    return NextResponse.json({ ok: true, restored });
   }
   if (d.action === "restore_owner") {
     // Only the deals this request was checked for.

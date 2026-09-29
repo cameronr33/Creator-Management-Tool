@@ -76,7 +76,9 @@ What the scripts anchor:
 - **today / today-data** — the latest-message line and every Today
   placement; nudges for quiet deals, Due and Late, the oldest-first sort
   (unknown dates last), "waiting since" ignoring undone moves and undo rows;
-  snooze's wake rules (their message wakes it, ours and invites don't).
+  Archive's rules (their message brings them back, ours and invites don't; a
+  stage move clears it; archived creators are out of Today, the Pipeline, the
+  Creators list and every count).
 - **logging** — the date limits (never the future, 180 days back), a message
   dated before a person's stage change never moves it (a late "They replied"
   can't reopen No response; the one-time stage clean-up doesn't count), email

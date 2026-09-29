@@ -13,13 +13,16 @@ import { CreatorsFilterBar } from "@/components/creators-filter-bar";
 import { CreatorsTable } from "@/components/creators-table";
 import type { CmStage } from "@/lib/db/schema";
 import { STAGES } from "@/lib/stages";
+import { splitArchived } from "@/lib/archive-rules";
+import { getLastInboundStoredAt } from "@/lib/archive";
+import Link from "next/link";
 
 export const metadata: Metadata = { title: "Creators" };
 
 export default async function CreatorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; stage?: string }>;
+  searchParams: Promise<{ q?: string; stage?: string; archived?: string }>;
 }) {
   const session = await requireAgencyPage();
   await scheduleEmailCheckForVisitor();
@@ -40,10 +43,15 @@ export default async function CreatorsPage({
   const meId = (await memberForUser(session.user))?.id ?? null;
   const labels = chipLabels(teammates);
   const team = teammates.map((t) => ({ ...t, label: labels.get(t.id) ?? "?" }));
-  const scoped = await getCreatorRows(client.id, {
+  const inScope = await getCreatorRows(client.id, {
     campaignId: campaign?.id,
     stage: STAGES.some((s) => s.value === sp.stage) ? (sp.stage as CmStage) : undefined,
   });
+  // The list is the active ones; Archived (2026-09-29) is its own view with Restore.
+  const showArchived = sp.archived === "1";
+  const split = splitArchived(inScope, await getLastInboundStoredAt(inScope.map((r) => r.partnershipId)));
+  const scoped = showArchived ? split.archived : split.active;
+  const otherCount = splitForList(showArchived ? split.active : split.archived, view, meId, null).rows.length;
   const q = (sp.q ?? "").trim().toLowerCase();
   const matches = q
     ? (r: (typeof scoped)[number]) =>
@@ -74,7 +82,23 @@ export default async function CreatorsPage({
         title="Creators"
         client={client.name}
         campaign={campaign?.name ?? null}
-        subtitle={`${rows.length === total ? `${total} creator${total === 1 ? "" : "s"}` : `${rows.length} of ${total} shown`}${view === "mine" ? ` · yours and unassigned${hiddenLine ? ` (${hiddenLine})` : ""}` : ""}`}
+        subtitle={
+          <>
+            {showArchived ? "Archived · " : ""}
+            {`${rows.length === total ? `${total} creator${total === 1 ? "" : "s"}` : `${rows.length} of ${total} shown`}${view === "mine" ? ` · yours and unassigned${hiddenLine ? ` (${hiddenLine})` : ""}` : ""}`}
+            {showArchived ? (
+              <>
+                {" · "}
+                <Link href="/creators" className="underline hover:text-accent">Back to the list</Link>
+              </>
+            ) : otherCount ? (
+              <>
+                {" · "}
+                <Link href="/creators?archived=1" className="underline hover:text-accent">{otherCount} archived</Link>
+              </>
+            ) : null}
+          </>
+        }
         help="Everyone you're tracking. Tick creators to move them to a stage or another campaign, or to delete them. Open a creator for their conversation, deal, shipping and videos."
         actions={
           <>
@@ -136,6 +160,7 @@ export default async function CreatorsPage({
             scopeName={campaign?.name ?? null}
             teammates={team}
             meId={meId}
+            archivedView={showArchived}
           />
         )}
       </div>

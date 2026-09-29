@@ -216,10 +216,13 @@ what moved it, the email quote, anything undone).
   defaults, Settings and Help): first message due, two follow-ups, No
   response, a nudge for a deal gone quiet at Talking / Agreed / Finalizing,
   and a video late after delivery.
-- **Snooze** (`src/lib/snooze-rules.ts`) takes a creator off Today until a
-  date with a reason; it is checked on page load — they come back sooner if
-  they write (an inbound message stored after the snooze) or their stage
-  changes.
+- **Archive** (`src/lib/archive-rules.ts`, 2026-09-29 — it replaced Snooze)
+  puts a creator out of Today, the Pipeline and the Creators list, with an
+  optional reminder date and a reason; it is checked on page load — they come
+  back if they write (an inbound message stored after it) or their stage
+  changes, and any stage move clears it. Creators → Archived lists them with
+  Restore; bulk Archive / Restore on Creators. (The columns kept their
+  `snooze_*` names.)
 - **Logging by hand** (`src/lib/logging.ts`): I messaged them / They replied
   stay one click; the calendar button beside them logs an earlier day or an
   email from your own inbox or a call. Email logged by hand is never read,
@@ -292,7 +295,7 @@ authoritative description and every agent reads it first.
   on a teammate's machine today, so server and browser agree. If it's ever
   hosted elsewhere (a cloud server runs in UTC), set `TZ` to the team's zone
   (for example `TZ=America/Los_Angeles`), or "Sep 28, 6 pm" shows as Sep 29.
-  Dates picked in the browser (snooze, a logged day) are sent as instants and
+  Dates picked in the browser (an archive reminder, a logged day) are sent as instants and
   shown back in the browser's own zone.
 
 - **Schema changes: use `db:generate` + `db:apply`, never `db:push`.**

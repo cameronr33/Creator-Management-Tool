@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Check, ExternalLink, ImageDown, Mail, NotebookPen, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, Check, ExternalLink, ImageDown, Mail, NotebookPen, Trash2, X } from "lucide-react";
 import { Avatar, Badge, Button, Checkbox, Field, Select, StagePill } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { OwnerMenu, ownerToast, type OwnerInfo, type TeammateOption } from "@/components/owner-controls";
@@ -46,6 +46,7 @@ export function CreatorsTable({
   scopeName,
   teammates,
   meId,
+  archivedView = false,
 }: {
   rows: CreatorsTableRow[];
   campaigns: { id: string; name: string }[];
@@ -54,6 +55,8 @@ export function CreatorsTable({
   /** Everyone with a Sentic login, for "Assign to…". */
   teammates: TeammateOption[];
   meId: string | null;
+  /** Showing Creators → Archived: the bar offers Restore instead of Archive. */
+  archivedView?: boolean;
 }) {
   const { pending, run } = useSave();
   const router = useRouter();
@@ -199,6 +202,23 @@ export function CreatorsTable({
             >
               Get photos & followers
             </Button>
+          </div>
+          <div className="self-center">
+            {archivedView ? (
+              <Button size="sm" icon={<ArchiveRestore size={13} />} pending={pending} onClick={() => bulk({ action: "unarchive" }, (d) => `${d.restored ?? 0} back on the lists`)}>
+                Restore
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                icon={<Archive size={13} />}
+                pending={pending}
+                title="Off Today, the Pipeline and this list — they come back if they write"
+                onClick={() => bulk({ action: "archive" }, (d) => `${d.archived ?? 0} archived — see them under Archived`)}
+              >
+                Archive
+              </Button>
+            )}
           </div>
           <div className="ml-auto self-center">
             <ConfirmButton

@@ -9,6 +9,8 @@ import { PipelineBoard, type BoardCard } from "@/components/pipeline-board";
 import { MineToggle } from "@/components/mine-toggle";
 import { getSelectedView } from "@/lib/view-cookie";
 import { chipLabels, hiddenSummary, listTeammates, memberForUser, splitByView } from "@/lib/owners";
+import { splitArchived } from "@/lib/archive-rules";
+import { getLastInboundStoredAt } from "@/lib/archive";
 
 export default async function PipelinePage() {
   const session = await requireAgencyPage();
@@ -29,7 +31,10 @@ export default async function PipelinePage() {
   const meId = (await memberForUser(session.user))?.id ?? null;
   const labels = chipLabels(teammates);
   const team = teammates.map((t) => ({ ...t, label: labels.get(t.id) ?? "?" }));
-  const all = await getCreatorRows(client.id, { campaignId: campaign?.id, withOutreach: false });
+  const everything = await getCreatorRows(client.id, { campaignId: campaign?.id, withOutreach: false });
+  // Archived creators aren't on the board, nor in its counts (2026-09-29).
+  const { active: all, archived } = splitArchived(everything, await getLastInboundStoredAt(everything.map((r) => r.partnershipId)));
+  const archivedHere = splitByView(archived, view, meId).shown.length;
   const { shown: rows, hidden } = splitByView(all, view, meId);
   const hiddenLine = hiddenSummary(hidden);
   const cards: BoardCard[] = rows.map((r) => ({
@@ -55,7 +60,7 @@ export default async function PipelinePage() {
         title="Pipeline"
         client={client.name}
         campaign={campaign?.name ?? null}
-        subtitle={`${cards.length} creator${cards.length === 1 ? "" : "s"}${view === "mine" ? ` · yours and unassigned${hiddenLine ? ` (${hiddenLine})` : ""}` : ""}`}
+        subtitle={`${cards.length} creator${cards.length === 1 ? "" : "s"}${archivedHere ? ` · ${archivedHere} archived` : ""}${view === "mine" ? ` · yours and unassigned${hiddenLine ? ` (${hiddenLine})` : ""}` : ""}`}
         actions={<MineToggle view={view} />}
         help="One column per stage. Each card shows the campaign, the latest message and whose turn it is. Change the stage from the menu on the card, or drag it. Hover a column name to see what that stage means; closing a deal asks who ended it and why."
         helpAnchor="stages"

@@ -7,7 +7,7 @@
 import { latestActivity, type LastMessage } from "../src/lib/activity";
 import { placeOnToday, sortToday, TODAY_SECTIONS, type TodayFacts, listedOnToday } from "../src/lib/today";
 import { THRESHOLD_FIELDS, THRESHOLDS_SCHEMA } from "../src/lib/thresholds";
-import { SNOOZE_MAX_DAYS, parseSnoozeUntil, snoozeActive } from "../src/lib/snooze-rules";
+import { ARCHIVE_REMIND_MAX_DAYS, archiveActive, archiveWoke, parseRemindOn, splitArchived } from "../src/lib/archive-rules";
 import { DEFAULT_THRESHOLDS } from "../src/lib/outreach";
 import { ACTIVE_STAGES, STAGE_VALUES, isTerminal } from "../src/lib/stages";
 import type { CmStage } from "../src/lib/db/schema";
@@ -117,19 +117,31 @@ const sorted = sortToday([
 ]);
 check("whoever has waited longest comes first; unknown dates last; ties by name", sorted.map((r) => r.name).join(",") === "Bo,Ab,Cy,Al", sorted.map((r) => r.name).join(","));
 
-console.log("\n── Snooze (2026-09-28) ──");
-const snoozed = { snoozedUntil: at(25), snoozedAt: at(20), snoozeStage: "in_conversation" as CmStage, stage: "in_conversation" as CmStage, lastInboundStoredAt: null, now: at(22) };
-check("asleep before the date", snoozeActive(snoozed));
-check("awake on the date", !snoozeActive({ ...snoozed, now: at(25) }));
-check("a message from them stored after the snooze wakes it", !snoozeActive({ ...snoozed, lastInboundStoredAt: at(21) }));
-check("…one stored before it doesn't", snoozeActive({ ...snoozed, lastInboundStoredAt: at(19) }));
-check("a stage change wakes it", !snoozeActive({ ...snoozed, stage: "awaiting_address" }));
-check("never snoozed: never asleep", !snoozeActive({ ...snoozed, snoozedUntil: null }));
+// Archive replaced Snooze (owner, 2026-09-29): the same bring-back rules under the new names, plus archives with no date.
+console.log("\n── Archive (2026-09-29) ──");
+const archivedFacts = { archivedAt: at(20), archivedUntil: at(25) as Date | null, archiveStage: "in_conversation" as CmStage, stage: "in_conversation" as CmStage, lastInboundStoredAt: null as Date | null, now: at(22) };
+check("archived before the reminder date", archiveActive(archivedFacts));
+check("back on the reminder date, saying so", !archiveActive({ ...archivedFacts, now: at(25) }) && archiveWoke({ ...archivedFacts, now: at(25) }) === "reminder");
+check("with no reminder date it stays archived, however long", archiveActive({ ...archivedFacts, archivedUntil: null, now: daysAfter(at(20), 400) }));
+check("a message from them stored after it brings them back, saying so", !archiveActive({ ...archivedFacts, lastInboundStoredAt: at(21) }) && archiveWoke({ ...archivedFacts, lastInboundStoredAt: at(21) }) === "wrote");
+check("…one stored before it doesn't", archiveActive({ ...archivedFacts, lastInboundStoredAt: at(19) }));
+check("a stage change brings them back", !archiveActive({ ...archivedFacts, stage: "awaiting_address" }));
+check("never archived: never hidden, never 'back'", !archiveActive({ ...archivedFacts, archivedAt: null }) && archiveWoke({ ...archivedFacts, archivedAt: null }) === null);
 const now22 = at(22);
-check("a date in the past or today is refused", !parseSnoozeUntil(at(21).toISOString(), now22).ok && !parseSnoozeUntil(now22.toISOString(), now22).ok);
-check(`at most ${SNOOZE_MAX_DAYS} days away`, parseSnoozeUntil(daysAfter(now22, SNOOZE_MAX_DAYS).toISOString(), now22).ok && !parseSnoozeUntil(daysAfter(now22, SNOOZE_MAX_DAYS + 1).toISOString(), now22).ok);
-check("nonsense is refused", !parseSnoozeUntil("soon", now22).ok);
-check("Snoozed is the last section", TODAY_SECTIONS[TODAY_SECTIONS.length - 1].key === "snoozed");
+check("no reminder date is allowed", (() => { const r = parseRemindOn(null, now22); return r.ok && r.until === null; })());
+check("a reminder in the past or today is refused", !parseRemindOn(at(21).toISOString(), now22).ok && !parseRemindOn(now22.toISOString(), now22).ok);
+check(`a reminder at most ${ARCHIVE_REMIND_MAX_DAYS} days away`, parseRemindOn(daysAfter(now22, ARCHIVE_REMIND_MAX_DAYS).toISOString(), now22).ok && !parseRemindOn(daysAfter(now22, ARCHIVE_REMIND_MAX_DAYS + 1).toISOString(), now22).ok);
+check("nonsense is refused", !parseRemindOn("soon", now22).ok);
+const lists = splitArchived(
+  [
+    { partnershipId: "p1", stage: "in_conversation" as CmStage, archivedAt: at(20), archivedUntil: null, archiveStage: "in_conversation" as CmStage },
+    { partnershipId: "p2", stage: "contacted" as CmStage, archivedAt: null, archivedUntil: null, archiveStage: null },
+  ],
+  new Map(),
+  at(22),
+);
+check("the lists split the archived from the rest", lists.archived.map((r) => r.partnershipId).join() === "p1" && lists.active.map((r) => r.partnershipId).join() === "p2");
+check("Today has no archived (or snoozed) section — archived creators aren't listed at all", !TODAY_SECTIONS.some((t) => ["snoozed", "archived"].includes(t.key as string)));
 
 console.log("\n── The timing table ──");
 check("the field table, the defaults and the settings schema have the same keys", JSON.stringify(THRESHOLD_FIELDS.map((f) => f.key).sort()) === JSON.stringify(Object.keys(DEFAULT_THRESHOLDS).sort()));

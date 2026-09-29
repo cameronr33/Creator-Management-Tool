@@ -8,8 +8,8 @@ import { listedOnToday, placeOnToday, sortToday, type TodaySection } from "@/lib
 import type { WhoseTurn } from "@/lib/activity";
 import { statusNoteView, type StatusNoteView } from "@/lib/status-note";
 import { hiddenSummary, splitByView, type MemberId, type View } from "@/lib/owners";
-import { snoozeActive } from "@/lib/snooze-rules";
-import { getLastInboundStoredAt } from "@/lib/snooze";
+import { archiveWoke, splitArchived } from "@/lib/archive-rules";
+import { getLastInboundStoredAt } from "@/lib/archive";
 
 /** One Today row — plain values only, so it can go straight to the client list. */
 export interface TodayRow {
@@ -41,8 +41,8 @@ export interface TodayRow {
   since: string | null;
   /** "due" (first message) or "late" (video). */
   badge: "due" | "late" | null;
-  /** While snoozed: back when (ISO), who snoozed it and why. */
-  snooze: { until: string; by: string | null; reason: string | null } | null;
+  /** Back from the archive: because the reminder date came or they wrote, with who archived it and why. */
+  backFromArchive: { why: "reminder" | "wrote"; by: string | null; reason: string | null } | null;
 }
 
 export interface TodayData {
@@ -53,8 +53,8 @@ export interface TodayData {
   hiddenSummary: string | null;
   /** Creators on the client/campaign at all, whatever the view — tells "all caught up" from "none yet". */
   totalCreators: number;
-  /** How many are snoozed off Today right now. */
-  snoozedCount: number;
+  /** How many on this view are archived (not listed anywhere but Creators → Archived). */
+  archivedCount: number;
 }
 
 export interface TodayOptions {
@@ -66,16 +66,20 @@ export interface TodayOptions {
 }
 
 export async function getTodayData({ clientId, campaignId, view = "all", me }: TodayOptions): Promise<TodayData> {
-  const all = await getCreatorRows(clientId, { campaignId, withOutreach: false });
+  const everything = await getCreatorRows(clientId, { campaignId, withOutreach: false });
+  // Archived creators are off Today — and out of every count here — before Mine splits anything (2026-09-29).
+  const lastInbound = await getLastInboundStoredAt(everything.map((c) => c.partnershipId));
+  const { active: all, archived } = splitArchived(everything, lastInbound);
+  const archivedCount = splitByView(archived, view, me).shown.length;
   const { shown: creators, hidden } = splitByView(all, view, me);
   const stageCounts: Partial<Record<CmStage, number>> = {};
   for (const c of creators) stageCounts[c.stage] = (stageCounts[c.stage] ?? 0) + 1;
   // "N of Kieran's not shown" counts only what Today would have listed — never their Posted or closed deals.
-  const base = { stageCounts, hiddenSummary: hiddenSummary(hidden.filter((h) => listedOnToday(h.stage))), totalCreators: all.length };
-  if (creators.length === 0) return { rows: [], ...base, snoozedCount: 0 };
+  const base = { stageCounts, hiddenSummary: hiddenSummary(hidden.filter((h) => listedOnToday(h.stage))), totalCreators: all.length, archivedCount };
+  if (creators.length === 0) return { rows: [], ...base };
 
   const ids = creators.map((c) => c.partnershipId);
-  const [outreach, thresholds, details, shipments, stageSince, lastInbound] = await Promise.all([
+  const [outreach, thresholds, details, shipments, stageSince] = await Promise.all([
     getOutreachStates(ids),
     getFollowUpThresholds(clientId),
     db
@@ -95,7 +99,6 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       .where(inArray(cmShipments.partnershipId, ids))
       .orderBy(desc(cmShipments.createdAt)),
     getStageSince(ids),
-    getLastInboundStoredAt(ids),
   ]);
   const detailById = new Map(details.map((d) => [d.id, d]));
   const latestShipment = new Map<string, (typeof shipments)[number]>();
@@ -120,8 +123,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       deliveredAt: latestShipment.get(c.partnershipId)?.deliveredAt ?? null,
     });
     if (!placed) continue;
-    // Snoozed: off the working sections until the date, or until they write or the stage moves.
-    const asleep = snoozeActive({ ...c, stage: c.stage, lastInboundStoredAt: lastInbound.get(c.partnershipId) ?? null });
+    const woke = archiveWoke({ ...c, lastInboundStoredAt: lastInbound.get(c.partnershipId) ?? null });
     const d = detailById.get(c.partnershipId);
     rows.push({
       partnershipId: c.partnershipId,
@@ -129,8 +131,8 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       username: c.profileUrl ? c.username : null,
       campaignName: c.campaignName,
       stage: c.stage,
-      section: asleep ? "snoozed" : placed.section,
-      note: asleep ? null : placed.note,
+      section: placed.section,
+      note: placed.note,
       latest: c.activity.text,
       latestFromEmail: c.activity.fromEmail,
       latestAt: c.activity.at?.toISOString() ?? null,
@@ -145,10 +147,10 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       approvalByName: c.approvalByName,
       ownerId: c.ownerId,
       ownerName: c.ownerName,
-      since: asleep ? c.snoozedUntil!.toISOString() : (placed.since?.toISOString() ?? null),
-      badge: asleep ? null : placed.badge,
-      snooze: asleep ? { until: c.snoozedUntil!.toISOString(), by: c.snoozedByName, reason: c.snoozeReason } : null,
+      since: placed.since?.toISOString() ?? null,
+      badge: placed.badge,
+      backFromArchive: woke ? { why: woke, by: c.archivedByName, reason: c.archiveReason } : null,
     });
   }
-  return { rows: sortToday(rows), ...base, snoozedCount: rows.filter((r) => r.section === "snoozed").length };
+  return { rows: sortToday(rows), ...base };
 }

@@ -19,6 +19,8 @@ import type { cmExitReasonEnum } from "@/lib/db/schema";
  *    ship date survives a misclick).
  *  - Posted always has a video: a move to Posted without one needs the link.
  *  - Agreed with a complete address on file continues straight to Ready to ship.
+ *  - Any stage move clears an archive (2026-09-29): they're back, and moving
+ *    back into the archived stage later can't archive them again by itself.
  *  - Every move writes a cm_stage_transitions row saying who moved it
  *    (manual / rule / email / migration), why, what it created and the exit
  *    reason it replaced (`priorExitReason`), so Undo can take it back
@@ -137,6 +139,7 @@ export async function moveStage(input: StageMoveInput): Promise<StageMoveResult>
             when ${clearExit} then null
             else exit_reason
           end,
+          snoozed_until = null, snoozed_at = null, snooze_stage = null, snooze_reason = null, snoozed_by_name = null,
           updated_at = now()
       where id = ${input.partnershipId} and stage = ${from}::cm_stage
       returning id

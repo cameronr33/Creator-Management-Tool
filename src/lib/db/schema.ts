@@ -387,16 +387,17 @@ export const cmPartnerships = pgTable(
      */
     legacyOwnerUserId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
     /**
-     * Snoozed off Today until this time (2026-09-28, owner: "snooze / remind me
-     * on"). It wakes early when the creator (or someone on their thread) writes
-     * after snoozedAt, or when the stage is no longer snoozeStage — worked out
-     * when the page loads, so nothing has to run to wake it.
+     * Archived (2026-09-29, owner: Archive replaces Snooze — the columns kept
+     * their snooze names). Off Today, the Pipeline and the Creators list until
+     * the optional reminder date, or until the creator (or someone on their
+     * thread) writes after archivedAt, or the stage moves — worked out when the
+     * page loads (archive-rules.ts). A stage move clears all five.
      */
-    snoozedUntil: timestamp("snoozed_until"),
-    snoozedAt: timestamp("snoozed_at"),
-    snoozeStage: cmStageEnum("snooze_stage"),
-    snoozeReason: text("snooze_reason"),
-    snoozedByName: text("snoozed_by_name"),
+    archivedUntil: timestamp("snoozed_until"),
+    archivedAt: timestamp("snoozed_at"),
+    archiveStage: cmStageEnum("snooze_stage"),
+    archiveReason: text("snooze_reason"),
+    archivedByName: text("snoozed_by_name"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

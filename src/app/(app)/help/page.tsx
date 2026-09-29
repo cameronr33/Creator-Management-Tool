@@ -8,7 +8,7 @@ import { BackLink } from "@/components/back-link";
 import { stagesByGroup, AUTO_TRIGGER_LABELS, stageLabel, STAGES, ACTIVE_STAGES, TERMINAL_STAGES } from "@/lib/stages";
 import { AUTO_STAGE_RULES, type AutoStageTrigger } from "@/lib/auto-stage";
 import { EMAIL_STAGE_RULES } from "@/lib/email-status";
-import { SNOOZE_MAX_DAYS } from "@/lib/snooze-rules";
+import { ARCHIVE_REMIND_MAX_DAYS } from "@/lib/archive-rules";
 import { LOG_MAX_PAST_DAYS } from "@/lib/log-time";
 import { UNDO_WINDOW_MS } from "@/lib/quick-actions";
 import type { CmStage } from "@/lib/db/schema";
@@ -288,9 +288,10 @@ export default async function HelpPage() {
               The message after I messaged them, They replied, Mark shipped or Mark delivered has an Undo button. Only whoever pressed it can
               undo it, within {UNDO_WINDOW_MS / 60_000} minutes, and not once the stage or the shipment has changed since.
             </Term>
-            <Term word="Snooze">
-              Takes a creator off Today until a date you pick (up to {SNOOZE_MAX_DAYS} days), with an optional reason. They come back sooner
-              if they write or their stage changes.
+            <Term word="Archive">
+              Puts a creator you&apos;re no longer really talking to out of Today, the Pipeline and the Creators list — with a reminder date if you
+              like (up to {ARCHIVE_REMIND_MAX_DAYS} days). They come back by themselves if they write or their stage changes; Creators → Archived
+              shows them all, with Restore.
             </Term>
             <Term word="Stage history">On each creator&apos;s page: every move between stages, who or what made it, and anything undone.</Term>
           </dl>

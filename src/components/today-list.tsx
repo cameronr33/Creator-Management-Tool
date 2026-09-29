@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { AlarmClock, CalendarClock, ChevronDown, ChevronRight, Mail, MapPin, MessageCircle, NotebookPen, PackageCheck, Truck, Clapperboard, ArrowRight } from "lucide-react";
+import { Archive, CalendarClock, ChevronDown, ChevronRight, Mail, MapPin, MessageCircle, NotebookPen, PackageCheck, Truck, Clapperboard, ArrowRight } from "lucide-react";
 import { Avatar, Badge, Button, Card } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { QuickStage } from "@/components/quick-stage";
 import { StatusNote } from "@/components/status-note";
 import { OwnerMenu, type TeammateOption } from "@/components/owner-controls";
-import { BringBackButton, SnoozeControl, SnoozeLine } from "@/components/snooze";
+import { ArchiveControl } from "@/components/archive";
 import { MessagedButton, ReplyButton } from "@/components/reply-button";
 import { LogMessagePanel } from "@/components/log-message";
 import { Menu, MenuItem } from "@/components/menu";
@@ -25,7 +25,7 @@ import { relativeDays } from "@/lib/format";
 /**
  * Today, as sections of work. Every row: who, what was said last and whose
  * turn it is, a stage menu to fix the stage in place, the one button for the
- * next step, and a ⋯ menu for the rest (log with a date, a note, snooze). The
+ * next step, and a ⋯ menu for the rest (log with a date, a note, archive). The
  * campaign shows only when the sidebar is on All campaigns. "Waiting on them"
  * starts folded.
  */
@@ -40,7 +40,7 @@ export function TodayList({
   team: TeammateOption[];
   showCampaign?: boolean;
 }) {
-  // "Waiting on them" and "Snoozed" start folded: nothing to do there today.
+  // "Waiting on them" starts folded: nothing to do there today.
   const [open, setOpen] = useState<Set<TodaySection>>(new Set());
   const bySection = new Map<TodaySection, TodayRow[]>();
   for (const r of rows) bySection.set(r.section, [...(bySection.get(r.section) ?? []), r]);
@@ -50,7 +50,7 @@ export function TodayList({
     <div className="space-y-4">
       {shown.map((s) => {
         const list = bySection.get(s.key)!;
-        const foldable = s.key === "waiting" || s.key === "snoozed";
+        const foldable = s.key === "waiting";
         const folded = foldable && !open.has(s.key);
         return (
           <Card key={s.key} className="overflow-hidden" id={`today-${s.key}`}>
@@ -108,7 +108,7 @@ function href(r: TodayRow, section: CreatorSection) {
 
 function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: string | null; team: TeammateOption[]; showCampaign: boolean }) {
   const turn = whoseTurnText(r.whoseTurn);
-  const [panel, setPanel] = useState<"log" | "snooze" | null>(null);
+  const [panel, setPanel] = useState<"log" | "archive" | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
   const owner = r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: team.find((t) => t.id === r.ownerId)?.label ?? "?" } : null;
   return (
@@ -148,13 +148,14 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
               Found in their email: <span className="font-medium text-text">{r.suggestedAddress}</span>
             </p>
           )}
-          {r.snooze && (
+          {r.backFromArchive && (
             <p className="mt-1 text-xs text-text-muted">
-              <SnoozeLine until={r.snooze.until} by={r.snooze.by} reason={r.snooze.reason} />
+              Back from the archive — {r.backFromArchive.why === "wrote" ? "they wrote" : "the reminder date came"}
+              {r.backFromArchive.reason ? ` · ${r.backFromArchive.by ? `${r.backFromArchive.by.split(" ")[0]}: ` : ""}${r.backFromArchive.reason}` : ""}
             </p>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            {r.section === "snoozed" ? <BringBackButton partnershipId={r.partnershipId} name={r.name} /> : <NextAction row={r} />}
+            <NextAction row={r} />
             <Menu label={`More for ${r.name}`}>
               <MenuItem icon={<CalendarClock size={14} />} onSelect={() => setPanel("log")}>
                 Log with a date or another way…
@@ -162,11 +163,9 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
               <MenuItem icon={<NotebookPen size={14} />} onSelect={() => setNoteOpen(true)}>
                 {r.statusNote ? "Edit the note" : "Add a note"}
               </MenuItem>
-              {r.section !== "snoozed" && (
-                <MenuItem icon={<AlarmClock size={14} />} onSelect={() => setPanel("snooze")}>
-                  Snooze…
-                </MenuItem>
-              )}
+              <MenuItem icon={<Archive size={14} />} onSelect={() => setPanel("archive")}>
+                Archive…
+              </MenuItem>
             </Menu>
           </div>
           {panel === "log" && (
@@ -174,9 +173,9 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
               <LogMessagePanel partnershipId={r.partnershipId} name={r.name} hasOutbound={r.hasOutbound} onClose={() => setPanel(null)} />
             </div>
           )}
-          {panel === "snooze" && (
+          {panel === "archive" && (
             <div className="mt-2">
-              <SnoozeControl partnershipId={r.partnershipId} name={r.name} startOpen onClose={() => setPanel(null)} />
+              <ArchiveControl partnershipId={r.partnershipId} name={r.name} startOpen onClose={() => setPanel(null)} />
             </div>
           )}
         </div>
