@@ -11,7 +11,7 @@ import { Avatar, Badge, StagePill, Button, IconButton, cn } from "@/components/u
 import { api, useSave } from "@/components/use-save";
 import { VideoLinkPrompt, needsVideo } from "@/components/partnership-actions";
 import { QuickStage } from "@/components/quick-stage";
-import { OwnerSlot, type OwnerInfo } from "@/components/owner-controls";
+import { OwnerMenu, type OwnerInfo, type TeammateOption } from "@/components/owner-controls";
 import { StatusNote } from "@/components/status-note";
 import type { StatusNoteView } from "@/lib/status-note";
 
@@ -64,7 +64,7 @@ interface Closing {
   stage: CmStage | null;
 }
 
-export function PipelineBoard({ cards, meId }: { cards: BoardCard[]; meId: string | null }) {
+export function PipelineBoard({ cards, meId, team }: { cards: BoardCard[]; meId: string | null; team: TeammateOption[] }) {
   const { run, pending } = useSave();
   const [items, setItems] = useState(cards);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -254,7 +254,7 @@ export function PipelineBoard({ cards, meId }: { cards: BoardCard[]; meId: strin
                       <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
                         <span className="truncate">{c.username ? `@${c.username}` : "No profile link yet"}</span>
                         <span onMouseDown={(e) => e.stopPropagation()} draggable={false}>
-                          <OwnerSlot partnershipId={c.partnershipId} owner={c.owner} meId={meId} />
+                          <OwnerMenu partnershipId={c.partnershipId} name={c.name} owner={c.owner} meId={meId} team={team} />
                         </span>
                         <span className="tabular" title="Followers">
                           {compactNumber(c.followers)}

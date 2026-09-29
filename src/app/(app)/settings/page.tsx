@@ -20,6 +20,8 @@ import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 import { summarizeGmailHealth } from "@/lib/gmail-health";
 import { listClientUsers } from "@/lib/client-users";
 import { ClientTeam } from "@/components/client-team";
+import { TeamSettings } from "@/components/team-settings";
+import { listTeamForSettings, memberForUser } from "@/lib/owners";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -47,7 +49,7 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAgencyPage();
+  const session = await requireAgencyPage();
   const sp = await searchParams;
   const gmailResult = describeGmailResult(typeof sp.gmail === "string" ? sp.gmail : null);
   const client = await resolveClient(await getSelectedClientSlug());
@@ -70,7 +72,8 @@ export default async function SettingsPage({
     getEmailCoverage(),
     emailMoveStats(monthStart),
   ]);
-  const [counts, clientPeople] = await Promise.all([getCampaignCounts(client.id), listClientUsers(client.id)]);
+  const [counts, clientPeople, myMember] = await Promise.all([getCampaignCounts(client.id), listClientUsers(client.id), memberForUser(session.user)]);
+  const teamMembers = await listTeamForSettings();
   const readingOn = !!process.env.ANTHROPIC_API_KEY;
   const automove = emailAutomoveOn();
   const currentSettings = clients.find((c) => c.id === client.id) ?? null;
@@ -207,6 +210,16 @@ export default async function SettingsPage({
         </Card>
 
         <GroupHeading>Admin · applies to every client</GroupHeading>
+
+        <Card id="team" className="scroll-mt-4 p-5">
+          <CardHeader
+            title="Team"
+            description="Who deals can be assigned to. Nobody needs a login to be on the list; once someone signs in with the email here, Mine shows their deals. Switching someone off keeps them as owner of what they have, but they're no longer offered."
+          />
+          <div className="mt-3">
+            <TeamSettings members={teamMembers} meId={myMember?.id ?? null} />
+          </div>
+        </Card>
 
         <Card id="gmail" className="scroll-mt-4 p-5">
           <CardHeader

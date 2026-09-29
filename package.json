@@ -45,7 +45,8 @@
     "email:assess": "tsx --env-file=.env.local scripts/email-assess.ts",
     "verify:email-status": "node scripts/preview/run.mjs verify scripts/verify-email-status.ts",
     "photos:backfill": "tsx --env-file=.env.local scripts/photos-backfill.ts",
-    "contracts:backfill": "tsx --env-file=.env.local scripts/contracts-backfill.ts"
+    "contracts:backfill": "tsx --env-file=.env.local scripts/contracts-backfill.ts",
+    "team:adopt": "tsx --env-file=.env.local scripts/team-adopt.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.116.0",

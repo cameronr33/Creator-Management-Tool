@@ -244,6 +244,16 @@ export function ChipButton({ children, icon, onClick, disabled, title }: { child
   );
 }
 
+/** The dashed "Take it" chip as a look only — for inside a button that isn't this one (the owner menu's trigger). */
+export function DashedChip({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
+  return (
+    <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full border border-dashed border-border-strong px-1.5 text-[11px] font-medium text-text-muted transition hover:border-accent hover:text-accent">
+      {icon}
+      {children}
+    </span>
+  );
+}
+
 /**
  * A creator's picture, or their initials when there isn't one. `src` is the
  * app's own photo URL (/api/creators/[id]/photo) — never Instagram's link.

@@ -64,7 +64,7 @@ import { BringBackButton, SnoozeControl, SnoozeLine } from "@/components/snooze"
 import { snoozeActive } from "@/lib/snooze-rules";
 import { TrackingLink } from "@/components/tracking-link";
 import { OwnerPicker } from "@/components/owner-controls";
-import { listTeammates } from "@/lib/owners";
+import { chipLabels, listLoginNames, listTeammates, memberForUser } from "@/lib/owners";
 import { buildHistory, getStageHistory } from "@/lib/history";
 import { listedOnToday } from "@/lib/today";
 import { StageHistory } from "@/components/stage-history";
@@ -147,8 +147,11 @@ export default async function CreatorDetailPage({
   }
   const client = clients.find((item) => item.id === creator.clientId);
   const history = buildHistory(historyRows, { clientName: client?.name ?? "the client", undoableId: undoable.get(partnership.id)?.id ?? null });
-  // "· by Kieran" on what a teammate logged by hand.
-  const teammateNames = new Map(teammates.map((t) => [t.id, t.name]));
+  // "· by Kieran" on what a teammate logged by hand — logged under their login, so by login id.
+  const teammateNames = await listLoginNames();
+  const me = await memberForUser(session.user);
+  const chip = chipLabels(teammates);
+  const team = teammates.map((t) => ({ ...t, label: chip.get(t.id) ?? "?" }));
 
   const hasAddress = !!(partnership.addressLine1 && partnership.city && partnership.region && partnership.postalCode);
   // Snoozed off Today? The same rule Today uses, over the messages already loaded.
@@ -316,7 +319,7 @@ export default async function CreatorDetailPage({
           <div className="w-full space-y-3 sm:w-72">
             <StageControl partnershipId={partnership.id} stage={partnership.stage} exitReason={partnership.exitReason} autoNote={autoNote} />
             <CampaignPicker partnershipId={partnership.id} campaignId={campaign.id} campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))} />
-            <OwnerPicker partnershipId={partnership.id} ownerId={partnership.ownerId} teammates={teammates} meId={session.user.id} />
+            <OwnerPicker partnershipId={partnership.id} ownerId={partnership.ownerId} teammates={team} meId={me?.id ?? null} />
           </div>
         </div>
         <nav aria-label="Jump to" className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">

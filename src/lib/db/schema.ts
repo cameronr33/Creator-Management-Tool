@@ -14,6 +14,7 @@ import {
   index,
   unique,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
 
 // ─────────────────────────────────────────────────────────────────
@@ -374,11 +375,17 @@ export const cmPartnerships = pgTable(
     dealEditedAt: timestamp("deal_edited_at"),
     /**
      * Who on the team looks after this deal (2026-09-28, owner: "an owner per
-     * creator"). Null = unassigned — new deals start that way until someone
-     * takes them. A login removed from the shared users table leaves it null.
+     * creator"; 2026-09-29: a teammate from the team list, login or not).
+     * Null = unassigned — new deals start that way until someone takes them.
      * Changing it never touches updatedAt (the email check files mail by it).
      */
-    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    ownerId: uuid("owner_member_id").references(() => cmTeamMembers.id, { onDelete: "set null" }),
+    /**
+     * The owner as it was first stored — a login. Only read to hand the one
+     * early assignment to that login's team member (owners.ts memberForUser),
+     * and cleared whenever the owner changes. To be dropped once empty.
+     */
+    legacyOwnerUserId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
     /**
      * Snoozed off Today until this time (2026-09-28, owner: "snooze / remind me
      * on"). It wakes early when the creator (or someone on their thread) writes
@@ -398,7 +405,8 @@ export const cmPartnerships = pgTable(
     unique("cm_partnerships_creator_campaign_uq").on(t.creatorId, t.campaignId),
     index("cm_partnerships_stage_idx").on(t.stage),
     index("cm_partnerships_campaign_idx").on(t.campaignId),
-    index("cm_partnerships_owner_idx").on(t.ownerId),
+    index("cm_partnerships_owner_idx").on(t.legacyOwnerUserId),
+    index("cm_partnerships_owner_member_idx").on(t.ownerId),
     // Email roster: most recently updated open partnership per creator.
     index("cm_partnerships_creator_updated_idx").on(t.creatorId, t.updatedAt.desc()),
   ],
@@ -849,6 +857,34 @@ export const cmStageTransitions = pgTable(
   },
   (t) => [index("cm_transitions_partnership_idx").on(t.partnershipId)],
 );
+
+// ─────────────────────────────────────────────────────────────────
+// cm_team_members — who can own a deal (owner, 2026-09-29: "a team list in
+// Settings"). A teammate needs no login to be assigned; a login whose email
+// matches is linked to it (user_id), so "Mine" works for them. Every login
+// that opens the app gets one. Never a brand's portal login.
+// ─────────────────────────────────────────────────────────────────
+
+export const cmTeamMembers = pgTable(
+  "cm_team_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    /** Lowercased. */
+    email: text("email"),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    /** Off: kept for history and chips, but no longer offered to assign. */
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("cm_team_members_email_uq").on(t.email),
+    uniqueIndex("cm_team_members_user_uq").on(t.userId),
+    check("cm_team_members_email_lower", sql`${t.email} = lower(${t.email})`),
+  ],
+);
+
+export type CmTeamMember = typeof cmTeamMembers.$inferSelect;
 
 // ─────────────────────────────────────────────────────────────────
 // cm_quick_actions — one row per press of a quick button (I messaged

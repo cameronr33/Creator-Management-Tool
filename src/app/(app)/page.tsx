@@ -13,7 +13,7 @@ import { getActiveGmailAccount } from "@/lib/gmail-sync";
 import { summarizeGmailHealth } from "@/lib/gmail-health";
 import { resolveCampaign } from "@/lib/campaigns";
 import { getSelectedView } from "@/lib/view-cookie";
-import { chipLabels, listTeammates } from "@/lib/owners";
+import { chipLabels, listTeammates, memberForUser } from "@/lib/owners";
 
 export default async function TodayPage() {
   const session = await requireAgencyPage();
@@ -21,13 +21,15 @@ export default async function TodayPage() {
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) return <><PageHeader title="Today" /><div className="p-6"><EmptyState title="No clients to show" hint="Choose which clients to show in Settings." action={<Button href="/settings">Open settings</Button>} /></div></>;
   const [campaign, view] = await Promise.all([resolveCampaign(client.id), getSelectedView()]);
-  const meId = session.user.id;
+  const me = await memberForUser(session.user);
+  const meId = me?.id ?? null;
   const [{ rows, stageCounts, hiddenSummary, totalCreators, snoozedCount }, account, teammates] = await Promise.all([
-    getTodayData({ clientId: client.id, campaignId: campaign?.id, view, userId: meId }),
+    getTodayData({ clientId: client.id, campaignId: campaign?.id, view, me: meId }),
     getActiveGmailAccount(),
     listTeammates(),
   ]);
-  const labels = Object.fromEntries(chipLabels(teammates));
+  const labels = chipLabels(teammates);
+  const team = teammates.map((t) => ({ ...t, label: labels.get(t.id) ?? "?" }));
   const health = summarizeGmailHealth(account);
   const toDo = rows.filter((r) => r.section !== "waiting" && r.section !== "snoozed").length;
   const waiting = rows.filter((r) => r.section === "waiting").length;
@@ -47,7 +49,7 @@ export default async function TodayPage() {
         ? (totalCreators > 0
           ? <EmptyState title="All caught up" hint={`Nobody needs anything from you right now. Posted and closed deals don't show here.${hiddenSummary ? ` ${hiddenSummary} — switch to Everyone to see them.` : ""}`} />
           : <EmptyState title={campaign ? `No creators in ${campaign.name} yet` : "No creators yet"} hint="Add a creator or import a CSV to get started." action={<Button href="/import">Import CSV</Button>} />)
-        : <TodayList rows={rows} meId={meId} ownerLabels={labels} showCampaign={!campaign} />}
+        : <TodayList rows={rows} meId={meId} team={team} showCampaign={!campaign} />}
     </div>
   </>;
 }

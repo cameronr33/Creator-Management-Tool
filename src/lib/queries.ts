@@ -13,7 +13,7 @@ import {
   cmProductsRequested,
   cmCreatorSocials,
   cmClientSettings,
-  users,
+  cmTeamMembers,
   cmStageTransitions,
   type CmStage,
 } from "@/lib/db/schema";
@@ -215,7 +215,7 @@ export async function getCreatorRows(
       statusNoteAt: cmPartnerships.statusNoteAt,
       statusNoteBy: cmPartnerships.statusNoteBy,
       ownerId: cmPartnerships.ownerId,
-      ownerName: users.name,
+      ownerName: cmTeamMembers.name,
       createdAt: cmPartnerships.createdAt,
       approvalAt: cmPartnerships.approvalAt,
       snoozedUntil: cmPartnerships.snoozedUntil,
@@ -231,7 +231,7 @@ export async function getCreatorRows(
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
     .innerJoin(cmCampaigns, eq(cmPartnerships.campaignId, cmCampaigns.id))
     .leftJoin(cmCreatorPhotos, eq(cmCreatorPhotos.creatorId, cmCreators.id))
-    .leftJoin(users, eq(users.id, cmPartnerships.ownerId))
+    .leftJoin(cmTeamMembers, eq(cmTeamMembers.id, cmPartnerships.ownerId))
     .where(and(...conds))
     .orderBy(desc(cmCreators.followers));
 

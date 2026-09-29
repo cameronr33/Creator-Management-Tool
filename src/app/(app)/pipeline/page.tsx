@@ -8,7 +8,7 @@ import { PageHeader, EmptyState, Button } from "@/components/ui";
 import { PipelineBoard, type BoardCard } from "@/components/pipeline-board";
 import { MineToggle } from "@/components/mine-toggle";
 import { getSelectedView } from "@/lib/view-cookie";
-import { chipLabels, hiddenSummary, listTeammates, splitByView } from "@/lib/owners";
+import { chipLabels, hiddenSummary, listTeammates, memberForUser, splitByView } from "@/lib/owners";
 
 export default async function PipelinePage() {
   const session = await requireAgencyPage();
@@ -26,8 +26,9 @@ export default async function PipelinePage() {
   }
 
   const [campaign, view, teammates] = await Promise.all([resolveCampaign(client.id), getSelectedView(), listTeammates()]);
-  const meId = session.user.id;
+  const meId = (await memberForUser(session.user))?.id ?? null;
   const labels = chipLabels(teammates);
+  const team = teammates.map((t) => ({ ...t, label: labels.get(t.id) ?? "?" }));
   const all = await getCreatorRows(client.id, { campaignId: campaign?.id, withOutreach: false });
   const { shown: rows, hidden } = splitByView(all, view, meId);
   const hiddenLine = hiddenSummary(hidden);
@@ -69,7 +70,7 @@ export default async function PipelinePage() {
             action={<div className="flex gap-2"><Button href="/import">Import CSV</Button><Button href="/creators/new" variant="primary">Add creator</Button></div>}
           />
         ) : (
-          <PipelineBoard cards={cards} meId={meId} />
+          <PipelineBoard cards={cards} meId={meId} team={team} />
         )}
       </div>
     </>

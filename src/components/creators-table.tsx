@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Check, ExternalLink, ImageDown, Mail, NotebookPen, Trash2, X } from "lucide-react";
 import { Avatar, Badge, Button, Checkbox, Field, Select, StagePill } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
-import { OwnerSlot, type OwnerInfo, type TeammateOption } from "@/components/owner-controls";
+import { OwnerMenu, ownerToast, type OwnerInfo, type TeammateOption } from "@/components/owner-controls";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
 import { stagesByGroup } from "@/lib/stages";
@@ -55,6 +56,7 @@ export function CreatorsTable({
   meId: string | null;
 }) {
   const { pending, run } = useSave();
+  const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const visible = useMemo(() => new Set(rows.map((r) => r.partnershipId)), [rows]);
   // Rows can disappear after a refresh (deleted, moved out of scope): drop them from the selection.
@@ -75,6 +77,16 @@ export function CreatorsTable({
       toast(describe(r.data), { tone: "good" });
       setSelected(new Set());
     }
+  };
+
+  // Assign the ticked ones; the toast's Undo puts back who owned each before (2026-09-29).
+  const assignTo = async (to: string | null) => {
+    const who = to ? (to === meId ? "you" : (teammates.find((t) => t.id === to)?.name.split(" ")[0] ?? "them")) : null;
+    const r = await run(() => api<{ updated?: number; prior?: { id: string; ownerId: string | null }[] }>("/api/partnerships/bulk", { action: "set_owner", ids: chosen, ownerId: to }));
+    if (!r.ok) return;
+    const n = r.data.updated ?? 0;
+    ownerToast(who ? `${n} assigned to ${who}` : `${n} unassigned`, r.data.prior ?? [], to, () => router.refresh());
+    setSelected(new Set());
   };
 
   const where = scopeName ? `from ${scopeName}` : "from the campaign each is in";
@@ -146,15 +158,14 @@ export function CreatorsTable({
                 const v = e.target.value;
                 if (!v) return;
                 const to = v === "__nobody" ? null : v;
-                const who = to ? (to === meId ? "you" : (teammates.find((t) => t.id === to)?.name.split(" ")[0] ?? "them")) : null;
-                bulk({ action: "set_owner", ownerId: to }, (d) => (who ? `${d.updated ?? 0} assigned to ${who}` : `${d.updated ?? 0} unassigned`));
+                assignTo(to);
               }}
               className="w-44"
             >
               <option value="">Choose…</option>
-              {meId && teammates.some((t) => t.id === meId) && <option value={meId}>Me</option>}
+              {meId && teammates.some((t) => t.id === meId && t.active) && <option value={meId}>Me</option>}
               {teammates
-                .filter((t) => t.id !== meId)
+                .filter((t) => t.id !== meId && t.active)
                 .map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
@@ -268,7 +279,7 @@ export function CreatorsTable({
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-1.5 text-xs text-text-muted">
-                      <OwnerSlot partnershipId={r.partnershipId} owner={r.owner} meId={meId} />
+                      <OwnerMenu partnershipId={r.partnershipId} name={r.name} owner={r.owner} meId={meId} team={teammates} />
                       {r.owner && <span className="truncate">{r.owner.id === meId ? "You" : r.owner.name.split(" ")[0]}</span>}
                     </div>
                   </td>

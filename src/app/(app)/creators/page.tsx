@@ -1,6 +1,6 @@
 import { MineToggle } from "@/components/mine-toggle";
 import { getSelectedView } from "@/lib/view-cookie";
-import { chipLabels, emptyListMessage, listTeammates, listViewLine, splitForList } from "@/lib/owners";
+import { chipLabels, emptyListMessage, listTeammates, listViewLine, memberForUser, splitForList } from "@/lib/owners";
 import { requireAgencyPage } from "@/lib/page-guards";
 import type { Metadata } from "next";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
@@ -37,8 +37,9 @@ export default async function CreatorsPage({
   }
 
   const [campaigns, campaign, view, teammates] = await Promise.all([getCampaigns(client.id), resolveCampaign(client.id), getSelectedView(), listTeammates()]);
-  const meId = session.user.id;
+  const meId = (await memberForUser(session.user))?.id ?? null;
   const labels = chipLabels(teammates);
+  const team = teammates.map((t) => ({ ...t, label: labels.get(t.id) ?? "?" }));
   const scoped = await getCreatorRows(client.id, {
     campaignId: campaign?.id,
     stage: STAGES.some((s) => s.value === sp.stage) ? (sp.stage as CmStage) : undefined,
@@ -133,7 +134,7 @@ export default async function CreatorsPage({
             }))}
             campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))}
             scopeName={campaign?.name ?? null}
-            teammates={teammates}
+            teammates={team}
             meId={meId}
           />
         )}

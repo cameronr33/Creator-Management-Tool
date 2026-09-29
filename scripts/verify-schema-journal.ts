@@ -64,11 +64,14 @@ async function main() {
     "alter table users add column x text",
     `ALTER TYPE "public"."user_role" ADD VALUE 'viewer'`,
     'DROP TABLE "sa_reports"',
+    // Even a read: a migration that copies from the shared table depends on another app's data (2026-09-29).
+    'INSERT INTO "cm_team_members" ("name", "user_id") SELECT "name", "id" FROM "users"',
   ];
   const fine = [
     'ALTER TABLE "cm_partnerships" ADD CONSTRAINT "f" FOREIGN KEY ("owner_id") REFERENCES "public"."users"("id") ON DELETE set null',
     'ALTER TABLE "cm_api_keys" ADD CONSTRAINT "cm_api_keys_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id")',
     'CREATE TABLE "users" (\n\t"id" uuid PRIMARY KEY NOT NULL\n)',
+    'ALTER TABLE "cm_team_members" ADD CONSTRAINT "cm_team_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action',
   ];
   check("…and that check catches each way one could", wouldTouch.every(touchesShared) && !fine.some(touchesShared), JSON.stringify({ missed: wouldTouch.filter((s) => !touchesShared(s)), flagged: fine.filter(touchesShared) }));
 }

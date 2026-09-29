@@ -16,7 +16,7 @@ import {
 import { changeStage } from "@/lib/mutations";
 import { moveToCampaign, removePartnerships } from "@/lib/campaigns";
 import { STAGE_VALUES } from "@/lib/stages";
-import { setOwner, takeUnassigned } from "@/lib/owners";
+import { memberForUser, restoreOwners, setOwner, takeUnassigned } from "@/lib/owners";
 import { cmExitReasonEnum } from "@/lib/db/schema";
 
 const schema = z.discriminatedUnion("action", [
@@ -33,6 +33,13 @@ const schema = z.discriminatedUnion("action", [
   // Owners (2026-09-28): assign to a teammate (null = nobody), or take unassigned ones yourself.
   z.object({ action: z.literal("set_owner"), ids: z.array(z.string()).min(1).max(500), ownerId: z.string().uuid().nullable() }),
   z.object({ action: z.literal("take"), ids: z.array(z.string()).min(1).max(500) }),
+  // The owner toast's Undo (2026-09-29): back to who owned each before — only where the owner is still `expected`.
+  z.object({
+    action: z.literal("restore_owner"),
+    ids: z.array(z.string()).min(1).max(500),
+    prior: z.array(z.object({ id: z.string().uuid(), ownerId: z.string().uuid().nullable() })).min(1).max(500),
+    expected: z.string().uuid().nullable(),
+  }),
 ]);
 
 /**
@@ -68,10 +75,19 @@ export async function POST(req: NextRequest) {
   if (d.action === "set_owner") {
     const r = await setOwner([...new Set(d.ids)], d.ownerId);
     if (!r.ok) return badRequest(r.error);
-    return NextResponse.json({ ok: true, updated: r.updated });
+    return NextResponse.json({ ok: true, updated: r.updated, prior: r.prior });
   }
   if (d.action === "take") {
-    const r = await takeUnassigned([...new Set(d.ids)], session.user.id);
+    const me = await memberForUser(session.user);
+    if (!me) return badRequest("You're not on the team list — add yourself under Settings → Team");
+    const r = await takeUnassigned([...new Set(d.ids)], me.id);
+    return NextResponse.json({ ok: true, ...r });
+  }
+  if (d.action === "restore_owner") {
+    // Only the deals this request was checked for.
+    const allowed = new Set(d.ids);
+    if (!d.prior.every((p) => allowed.has(p.id))) return badRequest("Invalid undo");
+    const r = await restoreOwners(d.prior, d.expected);
     return NextResponse.json({ ok: true, ...r });
   }
   if (d.action === "set_campaign") {

@@ -7,7 +7,7 @@ import { hasCompleteAddress } from "@/lib/address";
 import { listedOnToday, placeOnToday, sortToday, type TodaySection } from "@/lib/today";
 import type { WhoseTurn } from "@/lib/activity";
 import { statusNoteView, type StatusNoteView } from "@/lib/status-note";
-import { hiddenSummary, splitByView, type View } from "@/lib/owners";
+import { hiddenSummary, splitByView, type MemberId, type View } from "@/lib/owners";
 import { snoozeActive } from "@/lib/snooze-rules";
 import { getLastInboundStoredAt } from "@/lib/snooze";
 
@@ -61,12 +61,13 @@ export interface TodayOptions {
   clientId: string;
   campaignId?: string;
   view?: View;
-  userId?: string | null;
+  /** My team member (owners.ts memberForUser) — never a login id. */
+  me?: MemberId | null;
 }
 
-export async function getTodayData({ clientId, campaignId, view = "all", userId }: TodayOptions): Promise<TodayData> {
+export async function getTodayData({ clientId, campaignId, view = "all", me }: TodayOptions): Promise<TodayData> {
   const all = await getCreatorRows(clientId, { campaignId, withOutreach: false });
-  const { shown: creators, hidden } = splitByView(all, view, userId);
+  const { shown: creators, hidden } = splitByView(all, view, me);
   const stageCounts: Partial<Record<CmStage, number>> = {};
   for (const c of creators) stageCounts[c.stage] = (stageCounts[c.stage] ?? 0) + 1;
   // "N of Kieran's not shown" counts only what Today would have listed — never their Posted or closed deals.

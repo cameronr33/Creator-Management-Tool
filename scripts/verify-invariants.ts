@@ -127,6 +127,9 @@ async function main() {
     join cm_outreach_events e on e.id = q.outreach_event_id
     where e.external_id is not null`);
   check("no quick action points at mail the mailbox holds", quickOnSynced === 0, `${quickOnSynced}`);
+  // Owners moved to the team list (2026-09-29): an old login owner is handed over the next time that login opens the app.
+  const stuckOwner = await scalar(sql`select count(*)::int from cm_partnerships where owner_id is not null and owner_member_id is null`);
+  check("no deal is left with only its old login owner (run npm run team:adopt, or open the app once as that login)", stuckOwner === 0, `${stuckOwner}`);
 
   console.log("\n── Test hygiene: verification scripts left nothing behind ──");
   const leftovers = await count(
@@ -141,6 +144,13 @@ async function main() {
   check("no __verify_ creators/campaigns/accounts in the database", leftovers + leftoverCampaigns + leftoverAccounts === 0, `${leftovers}/${leftoverCampaigns}/${leftoverAccounts}`);
   const leftoverUsers = await count(db.select({ n: N }).from(schema.users).where(sql`${schema.users.email} like '\\_\\_verify%' escape '\\'`));
   check("no throwaway __verify logins left in the shared users table", leftoverUsers === 0, String(leftoverUsers));
+  const leftoverMembers = await count(
+    db
+      .select({ n: N })
+      .from(schema.cmTeamMembers)
+      .where(sql`${schema.cmTeamMembers.name} like '\\_\\_verify%' escape '\\' or ${schema.cmTeamMembers.email} like '\\_\\_verify%' escape '\\'`),
+  );
+  check("no throwaway __verify teammates left on the team list", leftoverMembers === 0, String(leftoverMembers));
 
   console.log("\n── Shared tables untouched by this app's verification ──");
   const clientsN = await count(db.select({ n: N }).from(schema.clients));

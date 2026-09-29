@@ -7,7 +7,7 @@ import { Avatar, Badge, Button, Card } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { QuickStage } from "@/components/quick-stage";
 import { StatusNote } from "@/components/status-note";
-import { OwnerSlot } from "@/components/owner-controls";
+import { OwnerMenu, type TeammateOption } from "@/components/owner-controls";
 import { BringBackButton, SnoozeControl, SnoozeLine } from "@/components/snooze";
 import { MessagedButton, ReplyButton } from "@/components/reply-button";
 import { LogMessagePanel } from "@/components/log-message";
@@ -32,12 +32,12 @@ import { relativeDays } from "@/lib/format";
 export function TodayList({
   rows,
   meId,
-  ownerLabels,
+  team,
   showCampaign = true,
 }: {
   rows: TodayRow[];
   meId: string | null;
-  ownerLabels: Record<string, string>;
+  team: TeammateOption[];
   showCampaign?: boolean;
 }) {
   // "Waiting on them" and "Snoozed" start folded: nothing to do there today.
@@ -78,7 +78,7 @@ export function TodayList({
             {!folded && (
               <ul className="divide-y divide-border">
                 {list.map((r) => (
-                  <TodayItem key={r.partnershipId} row={r} meId={meId} ownerLabels={ownerLabels} showCampaign={showCampaign} />
+                  <TodayItem key={r.partnershipId} row={r} meId={meId} team={team} showCampaign={showCampaign} />
                 ))}
               </ul>
             )}
@@ -106,11 +106,11 @@ function href(r: TodayRow, section: CreatorSection) {
   return creatorSectionHref(r.partnershipId, section, "/");
 }
 
-function TodayItem({ row: r, meId, ownerLabels, showCampaign }: { row: TodayRow; meId: string | null; ownerLabels: Record<string, string>; showCampaign: boolean }) {
+function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: string | null; team: TeammateOption[]; showCampaign: boolean }) {
   const turn = whoseTurnText(r.whoseTurn);
   const [panel, setPanel] = useState<"log" | "snooze" | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
-  const owner = r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: ownerLabels[r.ownerId] ?? "?" } : null;
+  const owner = r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: team.find((t) => t.id === r.ownerId)?.label ?? "?" } : null;
   return (
     <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start">
       <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -120,7 +120,7 @@ function TodayItem({ row: r, meId, ownerLabels, showCampaign }: { row: TodayRow;
             <Link href={href(r, "overview")} className="text-sm font-semibold text-text hover:text-accent">
               {r.name}
             </Link>
-            <OwnerSlot partnershipId={r.partnershipId} owner={owner} meId={meId} />
+            <OwnerMenu partnershipId={r.partnershipId} name={r.name} owner={owner} meId={meId} team={team} />
             {r.badge === "due" && <Badge tone="warn" title="The first message is overdue">Due</Badge>}
             {r.badge === "late" && <Badge tone="bad" title="The video is later than the client's Video due setting">Late</Badge>}
             {showCampaign && <Badge tone="info" title="Campaign">{r.campaignName}</Badge>}
