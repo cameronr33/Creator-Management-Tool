@@ -2,25 +2,26 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Mail, MessageCircle, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Archive, ArrowRight, CalendarClock, Mail, MessageCircle, MoveRight, NotebookPen, X } from "lucide-react";
 import { STAGES, stageHint, stageLabel, EXIT_REASONS_BY_STAGE, STAGE_GROUP_LABELS } from "@/lib/stages";
 import type { CmStage } from "@/lib/db/schema";
-import { compactNumber, relativeDays } from "@/lib/format";
+import { relativeDays } from "@/lib/format";
 import { whoseTurnText, type WhoseTurn } from "@/lib/activity";
-import { Avatar, Badge, StagePill, Button, IconButton, cn } from "@/components/ui";
+import { Avatar, Badge, StagePill, Button, IconButton, TurnDot, cn } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { VideoLinkPrompt, needsVideo } from "@/components/partnership-actions";
 import { QuickStage } from "@/components/quick-stage";
 import { OwnerMenu, type OwnerInfo, type TeammateOption } from "@/components/owner-controls";
 import { StatusNote } from "@/components/status-note";
+import { ArchiveControl } from "@/components/archive";
+import { LogMessagePanel } from "@/components/log-message";
+import { Menu, MenuItem, MenuLabel } from "@/components/menu";
 import type { StatusNoteView } from "@/lib/status-note";
 
 export interface BoardCard {
   partnershipId: string;
   name: string;
-  /** Null for a creator added by name alone (no profile link). */
-  username: string | null;
-  followers: number | null;
   stage: CmStage;
   campaignName: string;
   /** The latest message, as one line (the email summary when it's current). */
@@ -35,6 +36,8 @@ export interface BoardCard {
   clientApproval: "pending" | "approved" | "passed" | null;
   /** Who looks after it; null = unassigned. */
   owner: OwnerInfo | null;
+  /** Anything sent yet — a logged message is then a follow-up, not the first. */
+  hasOutbound: boolean;
 }
 
 // Active stages get their own column; the three terminal stages collapse into
@@ -64,7 +67,26 @@ interface Closing {
   stage: CmStage | null;
 }
 
-export function PipelineBoard({ cards, meId, team }: { cards: BoardCard[]; meId: string | null; team: TeammateOption[] }) {
+/**
+ * The board. Each card is kept to what you need at a glance (owner decision
+ * 2026-09-29, "minimal"): the name and who looks after it, whose turn it is,
+ * the latest message and when, and our note only if there is one. Moving,
+ * logging, notes and archiving live in the card's ⋯ menu; dragging still works.
+ * The campaign shows only when the sidebar is on All campaigns.
+ */
+export function PipelineBoard({
+  cards,
+  meId,
+  team,
+  clientName,
+  showCampaign,
+}: {
+  cards: BoardCard[];
+  meId: string | null;
+  team: TeammateOption[];
+  clientName: string;
+  showCampaign: boolean;
+}) {
   const { run, pending } = useSave();
   const [items, setItems] = useState(cards);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -229,87 +251,167 @@ export function PipelineBoard({ cards, meId, team }: { cards: BoardCard[]; meId:
             <div className="flex min-h-16 flex-col gap-2 px-2 pb-2">
               {closing && col.key === "closed" && closePrompt(closing)}
               {colCards.map((c) => (
-                <div
+                <PipelineCard
                   key={c.partnershipId}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = "move";
-                    setDragId(c.partnershipId);
-                  }}
+                  card={c}
+                  closed={col.key === "closed"}
+                  dragging={dragId === c.partnershipId}
+                  onDragStart={() => setDragId(c.partnershipId)}
                   onDragEnd={() => setDragId(null)}
-                  className={cn(
-                    "cursor-grab rounded-lg border border-border bg-surface p-2.5 shadow-card transition active:cursor-grabbing",
-                    dragId === c.partnershipId && "opacity-50",
-                  )}
-                >
-                  <div className="flex items-start gap-2">
-                    <Avatar name={c.name} size="sm" src={c.photoUrl} />
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/creators/${c.partnershipId}?returnTo=/pipeline`}
-                        className="block truncate text-sm font-medium text-text hover:text-accent"
-                      >
-                        {c.name}
-                      </Link>
-                      <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
-                        <span className="truncate">{c.username ? `@${c.username}` : "No profile link yet"}</span>
-                        <span onMouseDown={(e) => e.stopPropagation()} draggable={false}>
-                          <OwnerMenu partnershipId={c.partnershipId} name={c.name} owner={c.owner} meId={meId} team={team} />
-                        </span>
-                        <span className="tabular" title="Followers">
-                          {compactNumber(c.followers)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                    <Badge tone="info" title="Campaign">{c.campaignName}</Badge>
-                    {c.clientApproval === "pending" && c.stage === "shortlisted" && <Badge tone="warn" title="The client decides before anyone reaches out">Awaiting approval</Badge>}
-                    {col.key === "closed" && <StagePill stage={c.stage} />}
-                    {(() => {
-                      const t = whoseTurnText(c.whoseTurn);
-                      return t && col.key !== "closed" ? <Badge tone={t.tone}>{t.label}</Badge> : null;
-                    })()}
-                  </div>
-                  <p className="mt-1.5 line-clamp-3 text-xs leading-snug text-text-muted" title={c.latest}>
-                    {c.latestFromEmail ? (
-                      <Mail size={11} className="mr-1 inline align-[-1px] text-text-faint" />
-                    ) : (
-                      <MessageCircle size={11} className="mr-1 inline align-[-1px] text-text-faint" />
-                    )}
-                    {c.latest}
-                    {c.latestAt && <span className="text-text-faint"> · {relativeDays(c.latestAt)}</span>}
-                  </p>
-                  <div className="mt-1.5" onMouseDown={(e) => e.stopPropagation()} draggable={false}>
-                    <StatusNote partnershipId={c.partnershipId} note={c.statusNote} compact />
-                  </div>
-                  <div className="mt-2" onMouseDown={(e) => e.stopPropagation()} draggable={false}>
-                    <QuickStage
-                      partnershipId={c.partnershipId}
-                      name={c.name}
-                      stage={c.stage}
-                      asMove
-                      className="w-full"
-                      onMoved={(landed) =>
-                        setItems((prev) => prev.map((x) => (x.partnershipId === c.partnershipId ? { ...x, stage: landed } : x)))
-                      }
-                    />
-                  </div>
-                  {posting === c.partnershipId && (
-                    <div className="mt-2">
-                      <VideoLinkPrompt
-                        pending={pending}
-                        onSubmit={(url) => move(c.partnershipId, "posted", undefined, url)}
-                        onCancel={() => setPosting(null)}
-                      />
-                    </div>
-                  )}
-                </div>
+                  onMoved={(landed) => setItems((prev) => prev.map((x) => (x.partnershipId === c.partnershipId ? { ...x, stage: landed } : x)))}
+                  meId={meId}
+                  team={team}
+                  clientName={clientName}
+                  showCampaign={showCampaign}
+                  videoPrompt={
+                    posting === c.partnershipId ? (
+                      <VideoLinkPrompt pending={pending} onSubmit={(url) => move(c.partnershipId, "posted", undefined, url)} onCancel={() => setPosting(null)} />
+                    ) : null
+                  }
+                />
               ))}
             </div>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Keeps a click inside a card's controls from starting a drag. */
+const noDrag = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation(), draggable: false } as const;
+
+function PipelineCard({
+  card: c,
+  closed,
+  dragging,
+  onDragStart,
+  onDragEnd,
+  onMoved,
+  meId,
+  team,
+  clientName,
+  showCampaign,
+  videoPrompt,
+}: {
+  card: BoardCard;
+  closed: boolean;
+  dragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onMoved: (landed: CmStage) => void;
+  meId: string | null;
+  team: TeammateOption[];
+  clientName: string;
+  showCampaign: boolean;
+  videoPrompt: React.ReactNode;
+}) {
+  const router = useRouter();
+  const [panel, setPanel] = useState<"move" | "log" | "archive" | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const href = `/creators/${c.partnershipId}?returnTo=/pipeline`;
+  const turn = whoseTurnText(c.whoseTurn);
+  const awaitingApproval = c.clientApproval === "pending" && c.stage === "shortlisted";
+  return (
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+      className={cn("cursor-grab rounded-lg border border-border bg-surface p-2.5 shadow-card transition active:cursor-grabbing", dragging && "opacity-50")}
+    >
+      <div className="flex items-center gap-2">
+        <Avatar name={c.name} size="sm" src={c.photoUrl} />
+        <Link href={href} className="min-w-0 flex-1 truncate text-sm font-medium text-text hover:text-accent">
+          {c.name}
+        </Link>
+        <span {...noDrag}>
+          <OwnerMenu partnershipId={c.partnershipId} name={c.name} owner={c.owner} meId={meId} team={team} />
+        </span>
+        <span {...noDrag}>
+          <Menu label={`More for ${c.name}`}>
+            <MenuItem icon={<MoveRight size={14} />} onSelect={() => setPanel("move")}>
+              Move to…
+            </MenuItem>
+            <MenuItem icon={<CalendarClock size={14} />} onSelect={() => setPanel("log")}>
+              Log a message…
+            </MenuItem>
+            <MenuItem icon={<NotebookPen size={14} />} onSelect={() => setNoteOpen(true)}>
+              {c.statusNote ? "Edit the note" : "Add a note"}
+            </MenuItem>
+            <MenuItem icon={<Archive size={14} />} onSelect={() => setPanel("archive")}>
+              Archive…
+            </MenuItem>
+            <MenuLabel />
+            <MenuItem icon={<ArrowRight size={14} />} onSelect={() => router.push(href)}>
+              Open
+            </MenuItem>
+          </Menu>
+        </span>
+      </div>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        {closed ? (
+          <StagePill stage={c.stage} />
+        ) : awaitingApproval ? (
+          <TurnDot tone="warn" title="The client decides before anyone reaches out">
+            Waiting on {clientName}&rsquo;s approval
+          </TurnDot>
+        ) : turn ? (
+          <TurnDot tone={turn.tone}>{turn.label}</TurnDot>
+        ) : (
+          <span />
+        )}
+        {showCampaign && (
+          <Badge tone="info" title="Campaign">
+            {c.campaignName}
+          </Badge>
+        )}
+      </div>
+      <p className="mt-1.5 line-clamp-2 text-xs leading-snug text-text-muted" title={c.latest}>
+        {c.latestFromEmail ? (
+          <Mail size={11} className="mr-1 inline align-[-1px] text-text-faint" />
+        ) : (
+          <MessageCircle size={11} className="mr-1 inline align-[-1px] text-text-faint" />
+        )}
+        {c.latest}
+        {c.latestAt && <span className="text-text-faint"> · {relativeDays(c.latestAt)}</span>}
+      </p>
+      {(c.statusNote || noteOpen) && (
+        <div className="mt-1.5" {...noDrag}>
+          <StatusNote partnershipId={c.partnershipId} note={c.statusNote} compact editing={noteOpen} onEditingChange={setNoteOpen} hideWhenEmpty />
+        </div>
+      )}
+      {panel && (
+        <div className="mt-2" {...noDrag}>
+          {panel === "move" && (
+            <div className="space-y-1.5">
+              <QuickStage
+                partnershipId={c.partnershipId}
+                name={c.name}
+                stage={c.stage}
+                asMove
+                className="w-full"
+                onMoved={(landed) => {
+                  setPanel(null);
+                  onMoved(landed);
+                }}
+              />
+              <Button variant="link" className="!text-[11px]" onClick={() => setPanel(null)}>
+                Cancel
+              </Button>
+            </div>
+          )}
+          {panel === "log" && <LogMessagePanel partnershipId={c.partnershipId} name={c.name} hasOutbound={c.hasOutbound} onClose={() => setPanel(null)} />}
+          {panel === "archive" && <ArchiveControl partnershipId={c.partnershipId} name={c.name} startOpen onClose={() => setPanel(null)} />}
+        </div>
+      )}
+      {videoPrompt && (
+        <div className="mt-2" {...noDrag}>
+          {videoPrompt}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { statusNoteView } from "@/lib/status-note";
 import { requireAgencyPage } from "@/lib/page-guards";
-import { resolveClient, getCreatorRows } from "@/lib/queries";
+import { resolveClient, getCreatorRows, getOutreachStates } from "@/lib/queries";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { resolveCampaign } from "@/lib/campaigns";
@@ -37,11 +37,10 @@ export default async function PipelinePage() {
   const archivedHere = splitByView(archived, view, meId).shown.length;
   const { shown: rows, hidden } = splitByView(all, view, meId);
   const hiddenLine = hiddenSummary(hidden);
+  const outreach = await getOutreachStates(rows.map((r) => r.partnershipId));
   const cards: BoardCard[] = rows.map((r) => ({
     partnershipId: r.partnershipId,
     name: r.name,
-    username: r.profileUrl ? r.username : null,
-    followers: r.followers,
     stage: r.stage,
     campaignName: r.campaignName,
     latest: r.activity.text,
@@ -52,6 +51,7 @@ export default async function PipelinePage() {
     photoUrl: r.photoUrl,
     clientApproval: r.clientApproval,
     owner: r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: labels.get(r.ownerId) ?? "?" } : null,
+    hasOutbound: (outreach.get(r.partnershipId)?.totalOutbound ?? 0) > 0,
   }));
 
   return (
@@ -62,7 +62,7 @@ export default async function PipelinePage() {
         campaign={campaign?.name ?? null}
         subtitle={`${cards.length} creator${cards.length === 1 ? "" : "s"}${archivedHere ? ` · ${archivedHere} archived` : ""}${view === "mine" ? ` · yours and unassigned${hiddenLine ? ` (${hiddenLine})` : ""}` : ""}`}
         actions={<MineToggle view={view} />}
-        help="One column per stage. Each card shows the campaign, the latest message and whose turn it is. Change the stage from the menu on the card, or drag it. Hover a column name to see what that stage means; closing a deal asks who ended it and why."
+        help="One column per stage. Each card shows who looks after it, whose turn it is and the latest message. Move a card by dragging it, or from its ⋯ menu — which also logs a message, adds a note or archives. Hover a column name to see what that stage means; closing a deal asks who ended it and why."
         helpAnchor="stages"
       />
       <div className="p-6">
@@ -75,7 +75,7 @@ export default async function PipelinePage() {
             action={<div className="flex gap-2"><Button href="/import">Import CSV</Button><Button href="/creators/new" variant="primary">Add creator</Button></div>}
           />
         ) : (
-          <PipelineBoard cards={cards} meId={meId} team={team} />
+          <PipelineBoard cards={cards} meId={meId} team={team} clientName={client.name} showCampaign={!campaign} />
         )}
       </div>
     </>
