@@ -55,7 +55,9 @@ migration, stop it (the node process listening on 5544) and start it again.
 One script: `node scripts/preview/run.mjs verify scripts/verify-<name>.ts`.
 
 The suite stops at the first non-zero exit, so **check the last script it
-printed is `verify-invariants`** — otherwise later scripts never ran. The
+printed is `verify-invariants`** (31 scripts after the boundary check, as of
+2026-09-28) — otherwise
+later scripts never ran. The
 preload defers `process.exit` briefly because Node 24 on Windows can crash
 at exit after a script passed (libuv assertion, exit 127).
 
@@ -71,7 +73,27 @@ What the scripts anchor:
   — who wrote each message, invites and auto-replies as notes, drafts and
   Spam never stored, coverage only advancing on a complete check (and a short
   resync never claiming a new address's 180 days), paging to the end, the lease.
-- **today** — the latest-message line and every Today placement.
+- **today / today-data** — the latest-message line and every Today
+  placement; nudges for quiet deals, Due and Late, the oldest-first sort
+  (unknown dates last), "waiting since" ignoring undone moves and undo rows;
+  snooze's wake rules (their message wakes it, ours and invites don't).
+- **logging** — the date limits (never the future, 180 days back), a message
+  dated before a person's stage change never moves it (a late "They replied"
+  can't reopen No response; the one-time stage clean-up doesn't count), email
+  logged by hand is never queued, read or re-labelled, and nothing a teammate
+  typed on a hand log is ever cited to move a stage or fill the deal.
+- **undo** — the planner matrix (who, ten minutes, once, never synced mail,
+  never after the stage or shipment changed) and the four quick buttons there
+  and back, a created shipment, undo B then A, a doubled click; a change
+  landing between the checks and the write leaves nothing written; with two
+  shipments only the pressed one changes; the email reader still respects a
+  quick Undo; a tracking number saved later keeps the ship date; the portal's
+  presses are never undoable.
+- **history** — every move's line (added, a person, a rule and what set it
+  off, the email reader, a client's pass, the stage clean-up) and undo folded
+  into the move it undid, read back with names.
+- **owners** — Mine / Everyone, take never steals, assigning checks the
+  teammate exists, the owner survives a campaign move, Today's hidden counts.
 - **photos** — Instagram hosts only, image type from the bytes (never SVG),
   size cap, the refresh → store → cascade round trip, name-only creators skipped.
 - **csv-import** — header aliases, one spelling per campaign, preview writes
@@ -85,7 +107,10 @@ What the scripts anchor:
 - **client-users / approvals / portal** — invites work once and expire, only
   the hash is stored; approvals only for the right brand and only what's
   waiting; the portal returns exactly the agreed fields and never a planted
-  private value; a client's shipment moves the stage through the same rule.
+  private value; a client's shipment moves the stage through the same rule;
+  views go out labelled (only Instagram's public count is verified) and the
+  totals never mix; the shipping list holds Ready-to-ship rows only, with a
+  formula guard.
 - **deal-fill / contracts** — a contract or an email fills only blank deal
   fields (a hand edit landing mid-fill wins), verbal → signed is the only
   upgrade, differences are offered never applied, only an Agreed deal moves
@@ -110,8 +135,9 @@ npm run verify:invariants
 Asserts the rules no loop may tune: stage never contradicts its tables
 (Ready to ship or later ⇒ shipment; Posted ⇒ video), no retired stage, every
 creator in at least one campaign, estimates never labeled authoritative, one
-active Gmail account, no duplicated synced messages, and **zero `__verify_`
-rows left behind**. The only known failure is "one shipment per partnership"
+active Gmail account, no duplicated synced messages, no quick action pointing
+at synced mail, and **zero `__verify_` rows or throwaway logins left
+behind**. The only known failure is "one shipment per partnership"
 (Loren Haleston's duplicate records, owner's call:
 `npm run fix:duplicate-shipments`). Any other failure means the data or the
 code path that wrote it is wrong, not the check.

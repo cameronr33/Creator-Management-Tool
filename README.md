@@ -198,7 +198,41 @@ Two engines may move a stage, both forward only, neither ever closing a deal
   Posted the creator's own post link. Every such move shows its quote with Undo.
 
 A "no" is only flagged (Today and the creator page offer to close it). Every
-move lands in `cm_stage_transitions` with its source and reason.
+move lands in `cm_stage_transitions` with its source and reason, and each
+creator's page shows it as **Stage history** (`src/lib/history.ts`: who or
+what moved it, the email quote, anything undone).
+
+## Working the list (product update, 2026-09-28)
+
+- **Owners.** `cm_partnerships.owner_id` (FK to the shared `users`, set null;
+  `users` itself is never altered). New deals start unassigned; take one on
+  Today, assign from the creator page, or in bulk on Creators. **Mine** shows
+  yours plus unassigned (the `cm_view` cookie remembers it; a first visit is
+  Everyone), and every count on a Mine view says what it hides ("7 of
+  Kieran's not shown"). Changing the owner never bumps `updatedAt`.
+- **Today** (`src/lib/today.ts`) sorts each section by how long it has
+  waited, oldest first; imported rows with unknown dates get no clock and go
+  last. Timing is per client (`src/lib/thresholds.ts` is the one table for
+  defaults, Settings and Help): first message due, two follow-ups, No
+  response, a nudge for a deal gone quiet at Talking / Agreed / Finalizing,
+  and a video late after delivery.
+- **Snooze** (`src/lib/snooze-rules.ts`) takes a creator off Today until a
+  date with a reason; it is checked on page load — they come back sooner if
+  they write (an inbound message stored after the snooze) or their stage
+  changes.
+- **Logging by hand** (`src/lib/logging.ts`): I messaged them / They replied
+  stay one click; the calendar button beside them logs an earlier day or an
+  email from your own inbox or a call. Email logged by hand is never read,
+  queued or re-labelled by the email reader (synced = `channel email` with an
+  `external_id`).
+- **Undo** (`src/lib/quick-actions.ts`, table `cm_quick_actions`): each quick
+  press records what it did; its toast offers Undo for ten seconds, and the
+  server allows it only for whoever pressed it, within ten minutes, once,
+  while nothing has changed since.
+- **The portal** shows each video's views labelled verified or estimated and
+  never adds the two; Ship product can download the list as CSV
+  (`src/lib/portal-export.ts`: Ready to ship only, spreadsheet-formula safe)
+  or print it, and asks once before marking shipped without tracking.
 
 ## Verifying changes
 
@@ -253,6 +287,13 @@ audit → reference) with frozen nodes and anchors — `AGENTS.md` is the
 authoritative description and every agent reads it first.
 
 ## Gotchas
+
+- **Dates rendered on the server use the server's time zone.** The app runs
+  on a teammate's machine today, so server and browser agree. If it's ever
+  hosted elsewhere (a cloud server runs in UTC), set `TZ` to the team's zone
+  (for example `TZ=America/Los_Angeles`), or "Sep 28, 6 pm" shows as Sep 29.
+  Dates picked in the browser (snooze, a logged day) are sent as instants and
+  shown back in the browser's own zone.
 
 - **Schema changes: use `db:generate` + `db:apply`, never `db:push`.**
   `drizzle-kit push`'s interactive enum-rename resolver needs a TTY and hangs

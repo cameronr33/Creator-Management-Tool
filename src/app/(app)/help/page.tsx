@@ -7,6 +7,9 @@ import { PageHeader, Card, CardHeader, StagePill, Badge } from "@/components/ui"
 import { stagesByGroup, AUTO_TRIGGER_LABELS, stageLabel, STAGES, ACTIVE_STAGES, TERMINAL_STAGES } from "@/lib/stages";
 import { AUTO_STAGE_RULES, type AutoStageTrigger } from "@/lib/auto-stage";
 import { EMAIL_STAGE_RULES } from "@/lib/email-status";
+import { SNOOZE_MAX_DAYS } from "@/lib/snooze-rules";
+import { LOG_MAX_PAST_DAYS } from "@/lib/log-time";
+import { UNDO_WINDOW_MS } from "@/lib/quick-actions";
 import type { CmStage } from "@/lib/db/schema";
 
 /** What each requirement in EMAIL_STAGE_RULES means, in plain English (decideEmailMove checks it). */
@@ -270,6 +273,20 @@ export default async function HelpPage() {
             <Term word="Posted video">A live post we tracked — its link, date and views.</Term>
             <Term word="Exit reason">Why a deal closed, split by who ended it: we passed, they declined, or they stopped replying.</Term>
             <Term word="Timeline">Every message in or out, plus notes. Emails arrive on it by themselves.</Term>
+            <Term word="Logged by hand">
+              A DM, call or email from your own inbox that you record yourself: one click for just now, or the calendar button beside it for an
+              earlier day (up to {LOG_MAX_PAST_DAYS} days back). A message dated before someone&apos;s last change to the stage never moves the
+              stage. Email the connected mailbox can see needs no logging.
+            </Term>
+            <Term word="Undo">
+              The message after I messaged them, They replied, Mark shipped or Mark delivered has an Undo button. Only whoever pressed it can
+              undo it, within {UNDO_WINDOW_MS / 60_000} minutes, and not once the stage or the shipment has changed since.
+            </Term>
+            <Term word="Snooze">
+              Takes a creator off Today until a date you pick (up to {SNOOZE_MAX_DAYS} days), with an optional reason. They come back sooner
+              if they write or their stage changes.
+            </Term>
+            <Term word="Stage history">On each creator&apos;s page: every move between stages, who or what made it, and anything undone.</Term>
           </dl>
         </Card>
 

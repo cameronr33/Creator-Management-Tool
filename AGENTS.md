@@ -63,6 +63,21 @@ them. Changing one requires a human decision and an explanation in the commit.
    split into Ready to ship → Shipped; a move to Shipped marks the shipment
    shipped. Email never moves anyone to Shipped: that is ours to mark, and it
    only moves to Waiting on video from Shipped — 2026-09-24 review finding.)
+   (2026-09-28, owner: product update.) Undo on the quick buttons (I
+   messaged them, They replied, Mark shipped / delivered) is a person's
+   move (source manual, reason "undo"), allowed only for whoever pressed
+   it, within ten minutes, while the press's move is still the latest real
+   move — so a rule move made by a quick button becomes undoable; no new
+   automation. The reversal is one statement with compare-and-sets (all of
+   it or none) and touches only the rows the press touched. A quick undo is
+   a person's say to the email reader like any other; only the backdating
+   rule looks past it (and past the one-time stage clean-up): a message
+   logged with a date before a person's last stage change never fires a
+   rule (`logging.ts`), so a late "They replied" can't reopen a deal closed
+   since. The email reader may cite only mail the mailbox holds: a DM or an
+   email a teammate logged by hand is their summary, never the creator's
+   own words (`fromMailbox`, review 2026-09-28). Anchors: `verify-undo.ts`,
+   `verify-logging.ts`.
    Matrices: `verify-auto-stage.ts` and `verify-email-status.ts`; edit the
    code and its matrix together, or neither.
 3. **Verification leaves nothing behind.** Every live check cleans up in
