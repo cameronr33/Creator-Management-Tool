@@ -68,24 +68,25 @@ export function DateChoice({ choice, picked, onChoice, onPicked }: { choice: Whe
 type How = "ig_dm" | "email" | "phone";
 
 /**
- * "I messaged them" / "They replied" with a date or another way — a DM, an
+ * Log a message with a date or another way — which way it went, a DM, an
  * email from a teammate's own inbox (one the connected mailbox can't see), or
- * a call.
+ * a call, and when. Opened from the row's ⋯ menu.
  */
 export function LogMessagePanel({
   partnershipId,
   name,
-  direction,
+  direction: initialDirection = "outbound",
   hasOutbound,
   onClose,
 }: {
   partnershipId: string;
   name: string;
-  direction: "outbound" | "inbound";
+  direction?: "outbound" | "inbound";
   hasOutbound: boolean;
   onClose: () => void;
 }) {
   const { pending, run } = useSave();
+  const [direction, setDirection] = useState<"outbound" | "inbound">(initialDirection);
   const [how, setHow] = useState<How>("ig_dm");
   // Today by default: this panel is also the only way to log an email or a call that happened just now (review, 2026-09-28).
   const [choice, setChoice] = useState<WhenChoice>("today");
@@ -112,6 +113,17 @@ export function LogMessagePanel({
 
   return (
     <div className="w-full space-y-2 rounded-lg border border-border bg-surface-2/60 p-2.5">
+      <FieldGroup label="What happened">
+        <Segmented<"outbound" | "inbound">
+          aria-label="What happened"
+          value={direction}
+          onChange={setDirection}
+          options={[
+            { value: "outbound", label: "We messaged them" },
+            { value: "inbound", label: "They replied" },
+          ]}
+        />
+      </FieldGroup>
       <FieldGroup label="How" hint={how === "email" ? "Only for email the connected mailbox can't see — it picks up the rest by itself." : undefined}>
         <Segmented<How>
           aria-label="How"

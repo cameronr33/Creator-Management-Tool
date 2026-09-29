@@ -41,10 +41,28 @@ type Choice = "3d" | "1w" | "pick";
  * from SEMA on the 10th"). They come back on the day — or sooner, if they
  * write or their stage changes. The toast offers Undo.
  */
-export function SnoozeControl({ partnershipId, name, label = "Snooze" }: { partnershipId: string; name: string; label?: string }) {
+export function SnoozeControl({
+  partnershipId,
+  name,
+  label = "Snooze",
+  startOpen = false,
+  onClose,
+}: {
+  partnershipId: string;
+  name: string;
+  label?: string;
+  /** Opened from a row's ⋯ menu: the panel shows at once, and closing it hands back to the menu. */
+  startOpen?: boolean;
+  onClose?: () => void;
+}) {
   const { pending, run } = useSave();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [openOwn, setOpenOwn] = useState(startOpen);
+  const open = openOwn;
+  const setOpen = (v: boolean) => {
+    setOpenOwn(v);
+    if (!v) onClose?.();
+  };
   const [choice, setChoice] = useState<Choice>("3d");
   const [picked, setPicked] = useState(ymd(startOfDay(7)));
   const [why, setWhy] = useState("");

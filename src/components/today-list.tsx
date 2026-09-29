@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Mail, MapPin, MessageCircle, PackageCheck, Truck, Clapperboard, ArrowRight } from "lucide-react";
+import { AlarmClock, CalendarClock, ChevronDown, ChevronRight, Mail, MapPin, MessageCircle, NotebookPen, PackageCheck, Truck, Clapperboard, ArrowRight } from "lucide-react";
 import { Avatar, Badge, Button, Card } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { QuickStage } from "@/components/quick-stage";
@@ -10,6 +10,8 @@ import { StatusNote } from "@/components/status-note";
 import { OwnerSlot } from "@/components/owner-controls";
 import { BringBackButton, SnoozeControl, SnoozeLine } from "@/components/snooze";
 import { MessagedButton, ReplyButton } from "@/components/reply-button";
+import { LogMessagePanel } from "@/components/log-message";
+import { Menu, MenuItem } from "@/components/menu";
 import { CloseAsDeclinedButton, NoReplyNeededButton } from "@/components/email-status";
 import { VideoLinkPrompt } from "@/components/partnership-actions";
 import { ApprovalButtons } from "@/components/approval-buttons";
@@ -21,11 +23,23 @@ import { creatorSectionHref, type CreatorSection } from "@/lib/creator-workspace
 import { relativeDays } from "@/lib/format";
 
 /**
- * Today, as sections of work. Every row: who, which campaign, what was said
- * last and whose turn it is, a stage menu to fix the stage in place, and the
- * one button for the next step. "Waiting on them" starts folded.
+ * Today, as sections of work. Every row: who, what was said last and whose
+ * turn it is, a stage menu to fix the stage in place, the one button for the
+ * next step, and a ⋯ menu for the rest (log with a date, a note, snooze). The
+ * campaign shows only when the sidebar is on All campaigns. "Waiting on them"
+ * starts folded.
  */
-export function TodayList({ rows, meId, ownerLabels }: { rows: TodayRow[]; meId: string | null; ownerLabels: Record<string, string> }) {
+export function TodayList({
+  rows,
+  meId,
+  ownerLabels,
+  showCampaign = true,
+}: {
+  rows: TodayRow[];
+  meId: string | null;
+  ownerLabels: Record<string, string>;
+  showCampaign?: boolean;
+}) {
   // "Waiting on them" and "Snoozed" start folded: nothing to do there today.
   const [open, setOpen] = useState<Set<TodaySection>>(new Set());
   const bySection = new Map<TodaySection, TodayRow[]>();
@@ -64,7 +78,7 @@ export function TodayList({ rows, meId, ownerLabels }: { rows: TodayRow[]; meId:
             {!folded && (
               <ul className="divide-y divide-border">
                 {list.map((r) => (
-                  <TodayItem key={r.partnershipId} row={r} meId={meId} ownerLabels={ownerLabels} />
+                  <TodayItem key={r.partnershipId} row={r} meId={meId} ownerLabels={ownerLabels} showCampaign={showCampaign} />
                 ))}
               </ul>
             )}
@@ -92,8 +106,10 @@ function href(r: TodayRow, section: CreatorSection) {
   return creatorSectionHref(r.partnershipId, section, "/");
 }
 
-function TodayItem({ row: r, meId, ownerLabels }: { row: TodayRow; meId: string | null; ownerLabels: Record<string, string> }) {
+function TodayItem({ row: r, meId, ownerLabels, showCampaign }: { row: TodayRow; meId: string | null; ownerLabels: Record<string, string>; showCampaign: boolean }) {
   const turn = whoseTurnText(r.whoseTurn);
+  const [panel, setPanel] = useState<"log" | "snooze" | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
   const owner = r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: ownerLabels[r.ownerId] ?? "?" } : null;
   return (
     <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start">
@@ -107,8 +123,7 @@ function TodayItem({ row: r, meId, ownerLabels }: { row: TodayRow; meId: string 
             <OwnerSlot partnershipId={r.partnershipId} owner={owner} meId={meId} />
             {r.badge === "due" && <Badge tone="warn" title="The first message is overdue">Due</Badge>}
             {r.badge === "late" && <Badge tone="bad" title="The video is later than the client's Video due setting">Late</Badge>}
-            {r.username && <span className="text-xs text-text-muted">@{r.username}</span>}
-            <Badge tone="info" title="Campaign">{r.campaignName}</Badge>
+            {showCampaign && <Badge tone="info" title="Campaign">{r.campaignName}</Badge>}
             {turn && r.section !== "your_turn" && r.section !== "waiting" && r.whoseTurn === "us" && <Badge tone="warn">Your turn</Badge>}
           </div>
           <p className="mt-1 text-sm text-text-muted">
@@ -122,9 +137,11 @@ function TodayItem({ row: r, meId, ownerLabels }: { row: TodayRow; meId: string 
             {r.section === "waiting" && turn && <span className="text-text-faint"> · {turn.label}</span>}
           </p>
           {r.note && <p className="mt-0.5 text-xs text-text-faint">{r.note}</p>}
-          <div className="mt-1.5">
-            <StatusNote partnershipId={r.partnershipId} note={r.statusNote} />
-          </div>
+          {(r.statusNote || noteOpen) && (
+            <div className="mt-1.5">
+              <StatusNote partnershipId={r.partnershipId} note={r.statusNote} editing={noteOpen} onEditingChange={setNoteOpen} hideWhenEmpty />
+            </div>
+          )}
           {r.section === "get_address" && r.suggestedAddress && (
             <p className="mt-1 text-xs text-text-muted">
               <MapPin size={12} className="mr-1 inline align-[-1px] text-text-faint" />
@@ -137,15 +154,31 @@ function TodayItem({ row: r, meId, ownerLabels }: { row: TodayRow; meId: string 
             </p>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            {r.section === "snoozed" ? (
-              <BringBackButton partnershipId={r.partnershipId} name={r.name} />
-            ) : (
-              <>
-                <NextAction row={r} />
-                <SnoozeControl partnershipId={r.partnershipId} name={r.name} />
-              </>
-            )}
+            {r.section === "snoozed" ? <BringBackButton partnershipId={r.partnershipId} name={r.name} /> : <NextAction row={r} />}
+            <Menu label={`More for ${r.name}`}>
+              <MenuItem icon={<CalendarClock size={14} />} onSelect={() => setPanel("log")}>
+                Log with a date or another way…
+              </MenuItem>
+              <MenuItem icon={<NotebookPen size={14} />} onSelect={() => setNoteOpen(true)}>
+                {r.statusNote ? "Edit the note" : "Add a note"}
+              </MenuItem>
+              {r.section !== "snoozed" && (
+                <MenuItem icon={<AlarmClock size={14} />} onSelect={() => setPanel("snooze")}>
+                  Snooze…
+                </MenuItem>
+              )}
+            </Menu>
           </div>
+          {panel === "log" && (
+            <div className="mt-2">
+              <LogMessagePanel partnershipId={r.partnershipId} name={r.name} hasOutbound={r.hasOutbound} onClose={() => setPanel(null)} />
+            </div>
+          )}
+          {panel === "snooze" && (
+            <div className="mt-2">
+              <SnoozeControl partnershipId={r.partnershipId} name={r.name} startOpen onClose={() => setPanel(null)} />
+            </div>
+          )}
         </div>
       </div>
       <div className="sm:w-44 sm:shrink-0">

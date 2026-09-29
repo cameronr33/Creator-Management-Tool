@@ -91,9 +91,15 @@ function main() {
 
   console.log("\n── primitives exist ──");
   const ui = readFileSync(join(ROOT, "components", "ui.tsx"), "utf8");
-  for (const name of ["Button", "IconButton", "Input", "Select", "Textarea", "Field", "Callout", "Badge", "StagePill", "PageHeader", "Card", "CardHeader", "EmptyState", "Segmented", "Checkbox", "FieldGroup", "OwnerChip", "ChipButton"]) {
+  for (const name of ["Button", "IconButton", "Input", "Select", "Textarea", "Field", "Callout", "Badge", "StagePill", "PageHeader", "Card", "CardHeader", "EmptyState", "Segmented", "Checkbox", "FieldGroup", "OwnerChip", "ChipButton", "TurnDot"]) {
     check(`ui.tsx exports ${name}`, new RegExp(`export function ${name}\\b`).test(ui));
   }
+  // The pop-up menu needs state and a portal, so it lives in its own client file (2026-09-29).
+  const menu = readFileSync(join(ROOT, "components", "menu.tsx"), "utf8");
+  for (const name of ["Menu", "MenuItem", "MenuLabel"]) {
+    check(`menu.tsx exports ${name}`, new RegExp(`export function ${name}\\b`).test(menu));
+  }
+  check("the menu renders outside clipping cards (a portal to document.body)", /createPortal\(/.test(menu) && /document\.body/.test(menu));
   const css = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
   for (const token of ["--accent", "--accent-hover", "--good", "--warn", "--bad", "--info", "--sidebar-bg", "--brand-lime", "--text-faint"]) {
     check(`globals.css defines ${token}`, new RegExp(`${token}:`).test(css));

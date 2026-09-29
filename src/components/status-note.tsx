@@ -12,9 +12,30 @@ import type { StatusNoteView } from "@/lib/status-note";
  * email reader writes. Edited in place wherever it shows (creator page, Today,
  * Pipeline); the email reader never overwrites it.
  */
-export function StatusNote({ partnershipId, note, compact = false }: { partnershipId: string; note: StatusNoteView | null; compact?: boolean }) {
+export function StatusNote({
+  partnershipId,
+  note,
+  compact = false,
+  editing: editingProp,
+  onEditingChange,
+  hideWhenEmpty = false,
+}: {
+  partnershipId: string;
+  note: StatusNoteView | null;
+  compact?: boolean;
+  /** Controlled from outside (a row's ⋯ menu opens it). */
+  editing?: boolean;
+  onEditingChange?: (editing: boolean) => void;
+  /** No "Note where things stand" link when there's no note — the row's menu offers it instead. */
+  hideWhenEmpty?: boolean;
+}) {
   const { pending, run } = useSave();
-  const [editing, setEditing] = useState(false);
+  const [editingOwn, setEditingOwn] = useState(false);
+  const editing = editingProp ?? editingOwn;
+  const setEditing = (v: boolean) => {
+    setEditingOwn(v);
+    onEditingChange?.(v);
+  };
   const [draft, setDraft] = useState(note?.text ?? "");
 
   const save = async (text: string) => {
@@ -57,6 +78,7 @@ export function StatusNote({ partnershipId, note, compact = false }: { partnersh
   }
 
   if (!note) {
+    if (hideWhenEmpty) return null;
     return (
       <Button
         variant="link"

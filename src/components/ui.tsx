@@ -26,6 +26,7 @@ export function PageHeader({
   client,
   campaign,
   back,
+  backSlot,
   actions,
   children,
 }: {
@@ -44,6 +45,8 @@ export function PageHeader({
    */
   campaign?: string | null;
   back?: { href: string; label: string };
+  /** A back control that isn't a plain link (Help's history-aware BackLink). */
+  backSlot?: ReactNode;
   actions?: ReactNode;
   /** A second row under the title — filter bars, tabs. */
   children?: ReactNode;
@@ -58,6 +61,7 @@ export function PageHeader({
           <ArrowLeft size={14} /> {back.label}
         </Link>
       )}
+      {!back && backSlot}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -686,6 +690,17 @@ export function FieldGroup({ label, hint, children, className = "" }: { label: R
       {children}
       {hint ? <span className="text-xs text-text-faint">{hint}</span> : null}
     </div>
+  );
+}
+
+/** Whose turn (or any one-word status), as a coloured dot and a label: "● Your turn". */
+export function TurnDot({ tone, children, title }: { tone: "warn" | "muted" | "info" | "good" | "bad"; children: ReactNode; title?: string }) {
+  const dot = { warn: "bg-warn", muted: "bg-border-strong", info: "bg-info", good: "bg-good-strong", bad: "bg-bad" }[tone];
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-text-muted" title={title}>
+      <span className={cn("h-2 w-2 shrink-0 rounded-full", dot)} aria-hidden />
+      <span className="truncate">{children}</span>
+    </span>
   );
 }
 

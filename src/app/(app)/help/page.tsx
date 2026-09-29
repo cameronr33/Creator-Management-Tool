@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { LayoutDashboard, Kanban, Users, Settings, ArrowRight } from "lucide-react";
 import { PageHeader, Card, CardHeader, StagePill, Badge } from "@/components/ui";
+import { BackLink } from "@/components/back-link";
 import { stagesByGroup, AUTO_TRIGGER_LABELS, stageLabel, STAGES, ACTIVE_STAGES, TERMINAL_STAGES } from "@/lib/stages";
 import { AUTO_STAGE_RULES, type AutoStageTrigger } from "@/lib/auto-stage";
 import { EMAIL_STAGE_RULES } from "@/lib/email-status";
@@ -40,6 +41,7 @@ export default async function HelpPage() {
   return (
     <>
       <PageHeader
+        backSlot={<BackLink />}
         title="How Creator Manager works"
         help="Everything a new teammate needs on day one: the daily loop, what each stage means, what moves by itself, and where things live."
       />

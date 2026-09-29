@@ -177,7 +177,8 @@ export function placeOnToday(f: TodayFacts): TodayPlacement | null {
     }
     const after = f.followUpCount === 0 ? f.thresholds.followUp1AfterDays : f.thresholds.followUp2AfterDays;
     return n >= after
-      ? place("follow_up", `Last message ${n} days ago${f.followUpCount ? ` · ${f.followUpCount} follow-up sent` : ""}.`, f.lastOutboundAt)
+      ? // The row's latest-message line already says when we last wrote (run-through, 2026-09-29).
+        place("follow_up", `Follow-up ${f.followUpCount + 1} is due.`, f.lastOutboundAt)
       : place("waiting", null, f.lastOutboundAt);
   }
   return nudge(f, stage, now) ?? place("waiting", null, f.lastMessageAt);

@@ -47,7 +47,7 @@ export default async function TodayPage() {
         ? (totalCreators > 0
           ? <EmptyState title="All caught up" hint={`Nobody needs anything from you right now. Posted and closed deals don't show here.${hiddenSummary ? ` ${hiddenSummary} — switch to Everyone to see them.` : ""}`} />
           : <EmptyState title={campaign ? `No creators in ${campaign.name} yet` : "No creators yet"} hint="Add a creator or import a CSV to get started." action={<Button href="/import">Import CSV</Button>} />)
-        : <TodayList rows={rows} meId={meId} ownerLabels={labels} />}
+        : <TodayList rows={rows} meId={meId} ownerLabels={labels} showCampaign={!campaign} />}
     </div>
   </>;
 }

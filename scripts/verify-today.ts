@@ -55,6 +55,10 @@ check(
   place({ now: new Date(at(20).getTime() + DEFAULT_THRESHOLDS.followUp1AfterDays * 86_400_000) })?.section === "follow_up",
 );
 check("imported rows never get a follow-up clock", place({ datesAreMigrated: true, now: at(30) })?.section === "waiting");
+// NEGATIVE (run-through, 2026-09-29): the follow-up line repeated the row's latest-message line ("Last message 67 days ago · 1 follow-up sent").
+const due1 = place({ now: new Date(at(20).getTime() + DEFAULT_THRESHOLDS.followUp1AfterDays * 86_400_000) });
+const due2 = place({ followUpCount: 1, now: new Date(at(20).getTime() + DEFAULT_THRESHOLDS.followUp2AfterDays * 86_400_000) });
+check("a due follow-up says which one is due, not when we last wrote (the row shows that already)", due1?.note === "Follow-up 1 is due." && due2?.note === "Follow-up 2 is due.", `${due1?.note} / ${due2?.note}`);
 check("after two follow-ups, suggests closing once the wait is over", /No response/.test(place({ followUpCount: 2, now: new Date(at(20).getTime() + DEFAULT_THRESHOLDS.markNoResponseAfterDays * 86_400_000) })?.note ?? ""));
 check("Agreed → get the address", place({ stage: "awaiting_address" })?.section === "get_address");
 check("Finalizing → its own section, saying when they wrote last", place({ stage: "finalizing" })?.section === "finalizing" && place({ stage: "finalizing", whoseTurn: "us" })?.note === "They wrote last — reply.");
