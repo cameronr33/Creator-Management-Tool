@@ -66,7 +66,7 @@ export function Toaster() {
 
   // Both live regions always exist, so a screen reader hears what's added to them.
   return (
-    <div className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
+    <div className="pointer-events-none fixed right-4 bottom-[calc(1rem+var(--toast-lift,0px))] z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
       <div className="flex flex-col gap-2" role="status" aria-live="polite">
         {others.map((t) => (
           <ToastCard key={t.id} t={t} onGone={remove} />

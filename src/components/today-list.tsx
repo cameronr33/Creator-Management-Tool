@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Archive, CalendarClock, Check, ChevronDown, ChevronRight, Mail, MapPin, MessageCircle, NotebookPen, PackageCheck, Truck, Clapperboard, ArrowRight } from "lucide-react";
-import { Avatar, Badge, Button, Card } from "@/components/ui";
+import { Avatar, Badge, Button, Card, SectionTitle } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { QuickStage } from "@/components/quick-stage";
 import { StatusNote } from "@/components/status-note";
@@ -180,12 +180,12 @@ function GhostRow({ ghost: g }: { ghost: Ghost }) {
 function SectionHeading({ title, hint, count, folded }: { title: string; hint: string; count: number; folded?: boolean }) {
   return (
     <>
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-text">
-        {folded !== undefined && (folded ? <ChevronRight size={14} /> : <ChevronDown size={14} />)}
-        {title}
+      <div className="flex items-center gap-2">
+        {folded !== undefined && (folded ? <ChevronRight size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />)}
+        <SectionTitle>{title}</SectionTitle>
         <span className="rounded-full bg-surface-2 px-1.5 text-[11px] font-semibold tabular text-text-muted ring-1 ring-inset ring-border">{count}</span>
-      </h2>
-      <p className="mt-0.5 text-xs text-text-muted">{hint}</p>
+      </div>
+      <p className="mt-0.5 text-[13px] text-text-muted">{hint}</p>
     </>
   );
 }
@@ -230,7 +230,7 @@ function TodayItem({
             <QuickStage partnershipId={r.partnershipId} name={r.name} stage={r.stage} asPill />
             {r.badge === "due" && <Badge tone="warn" title="The first message is overdue">Due</Badge>}
             {r.badge === "late" && <Badge tone="bad" title="The video is later than the client's Video due setting">Late</Badge>}
-            {showCampaign && <Badge tone="info" title="Campaign">{r.campaignName}</Badge>}
+            {showCampaign && <Badge tone="info">{r.campaignName}</Badge>}
             {turn && r.section !== "your_turn" && r.section !== "waiting" && r.whoseTurn === "us" && <Badge tone="warn">Your turn</Badge>}
           </div>
           <p className="mt-1 text-sm text-text-muted">

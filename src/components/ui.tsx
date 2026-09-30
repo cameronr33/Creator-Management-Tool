@@ -133,7 +133,7 @@ export function CardHeader({
         </div>
         {description && <p className="mt-1 max-w-prose text-[13px] leading-relaxed text-text-muted">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -185,14 +185,15 @@ export function Badge({
 }) {
   return (
     <span
-      title={title}
+      title={title ?? (typeof children === "string" ? children : undefined)}
       className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+        // Shrinks inside its row and ends in "…" — a long campaign name never runs off the card (R8).
+        "inline-flex min-w-0 max-w-full items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
         BADGE_TONES[tone],
         className,
       )}
     >
-      {children}
+      {typeof children === "string" ? <span className="truncate">{children}</span> : children}
     </span>
   );
 }
@@ -329,7 +330,7 @@ export function Callout({
         {title && <div className="font-medium">{title}</div>}
         {children && <div className={cn("leading-relaxed", title ? "mt-0.5 text-[13px] opacity-90" : "")}>{children}</div>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -614,7 +615,7 @@ export function Input({
     <input
       aria-invalid={invalid || undefined}
       {...props}
-      className={cn(FIELD_BASE, compact ? "h-8 px-2.5 text-xs" : "h-9 px-3 text-sm", invalid && FIELD_INVALID, className)}
+      className={cn(FIELD_BASE, compact ? "h-8 px-2.5 text-base sm:text-xs" : "h-9 px-3 text-base sm:text-sm", invalid && FIELD_INVALID, className)}
     />
   );
 }
@@ -632,7 +633,7 @@ export function Select({
       className={cn(
         FIELD_BASE,
         "select-chevron appearance-none pr-8",
-        compact ? "h-8 pl-2.5 text-xs" : "h-9 pl-3 text-sm",
+        compact ? "h-8 pl-2.5 text-base sm:text-xs" : "h-9 pl-3 text-base sm:text-sm",
         invalid && FIELD_INVALID,
         className,
       )}
@@ -651,7 +652,7 @@ export function Textarea({
   return (
     <textarea
       {...props}
-      className={cn(FIELD_BASE, compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm", invalid && FIELD_INVALID, className)}
+      className={cn(FIELD_BASE, compact ? "px-2.5 py-1.5 text-base sm:text-xs" : "px-3 py-2 text-base sm:text-sm", invalid && FIELD_INVALID, className)}
     />
   );
 }
@@ -722,7 +723,7 @@ export function FieldGroup({ label, hint, children, className = "", inline }: { 
 export function TurnDot({ tone, children, title }: { tone: "warn" | "muted" | "info" | "good" | "bad"; children: ReactNode; title?: string }) {
   const dot = { warn: "bg-warn", muted: "bg-border-strong", info: "bg-info", good: "bg-good-strong", bad: "bg-bad" }[tone];
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-text-muted" title={title}>
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-text-muted" title={title ?? (typeof children === "string" ? children : undefined)}>
       <span className={cn("h-2 w-2 shrink-0 rounded-full", dot)} aria-hidden />
       <span className="truncate">{children}</span>
     </span>

@@ -167,11 +167,11 @@ export function Contracts({ partnershipId, contracts, differences }: { partnersh
                 <div className="flex flex-wrap items-center gap-2">
                   <FileText size={14} className="shrink-0 text-text-muted" />
                   {c.downloaded ? (
-                    <a href={`/api/contracts/${c.id}`} target="_blank" rel="noreferrer" className="truncate text-sm font-medium text-accent hover:underline">
+                    <a href={`/api/contracts/${c.id}`} target="_blank" rel="noreferrer" title={c.filename} className="min-w-0 truncate text-sm font-medium text-accent hover:underline">
                       {c.filename}
                     </a>
                   ) : (
-                    <span className="truncate text-sm font-medium text-text">{c.filename}</span>
+                    <span title={c.filename} className="min-w-0 truncate text-sm font-medium text-text">{c.filename}</span>
                   )}
                   <Status c={c} />
                 </div>

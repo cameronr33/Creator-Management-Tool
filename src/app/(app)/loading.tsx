@@ -8,7 +8,7 @@ export default function Loading() {
     <div aria-busy="true" aria-label="Loading" className="animate-fade-in">
       <div className="border-b border-border bg-surface px-6 py-4">
         <div className="skeleton h-6 w-40" />
-        <div className="skeleton mt-2 h-4 w-72" />
+        <div className="skeleton mt-2 h-4 w-72 max-w-full" />
       </div>
       <div className="space-y-4 p-4 sm:p-6">
         <div className="skeleton h-9 w-full rounded-xl" />

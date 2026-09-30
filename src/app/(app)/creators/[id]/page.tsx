@@ -22,6 +22,7 @@ import { getPartnershipDetail, getClients, getPhotoUrl, getCampaigns, getFollowU
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
 import { Card, CardHeader, Avatar, Badge, Callout, cn } from "@/components/ui";
 import { JumpBar } from "@/components/jump-bar";
+import { ExpandableText } from "@/components/expandable-text";
 import {
   StageControl,
   TimelineNote,
@@ -268,7 +269,7 @@ export default async function CreatorDetailPage({
               )}
               {client?.name && <span>{client.name}</span>}
               {otherPartnerships.length > 0 && (
-                <span className="flex items-center gap-1 text-xs">
+                <span className="flex flex-wrap items-center gap-1 text-xs">
                   Also in:
                   {otherPartnerships.map((p) => (
                     <Link key={p.id} href={creatorSectionHref(p.id, "overview", returnTo)} className="rounded-md bg-surface-2 px-1.5 py-0.5 hover:text-accent">
@@ -401,7 +402,7 @@ export default async function CreatorDetailPage({
                     <header className="flex flex-wrap items-start justify-between gap-2 border-b border-border bg-surface-2/50 px-3 py-2">
                       <div className="min-w-0">
                         <h3 className="text-sm font-semibold text-text">{t.title}</h3>
-                        <p className="text-xs text-text-muted">
+                        <p className="text-xs text-text-muted" title={t.participants.length > 4 ? t.participants.join(", ") : undefined}>
                           {t.events.length} message{t.events.length === 1 ? "" : "s"} · last {relativeDays(t.lastAt)}
                           {t.participants.length > 0 && <> · {t.participants.slice(0, 4).join(", ")}{t.participants.length > 4 ? ` +${t.participants.length - 4}` : ""}</>}
                         </p>
@@ -677,7 +678,7 @@ function TimelineEvent({ e, clientName, names }: { e: CmOutreachEvent; clientNam
           {e.isMigrated && <Badge tone="muted">{timelineSource(e)}</Badge>}
         </div>
         {e.body && e.body !== "migrated from sheet; original date unknown" && (
-          <p className="mt-0.5 line-clamp-6 whitespace-pre-wrap break-words text-text-muted">{e.body}</p>
+          <ExpandableText text={e.body} className="mt-0.5 text-text-muted" />
         )}
       </div>
     </li>

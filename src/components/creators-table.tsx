@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, ArchiveRestore, Check, ExternalLink, ImageDown, Mail, NotebookPen, Trash2, X } from "lucide-react";
 import { Avatar, Badge, Button, Checkbox, FieldGroup, StagePill } from "@/components/ui";
-import { ChoiceMenu } from "@/components/menu";
+import { ChoiceMenu, Menu, MenuItem } from "@/components/menu";
 import { ConfirmButton } from "@/components/confirm-button";
 import { OwnerMenu, ownerToast, type OwnerInfo, type TeammateOption } from "@/components/owner-controls";
 import { api, useSave } from "@/components/use-save";
@@ -69,6 +69,22 @@ export function CreatorsTable({
 
   // Shift-click ticks everything between this row and the last one you ticked (I6).
   const lastTicked = useRef<number | null>(null);
+  // While the bulk bar is up, toasts rise above it instead of landing on Delete (R16).
+  const bar = useRef<HTMLDivElement>(null);
+  const barUp = chosen.length > 0;
+  useEffect(() => {
+    const el = bar.current;
+    if (!barUp || !el) return;
+    const root = document.documentElement;
+    const lift = () => root.style.setProperty("--toast-lift", `${el.offsetHeight + 12}px`);
+    lift();
+    const ro = new ResizeObserver(lift);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--toast-lift");
+    };
+  }, [barUp]);
   useEffect(() => {
     lastTicked.current = null; // a new list: its rows aren't the ones you ticked before
   }, [rows]);
@@ -214,7 +230,7 @@ export function CreatorsTable({
       </div>
       {/* The bar floats at the bottom of the screen, so ticking a row never pushes the table down (I6). */}
       {chosen.length > 0 && (
-        <div className="sticky bottom-4 z-10 flex animate-toast-in flex-wrap items-end gap-3 rounded-xl border border-accent-ring bg-surface p-3 shadow-float">
+        <div ref={bar} className="sticky bottom-4 z-10 flex animate-toast-in flex-wrap items-end gap-3 rounded-xl border border-accent-ring bg-surface p-3 shadow-float">
           <div className="flex items-center gap-2 self-center text-sm font-medium text-text">
             {chosen.length} selected
             <Button size="sm" variant="ghost" icon={<X size={13} />} onClick={() => setSelected(new Set())}>
@@ -270,47 +286,30 @@ export function CreatorsTable({
               onChoose={(v) => assignTo(v === "__nobody" ? null : v)}
             />
           </FieldGroup>
-          {rows.some((r) => chosen.includes(r.partnershipId) && r.clientApproval === "pending") && (
-            <div className="self-center">
-              <Button
-                size="sm"
-                icon={<Check size={13} />}
-                pending={pending}
-                title="Approve for outreach on the client's behalf — recorded under your name"
-                onClick={() => bulk({ action: "approve" }, (d) => `${d.approved ?? 0} approved for outreach`, undoApprove)}
-              >
-                Approve for outreach
-              </Button>
-            </div>
-          )}
-          <div className="self-center">
-            <Button
-              size="sm"
-              icon={<ImageDown size={13} />}
-              pending={pending}
-              title="Looks each one up on Instagram: profile picture, followers, and their public email if none is saved"
-              onClick={() =>
-                bulk({ action: "refresh_instagram" }, (d) => `Getting photos and followers for ${d.queued ?? 0} — they'll appear in a minute or two`)
-              }
-            >
-              Get photos & followers
-            </Button>
-          </div>
           <div className="self-center">
             {archivedView ? (
               <Button size="sm" icon={<ArchiveRestore size={13} />} pending={pending} onClick={() => bulk({ action: "unarchive" }, (d) => `${d.restored ?? 0} back on the lists`)}>
                 Restore
               </Button>
             ) : (
-              <Button
-                size="sm"
-                icon={<Archive size={13} />}
-                pending={pending}
-                title="Off Today, the Pipeline and this list — they come back if they write"
-                onClick={() => bulk({ action: "archive" }, (d) => `${d.archived ?? 0} archived — see them under Archived`)}
-              >
-                Archive
-              </Button>
+              // The less-used bulk actions live in ⋯, so the bar stays one short row (R16).
+              <Menu label="More for the selected" align="start">
+                {rows.some((r) => chosen.includes(r.partnershipId) && r.clientApproval === "pending") && (
+                  <MenuItem icon={<Check size={14} />} disabled={pending} onSelect={() => bulk({ action: "approve" }, (d) => `${d.approved ?? 0} approved for outreach`, undoApprove)}>
+                    Approve for outreach
+                  </MenuItem>
+                )}
+                <MenuItem
+                  icon={<ImageDown size={14} />}
+                  disabled={pending}
+                  onSelect={() => bulk({ action: "refresh_instagram" }, (d) => `Getting photos and followers for ${d.queued ?? 0} — they'll appear in a minute or two`)}
+                >
+                  Get photos &amp; followers
+                </MenuItem>
+                <MenuItem icon={<Archive size={14} />} disabled={pending} onSelect={() => bulk({ action: "archive" }, (d) => `${d.archived ?? 0} archived — see them under Archived`)}>
+                  Archive
+                </MenuItem>
+              </Menu>
             )}
           </div>
           <div className="ml-auto self-center">

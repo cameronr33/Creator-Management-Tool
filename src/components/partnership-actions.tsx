@@ -179,7 +179,7 @@ export function StageControl({
               />
             </FieldGroup>
           )}
-          {autoNote && <p className="text-[11px] leading-relaxed text-text-faint">{autoNote}</p>}
+          {autoNote && <p className="text-[13px] leading-relaxed text-text-faint">{autoNote}</p>}
         </>
       )}
     </div>

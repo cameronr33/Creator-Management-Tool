@@ -266,7 +266,7 @@ export function PipelineBoard({
               <div className="flex items-center justify-between text-[11px] text-text-faint">
                 <span>{col.group}</span>
                 {col.key === "closed" && showClosed && !dragId && (
-                  <Button variant="link" className="!text-[11px]" onClick={() => setShowClosed(false)}>
+                  <Button variant="link" onClick={() => setShowClosed(false)}>
                     Fold away
                   </Button>
                 )}
@@ -410,9 +410,7 @@ function PipelineCard({
           <span />
         )}
         {showCampaign && (
-          <Badge tone="info" title="Campaign">
-            {c.campaignName}
-          </Badge>
+          <Badge tone="info">{c.campaignName}</Badge>
         )}
       </div>
       <p className="mt-1.5 line-clamp-2 text-xs leading-snug text-text-muted" title={c.latest}>
@@ -444,7 +442,7 @@ function PipelineCard({
                   onMoved(landed);
                 }}
               />
-              <Button variant="link" className="!text-[11px]" onClick={() => setPanel(null)}>
+              <Button variant="link" onClick={() => setPanel(null)}>
                 Cancel
               </Button>
             </div>

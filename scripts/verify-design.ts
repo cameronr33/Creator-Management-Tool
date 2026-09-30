@@ -230,6 +230,18 @@ function main() {
   const sideBg = tokenHex("--sidebar-bg"), sideEdge = tokenHex("--sidebar-field-edge"), sideMuted = tokenHex("--sidebar-muted");
   check("sidebar dropdown edges clear 3:1 on the navy (R15)", !!sideBg && !!sideEdge && ratio(sideEdge, sideBg) >= 3, sideEdge && sideBg ? ratio(sideEdge, sideBg).toFixed(2) : "no --sidebar-field-edge token");
   check("sidebar small text is lifted (R15)", !!sideMuted && !!sideBg && ratio(sideMuted, sideBg) >= 9, sideMuted && sideBg ? ratio(sideMuted, sideBg).toFixed(2) : "missing");
+  // Interface review 2026-09-30 (owner picks R5, R7, R8, R16–R19, R27).
+  console.log("\n── fits, wraps, reads ──");
+  check("a long logged message can be read in full (Show all), and so can the participants (R5)", /<ExpandableText/.test(creatorPage) && !/line-clamp-6/.test(creatorPage) && /title=\{t\.participants/.test(creatorPage) && /Show all/.test(read("components/expandable-text.tsx")));
+  check("card-header and banner buttons wrap on a narrow screen (R7)", !/actions && <div className="flex shrink-0/.test(ui) && /Also in:/.test(creatorPage) && /flex flex-wrap items-center gap-1 text-xs/.test(creatorPage));
+  check("a badge shrinks and ends in …, and a truncated status line's tooltip is its own text (R8)", /export function Badge[\s\S]{0,900}min-w-0 max-w-full/.test(ui) && /title=\{title \?\? \(typeof children === "string"/.test(ui));
+  check("campaign badges carry the full campaign name as their tooltip (R8)", !/title="Campaign"/.test(todayList + board + creatorPage));
+  check("a contract's file name truncates, with the full name on hover (R8)", /min-w-0[^"]*"[^>]*title=\{c\.filename\}|title=\{c\.filename\}[^>]*min-w-0/.test(read("components/contracts.tsx")));
+  check("the bulk bar keeps the main moves; the rest sit in its ⋯ menu, and toasts rise above it (R16)", /More for the selected/.test(table) && /--toast-lift/.test(table) && /--toast-lift/.test(toastSrc));
+  check("fields are 16px on phones, so iPhones don't zoom in (R17)", /compact \? "h-8 px-2\.5 text-base sm:text-xs" : "h-9 px-3 text-base sm:text-sm"/.test(ui));
+  check("no sentence at 11px (R18)", !/text-\[11px\] leading-relaxed/.test(actions) && !/!text-\[11px\]/.test(board));
+  check("Today's section cards use the card title and description sizes (R19)", /<SectionTitle>/.test(todayList) && /text-\[13px\] text-text-muted">\{hint\}/.test(todayList));
+  check("the loading outline fits a phone (R27)", /skeleton mt-2 h-4 w-72 max-w-full/.test(read("app/(app)/loading.tsx")));
   check("every button gives a press, and a pending button keeps its width", /secondary: [`"][^`"]*active:/.test(ui) && /ghost: [`"][^`"]*active:/.test(ui) && /invisible/.test(ui));
 }
 
