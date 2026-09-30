@@ -96,7 +96,6 @@ export function GmailSyncStatus({ account }: { account: GmailAccountView }) {
           <div className="break-all font-medium text-text">{account.email}</div>
           <div className="mt-0.5 text-xs">{account.lastSyncAt ? `Last checked ${account.lastSyncAt}` : "No check recorded yet"}</div>
           {s && <div className="mt-0.5 text-xs">{s.rosterSize ?? 0} creator address(es) searched · {s.inserted ?? 0} new message(s) last time</div>}
-          {account.health.state === "error" && account.lastSyncStatus && <p className="mt-1 break-words text-xs text-bad">{account.lastSyncStatus}</p>}
         </div>
         <Button size="sm" icon={<RefreshCw size={13} />} onClick={syncNow} pending={pending}>
           {pending ? "Checking…" : "Check email now"}

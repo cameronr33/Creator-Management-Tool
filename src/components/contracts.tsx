@@ -185,7 +185,7 @@ export function Contracts({ partnershipId, contracts, differences }: { partnersh
                 {(c.readStatus === "failed" || c.givenUp || c.readStatus === "not_contract" || c.readStatus === "pending") && c.readError && (
                   <div className={c.readStatus === "not_contract" ? "text-xs text-text-muted" : "text-xs text-bad"}>
                     {/* The stored line is written while it's still retrying; once it has given up, say what's left to do. */}
-                    {c.givenUp ? "Couldn't download it from the email. Press Try fetching it again, or upload the PDF yourself." : c.readError}
+                    {c.givenUp ? "Couldn't download it from the email. Press ↻ to fetch it again, or upload the PDF yourself." : c.readError}
                   </div>
                 )}
               </div>

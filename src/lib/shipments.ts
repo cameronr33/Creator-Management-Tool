@@ -47,7 +47,7 @@ export async function recordShipment(
   const [before] = d.id
     ? await db.select().from(cmShipments).where(and(eq(cmShipments.id, d.id), eq(cmShipments.partnershipId, d.partnershipId))).limit(1)
     : await db.select().from(cmShipments).where(eq(cmShipments.partnershipId, d.partnershipId)).orderBy(desc(cmShipments.createdAt)).limit(1);
-  if (d.id && !before) return { ok: false, error: "Shipment not found for this partnership" };
+  if (d.id && !before) return { ok: false, error: "That shipment isn't here any more. Reload the page." };
 
   // Stamp shippedAt / deliveredAt only when the status really changes to it and
   // no date was given: saving a tracking number the next day mustn't restart

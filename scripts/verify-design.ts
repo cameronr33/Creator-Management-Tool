@@ -255,14 +255,24 @@ function main() {
     }
   };
   walkApi("app/api");
+  const routeSrc = errorFiles.filter((x) => x.startsWith("app/api")).map(read).join("\n");
+  for (const name of readdirSync(join(ROOT, "lib"))) {
+    const lib = `lib/${name}`;
+    const importedByARoute = routeSrc.includes(`"@/lib/${name.replace(/\.ts$/, "")}"`);
+    if (name.endsWith(".ts") && importedByARoute && /ok: false, error:/.test(read(lib)) && !errorFiles.includes(lib)) errorFiles.push(lib);
+  }
   for (const f of errorFiles.filter((x) => !x.includes("/cron/"))) {
     // Review 2026-09-30: any "Invalid …" or "… not found" is a raw word too, wherever it is.
-    for (const m of read(f).match(/"(?:Invalid [a-zA-Z ]+|[A-Z][a-z]+ not found[^"]*|Missing [^"]*|Expected [^"]*)"/g) ?? []) if (!/cron/.test(m)) rawErrors.push(`${f}: ${m}`);
+    for (const m of read(f).match(/["'`](?:Invalid [a-zA-Z ]+|[A-Z][a-z]+ not found[^"'`]*|Missing [^"'`]*|Expected [^"'`]*)["'`]/g) ?? []) if (!/cron/.test(m)) rawErrors.push(`${f}: ${m}`);
     // Second review: a caught error's own words, however it's spelled (err.message, error.message, e.message).
-    for (const line of read(f).split("\n")) if (/\b(?:e|err|error)\.message\b/.test(line) && !/instanceof UserError/.test(line)) rawErrors.push(`${f}: ${line.trim().slice(0, 80)}`);
+    for (const line of read(f).split("\n")) {
+      if (line.trim() === "if (e instanceof UserError) return badRequest(e.message);") continue;
+      if (/\bconsole\.(?:error|warn|log)\(/.test(line)) continue; // the server log may say anything
+      if (/\b(?:e|err|error|ex|cause)\.message\b|\(\w+ as Error\)\.message\b|String\((?:e|err|error)\)|\$\{(?:e|err|error)\}|\.errors\[0\]/.test(line)) rawErrors.push(`${f}: ${line.trim().slice(0, 80)}`);
+    }
     for (const m of read(f).match(/"(?:Unauthorized|Invalid request|Invalid fields|Invalid bulk action|Invalid undo|Invalid archive|Not found|Partnership not found|Invalid partnership id|No client selected)"|belongs to a different client|Couldn't pass on this creator|HTTP \$\{r\.status\}|\(e as Error\)\.message/g) ?? []) rawErrors.push(`${f}: ${m}`);
   }
-  check("every error a teammate can see says what to do next — no raw server words (R3)", rawErrors.length === 0, rawErrors.slice(0, 6).join("; "));
+  check("every error a teammate can see says what to do next — no raw server words (R3)", rawErrors.length === 0, rawErrors.join("; "));
   const confirmSrc = read("components/confirm-button.tsx");
   const vagueConfirms: string[] = [];
   for (const f of ["components/profile-editors.tsx", "components/email-status.tsx", "components/creators-table.tsx", "components/contracts.tsx", "components/creator-record-actions.tsx"]) {
@@ -296,7 +306,8 @@ function main() {
   check("a Field wraps its control itself (its hint and error are tied to what it wraps)", fieldWrapsDiv.length === 0, fieldWrapsDiv.slice(0, 5).join("; "));
   // Second review: once the email check gives up, the line points at the button that's there.
   const contractsUi = read("components/contracts.tsx");
-  check("a contract the email check gave up on says to press Try fetching it again", /c\.givenUp \?[\s\S]{0,200}Press Try fetching it again, or upload the PDF yourself/.test(contractsUi));
+  check("a contract the email check gave up on says to press ↻, the button that's shown", /c\.givenUp \?[\s\S]{0,200}Press ↻ to fetch it again, or upload the PDF yourself/.test(contractsUi) && /icon=\{<RotateCw/.test(contractsUi));
+  check("Settings doesn't print the email check's raw error under the callout", !/\{account\.lastSyncStatus\}/.test(read("components/settings-forms.tsx")));
   check("a bad id when changing a brand login doesn't ask to check a name and email", !/Check the name and email/.test(read("app/api/client-users/route.ts").split("export async function PATCH")[1] ?? ""));
   check("no Tailwind class that v4 doesn't have (blur-0 is blur-none)", !/\bblur-0\b/.test(ui));
   check("no leftover sidebar dropdown CSS now the switchers are menus", !/select-chevron-light/.test(cssAll));

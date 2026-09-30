@@ -41,7 +41,10 @@ export async function POST(req: NextRequest) {
     try {
       const r = await refreshFromInstagram([d.creatorId]);
       if (r.skipped) return NextResponse.json({ ok: false, error: "No Instagram link on this creator yet — add one under Profile first." });
-      if (r.errors.length && !r.found) return NextResponse.json({ ok: false, error: r.errors[0] });
+      if (r.errors.length && !r.found) {
+        console.error("[enrich]", r.errors);
+        return NextResponse.json({ ok: false, error: "Couldn't look them up right now. Try again in a minute." });
+      }
       if (!r.found) return NextResponse.json({ ok: false, error: "No profile returned — it may be private." });
       if (r.emailsFound) after(() => checkEmailForNewAddress());
       const [c] = await db.select({ followers: cmCreators.followers }).from(cmCreators).where(eq(cmCreators.id, d.creatorId)).limit(1);
