@@ -34,12 +34,22 @@ export function QuickStage({
   const { pending, run } = useSave();
   const [closingAs, setClosingAs] = useState<CmStage | null>(null);
   const [askVideo, setAskVideo] = useState(false);
+  // What you picked, shown until the page catches up (or put back if the save fails).
+  const [choosing, setChoosing] = useState<CmStage | null>(null);
+  const [seenStage, setSeenStage] = useState(stage);
+  if (seenStage !== stage) {
+    setSeenStage(stage);
+    setChoosing(null);
+  }
+  const shown = choosing ?? stage;
 
   const setStage = async (to: CmStage, exitReason?: string | null, videoUrl?: string) => {
+    setChoosing(to);
     const r = await run(() => api<{ stage?: CmStage }>(`/api/partnerships/${partnershipId}/stage`, { stage: to, exitReason, videoUrl }), {
       success: `${name} → ${stageLabel(to)}`,
     });
     setAskVideo(!r.ok && needsVideo(r.data));
+    if (!r.ok) setChoosing(null);
     if (r.ok) {
       setClosingAs(null);
       onMoved?.(r.data.stage ?? to);
@@ -52,7 +62,7 @@ export function QuickStage({
         compact
         aria-label={`Stage for ${name}`}
         title={stageHint(stage)}
-        value={asMove ? "" : stage}
+        value={asMove ? "" : shown}
         disabled={pending}
         className={className}
         onChange={(e) => {

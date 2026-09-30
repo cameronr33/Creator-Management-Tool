@@ -12,6 +12,7 @@ import { Toaster } from "@/components/toast";
 import { signOutAction } from "@/app/actions";
 import { Button } from "@/components/ui";
 import { MobileNavigation } from "@/components/mobile-navigation";
+import { MainPendingProvider, MainRegion } from "@/components/main-pending";
 
 export default async function AppLayout({
   children,
@@ -28,6 +29,7 @@ export default async function AppLayout({
   const campaignPicker = active ? <CampaignSwitcher campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))} activeId={campaign?.id ?? null} /> : null;
 
   return (
+    <MainPendingProvider>
     <div className="flex min-h-screen flex-col md:flex-row">
       <header className="border-b border-sidebar-line bg-sidebar-bg p-3 md:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3"><BrandLockup inverted /><div className="max-w-44 space-y-2"><ClientSwitcher clients={clients} activeSlug={active?.slug ?? ""} />{campaignPicker}</div></div>
@@ -75,11 +77,12 @@ export default async function AppLayout({
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1">
+      <MainRegion>
         {process.env.CREATOR_LOCAL_PREVIEW === "1" && <div className="border-b border-info-line bg-info-soft px-6 py-2 text-xs text-info">Preview workspace · fictional data · external integrations disabled</div>}
         {children}
-      </main>
+      </MainRegion>
       <Toaster />
     </div>
+    </MainPendingProvider>
   );
 }

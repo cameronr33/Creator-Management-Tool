@@ -74,13 +74,23 @@ export function StageControl({
   const { pending, run } = useSave();
   const [closingAs, setClosingAs] = useState<CmStage | null>(null);
   const [askVideo, setAskVideo] = useState(false);
+  // What you picked, shown until the page catches up (or put back if the save fails).
+  const [choosing, setChoosing] = useState<CmStage | null>(null);
+  const [seenStage, setSeenStage] = useState(stage);
+  if (seenStage !== stage) {
+    setSeenStage(stage);
+    setChoosing(null);
+  }
+  const shown = choosing ?? stage;
 
   const setStage = async (to: CmStage, reason?: string | null, videoUrl?: string) => {
+    setChoosing(to);
     const r = await run(
       () => api(`/api/partnerships/${partnershipId}/stage`, { stage: to, exitReason: reason, videoUrl }),
       { success: `Stage set to ${stageLabel(to)}` },
     );
     setAskVideo(!r.ok && needsVideo(r.data));
+    if (!r.ok) setChoosing(null);
     return r;
   };
 
@@ -88,7 +98,7 @@ export function StageControl({
     <div className="w-full max-w-xs space-y-1.5">
       <Field label="Stage">
         <Select
-          value={stage}
+          value={shown}
           disabled={pending}
           onChange={(e) => {
             const to = e.target.value as CmStage;

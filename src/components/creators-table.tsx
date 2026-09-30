@@ -9,6 +9,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { OwnerMenu, ownerToast, type OwnerInfo, type TeammateOption } from "@/components/owner-controls";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
+import { PendingDim } from "@/components/main-pending";
 import { stagesByGroup } from "@/lib/stages";
 import { compactNumber, relativeDays } from "@/lib/format";
 import type { CmStage } from "@/lib/db/schema";
@@ -95,6 +96,7 @@ export function CreatorsTable({
   const where = scopeName ? `from ${scopeName}` : "from the campaign each is in";
 
   return (
+    <PendingDim>
     <div className="space-y-3">
       {chosen.length > 0 && (
         <div className="sticky top-0 z-10 flex flex-wrap items-end gap-3 rounded-xl border border-accent-ring bg-surface p-3 shadow-float">
@@ -321,5 +323,6 @@ export function CreatorsTable({
         </table>
       </div>
     </div>
+    </PendingDim>
   );
 }

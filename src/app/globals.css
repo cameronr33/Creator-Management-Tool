@@ -199,6 +199,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* A toast's time-left line (toast.tsx). */
+@keyframes toast-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
 /* A placeholder shaped like the page, while it loads (loading.tsx). */
 .skeleton {
   border-radius: var(--radius-md);
@@ -223,6 +229,9 @@ body {
   .animate-spin {
     animation-duration: 1s !important;
     animation-iteration-count: infinite !important;
+  }
+  .toast-timer {
+    display: none;
   }
 }
 

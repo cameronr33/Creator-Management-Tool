@@ -412,13 +412,15 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "link
 export type ButtonSize = "sm" | "md";
 
 const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition select-none disabled:pointer-events-none disabled:opacity-50";
+  "relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition select-none disabled:pointer-events-none disabled:opacity-50";
 
+// Every button answers a press: a darker fill and a slight squeeze (not links — they're text).
+const PRESS = "active:scale-[0.98]";
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-white shadow-control hover:bg-accent-hover active:bg-accent-active",
-  secondary: "bg-surface text-text shadow-control hover:bg-surface-2",
-  ghost: "text-text-muted hover:bg-surface-2 hover:text-text",
-  danger: "border border-bad-line bg-surface text-bad hover:bg-bad-soft",
+  primary: `bg-accent text-white shadow-control hover:bg-accent-hover active:bg-accent-active ${PRESS}`,
+  secondary: `bg-surface text-text shadow-control hover:bg-surface-2 active:bg-surface-3 ${PRESS}`,
+  ghost: `text-text-muted hover:bg-surface-2 hover:text-text active:bg-surface-3 ${PRESS}`,
+  danger: `border border-bad-line bg-surface text-bad hover:bg-bad-soft active:bg-bad-line/40 ${PRESS}`,
   link: "text-accent hover:underline",
 };
 
@@ -470,12 +472,21 @@ export function Button({
     variant === "link" ? "h-auto px-0 text-sm" : BUTTON_SIZES[size],
     className,
   );
-  const content = (
-    <>
-      {pending ? <Spinner size={size === "sm" ? 13 : 14} /> : icon}
-      {children}
-    </>
-  );
+  // Pending: the spinner takes the icon's place. With no icon it sits over the
+  // hidden label, so the button keeps its width and nothing next to it moves.
+  const spinner = <Spinner size={size === "sm" ? 13 : 14} />;
+  const content =
+    pending && !icon ? (
+      <>
+        <span className="invisible inline-flex items-center gap-1.5">{children}</span>
+        <span className="absolute inset-0 flex items-center justify-center">{spinner}</span>
+      </>
+    ) : (
+      <>
+        {pending ? spinner : icon}
+        {children}
+      </>
+    );
   if (href && !disabled && !pending) {
     return (
       <Link href={href} target={target} rel={rel} className={classes} title={title} aria-label={rest["aria-label"]}>
@@ -532,7 +543,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-md transition disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex shrink-0 items-center justify-center rounded-md transition active:scale-[0.96] disabled:pointer-events-none disabled:opacity-50",
         size === "sm" ? "h-8 w-8" : "h-9 w-9",
         tone,
         className,

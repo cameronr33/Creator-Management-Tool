@@ -144,6 +144,24 @@ function main() {
   check("the success tick clears 3:1 (the dark green, not lime)", /good: <CheckCircle2[^>]*text-good"/.test(toastSrc));
   const owner = readFileSync(join(ROOT, "components", "owner-controls.tsx"), "utf8");
   check("the owner chip has a click area of at least 24px (WCAG 2.2 target size)", /triggerClassName="[^"]*before:-inset-1/.test(owner));
+
+  // Interaction review 2026-09-30 (owner: all picks): every wait shows it's working.
+  console.log("\n── feedback while waiting ──");
+  const has = (p: string) => { try { return statSync(join(ROOT, p)).isFile(); } catch { return false; } };
+  const read = (p: string) => (has(p) ? readFileSync(join(ROOT, p), "utf8") : "");
+  for (const [p, what] of [["app/(app)/loading.tsx", "any page"], ["app/(app)/pipeline/loading.tsx", "the Pipeline"], ["app/(app)/creators/[id]/loading.tsx", "a creator's page"]]) check(`an outline of the page shows at once while ${what} loads`, has(p) && /skeleton/.test(read(p)));
+  check("a failed page offers Try again (error.tsx with unstable_retry)", /unstable_retry/.test(read("app/(app)/error.tsx")) && /^"use client"/.test(read("app/(app)/error.tsx")));
+  check("an unknown page and a creator that's gone have their own not-found pages", has("app/not-found.tsx") && has("app/(app)/creators/[id]/not-found.tsx"));
+  check("the sidebar link you clicked shows it's on its way (useLinkStatus)", /useLinkStatus/.test(read("components/nav.tsx")));
+  const saveSrc = read("components/use-save.ts");
+  check("a save's spinner lasts until the refreshed page has landed (refresh inside a transition)", /startTransition\(\(\) => router\.refresh\(\)\)/.test(saveSrc) && /pending: saving \|\| refreshing/.test(saveSrc));
+  check("toasts pause while the pointer is on them, and errors are announced at once", /onMouseEnter/.test(toastSrc) && /onMouseLeave/.test(toastSrc) && /aria-live="assertive"/.test(toastSrc) && /animate-toast-in/.test(toastSrc));
+  check("the Today stage dropdown shows your choice while it saves", /value=\{asMove \? "" : shown\}/.test(read("components/quick-stage.tsx")));
+  check("the creator page's stage dropdown shows your choice while it saves", /value=\{shown\}/.test(read("components/partnership-actions.tsx")));
+  check("Mine / Everyone shows your choice at once", /useOptimistic/.test(read("components/mine-toggle.tsx")));
+  for (const f of ["client-switcher.tsx", "campaign-switcher.tsx"]) check(`${f.replace(".tsx", "")} dims the page and says it's switching`, /useMainPending/.test(read(`components/${f}`)));
+  check("search shows it's working while results load", /useMainPending/.test(read("components/creators-filter-bar.tsx")) && /Spinner/.test(read("components/creators-filter-bar.tsx")));
+  check("every button gives a press, and a pending button keeps its width", /secondary: [`"][^`"]*active:/.test(ui) && /ghost: [`"][^`"]*active:/.test(ui) && /invisible/.test(ui));
 }
 
 main();

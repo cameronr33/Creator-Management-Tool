@@ -4,7 +4,8 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { useCallback, useEffect, useReducer } from "react";
 import { stagesByGroup } from "@/lib/stages";
-import { Field, Input, Select, Button } from "@/components/ui";
+import { Field, Input, Select, Button, Spinner } from "@/components/ui";
+import { useMainPending } from "@/components/main-pending";
 import { searchDraft } from "@/lib/search-draft";
 
 /** Drop the list filters from a query string, keeping anything else. */
@@ -20,6 +21,8 @@ export function clearListFilters(query: string): string {
  */
 export function CreatorsFilterBar() {
   const router = useRouter();
+  const { pending, start } = useMainPending();
+  const go = useCallback((href: string) => start(() => router.push(href), { dim: false }), [router, start]);
   const pathname = usePathname();
   const params = useSearchParams();
   const urlQ = params.get("q") ?? "";
@@ -35,9 +38,9 @@ export function CreatorsFilterBar() {
       else next.delete(key);
       const qs = next.toString();
       if (key === "q") updateSearch({ type: "submit", value });
-      router.push(qs ? `${pathname}?${qs}` : pathname);
+      go(qs ? `${pathname}?${qs}` : pathname);
     },
-    [params, pathname, router],
+    [params, pathname, go],
   );
 
   const stage = params.get("stage") ?? "";
@@ -64,8 +67,9 @@ export function CreatorsFilterBar() {
             placeholder="Search creators"
             title="Search by name, handle or content type"
             aria-label="Search creators"
-            className="w-64 pl-8"
+            className="w-64 pl-8 pr-8"
           />
+          {(pending || q !== urlQ) && <Spinner size={14} className="absolute top-1/2 right-2.5 -translate-y-1/2 text-accent" />}
         </div>
       </Field>
 
@@ -92,7 +96,7 @@ export function CreatorsFilterBar() {
             setQ("");
             updateSearch({ type: "submit", value: "" });
             const query = clearListFilters(params.toString());
-            router.push(query ? `${pathname}?${query}` : pathname);
+            go(query ? `${pathname}?${query}` : pathname);
           }}
         >
           Clear

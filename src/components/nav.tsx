@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Users, Kanban, Settings, CircleHelp, type LucideIcon } from "lucide-react";
 
@@ -44,6 +44,7 @@ export function NavLink({
       {active && <span className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-full bg-sidebar-active" />}
       <Icon size={17} strokeWidth={2} />
       <span className="flex-1">{label}</span>
+      <LinkHint />
       {badge != null && badge > 0 && (
         <span className="rounded-full bg-brand-lime px-1.5 py-0.5 text-[11px] font-semibold tabular text-brand-navy">
           {badge}
@@ -51,6 +52,15 @@ export function NavLink({
       )}
     </Link>
   );
+}
+
+/**
+ * A small dot that pulses while the page you clicked is on its way — always
+ * there, only its opacity changes, so nothing shifts (interaction review 2026-09-30).
+ */
+function LinkHint() {
+  const { pending } = useLinkStatus();
+  return <span aria-hidden className={`h-1.5 w-1.5 rounded-full bg-sidebar-active transition-opacity ${pending ? "animate-pulse opacity-100" : "opacity-0"}`} />;
 }
 
 export function Nav() {
