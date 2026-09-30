@@ -27,6 +27,16 @@ function count(value: unknown): number {
 // this means nobody has had the app open and the worker isn't running.
 export const GMAIL_STALE_AFTER_HOURS = 18;
 
+/** "Email checked 4 min ago" — the quiet header line when all is well (design review 2026-09-30, D6). */
+export function emailCheckedLine(health: Pick<GmailHealthSummary, "lastCheckedAt">, now = new Date()): string {
+  if (!health.lastCheckedAt) return "Email checked";
+  const mins = Math.max(0, Math.round((now.getTime() - new Date(health.lastCheckedAt).getTime()) / 60_000));
+  if (mins < 1) return "Email checked just now";
+  if (mins < 60) return `Email checked ${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  return `Email checked ${hours} hour${hours === 1 ? "" : "s"} ago`;
+}
+
 export function summarizeGmailHealth(
   account: GmailHealthInput | null,
   now = new Date(),

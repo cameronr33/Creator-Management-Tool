@@ -136,7 +136,7 @@ export function OwnerPicker({ partnershipId, ownerId, teammates, meId }: { partn
   // Switched-off teammates aren't offered — unless they're the owner now.
   const options = teammates.filter((t) => t.active || t.id === ownerId);
   return (
-    <Field label="Owner">
+    <Field label="Owner" inline>
       <Select
         compact
         className="w-48"

@@ -24,9 +24,10 @@ import { creatorSectionHref, type CreatorSection } from "@/lib/creator-workspace
 import { relativeDays } from "@/lib/format";
 
 /**
- * Today, as sections of work. Every row: who, what was said last and whose
- * turn it is, a stage menu to fix the stage in place, the one button for the
- * next step, and a ⋯ menu for the rest (log with a date, a note, archive). The
+ * Today, as sections of work. Every row: who, their stage as a pill (click it
+ * to change the stage), what was said last and whose turn it is, the one
+ * button for the next step, and a ⋯ menu for the rest (log with a date, a
+ * note, archive). The
  * campaign shows only when the sidebar is on All campaigns. "Waiting on them"
  * starts folded.
  */
@@ -196,6 +197,7 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
               {r.name}
             </Link>
             <OwnerMenu partnershipId={r.partnershipId} name={r.name} owner={owner} meId={meId} team={team} />
+            <QuickStage partnershipId={r.partnershipId} name={r.name} stage={r.stage} asPill />
             {r.badge === "due" && <Badge tone="warn" title="The first message is overdue">Due</Badge>}
             {r.badge === "late" && <Badge tone="bad" title="The video is later than the client's Video due setting">Late</Badge>}
             {showCampaign && <Badge tone="info" title="Campaign">{r.campaignName}</Badge>}
@@ -255,9 +257,6 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
             </div>
           )}
         </div>
-      </div>
-      <div className="sm:w-44 sm:shrink-0">
-        <QuickStage partnershipId={r.partnershipId} name={r.name} stage={r.stage} className="w-full" />
       </div>
     </li>
   );

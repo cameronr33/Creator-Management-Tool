@@ -180,6 +180,18 @@ function main() {
   const confirm = read("components/confirm-button.tsx");
   check("a confirm lands on the safe No, Escape cancels, and it disarms by itself (I13)", /autoFocus/.test(confirm) && /Escape/.test(confirm) && /setTimeout|setInterval/.test(confirm));
   check("a contract PDF can be dropped onto the Deal (I17)", /onDrop/.test(read("components/contracts.tsx")) && /Drop the PDF/.test(read("components/contracts.tsx")));
+  console.log("\n── page layout ──");
+  const creatorPage = read("app/(app)/creators/[id]/page.tsx");
+  check("the creator page header: stage, owner and campaign in one row, not a column of dropdowns (D3)", !/sm:w-72/.test(creatorPage) && /data-header-controls/.test(creatorPage));
+  check("…one card for what to do: the stage flag and the approval sit inside the Next card (D3)", /data-next-card/.test(creatorPage) && !/<Callout\s+tone="warn"\s+title=\{staleStageLine/.test(creatorPage) && !/title=\{`Waiting on \$\{client\?\.name/.test(creatorPage));
+  const jump = read("components/jump-bar.tsx");
+  check("the jump bar stays pinned, shows where you are and scrolls smoothly (I12, S9)", /<JumpBar/.test(creatorPage) && /sticky top-0/.test(jump) && /aria-current/.test(jump) && /prefers-reduced-motion/.test(jump) && /shadow-control/.test(jump));
+  check("section cards leave room for the pinned bar when you jump to them", !/scroll-mt-4/.test(creatorPage) && /scroll-mt-16/.test(creatorPage));
+  check("a Today row shows its stage as a pill that opens the stage menu, not a full dropdown (D5)", /<QuickStage[^>]*asPill/.test(todayList) && !/sm:w-44/.test(todayList));
+  const todayPage = read("app/(app)/page.tsx");
+  check("the email banner only shows when something needs attention; otherwise a quiet line (D6)", /health\.state === "checked"/.test(todayPage) && /emailCheckedLine/.test(todayPage));
+  check("card descriptions can put how-it-works behind an ⓘ (D9)", /info\?: string/.test(ui) && /<HelpPopover[^>]*label=/.test(ui));
+  check("Today's help matches what Today shows (D10)", !/Each row shows the campaign/.test(todayPage) && !/Fix a stage with the menu on the right/.test(todayPage));
   check("every button gives a press, and a pending button keeps its width", /secondary: [`"][^`"]*active:/.test(ui) && /ghost: [`"][^`"]*active:/.test(ui) && /invisible/.test(ui));
 }
 

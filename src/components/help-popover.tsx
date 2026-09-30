@@ -9,7 +9,7 @@ import { CircleHelp } from "lucide-react";
  * click anywhere else or Escape (it used to stay open until you clicked "?"
  * again — interaction review 2026-09-30, I11). Focus goes back to "?".
  */
-export function HelpPopover({ help, helpAnchor }: { help: string; helpAnchor?: string }) {
+export function HelpPopover({ help, helpAnchor, label = "How this page works" }: { help: string; helpAnchor?: string; label?: string }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -39,8 +39,8 @@ export function HelpPopover({ help, helpAnchor }: { help: string; helpAnchor?: s
         ref={button}
         type="button"
         aria-expanded={open}
-        aria-label="How this page works"
-        title="How this page works"
+        aria-label={label}
+        title={label}
         onClick={() => setOpen((o) => !o)}
         className="inline-flex h-6 w-6 items-center justify-center rounded-full text-text-faint transition hover:bg-surface-2 hover:text-accent"
       >
@@ -49,7 +49,7 @@ export function HelpPopover({ help, helpAnchor }: { help: string; helpAnchor?: s
       {open && (
         <div
           role="dialog"
-          aria-label="How this page works"
+          aria-label={label}
           className="absolute left-0 z-20 mt-1 w-80 max-w-[calc(100vw-2rem)] animate-pop-in rounded-lg border border-border bg-surface p-3 text-[13px] leading-relaxed text-text-muted shadow-float"
         >
           {help}

@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import { getPartnershipDetail, getClients, getPhotoUrl, getCampaigns, getFollowUpThresholds } from "@/lib/queries";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
-import { Card, CardHeader, Avatar, Badge, Callout } from "@/components/ui";
+import { Card, CardHeader, Avatar, Badge, Callout, cn } from "@/components/ui";
+import { JumpBar } from "@/components/jump-bar";
 import {
   StageControl,
   TimelineNote,
@@ -233,142 +234,152 @@ export default async function CreatorDetailPage({
 
   return (
     <div>
-      {/* Header: who, what's next, and the stage */}
-      <div className="border-b border-border bg-surface px-4 py-4 sm:px-6">
+      {/*
+        Header (design review 2026-09-30, D3): who they are; stage, owner and
+        campaign in one row; then one card for what to do next — the stage
+        flag and the approval live inside it, not beside it; then the email
+        line and our note. The jump links stay pinned below (I12).
+      */}
+      <div className="border-b border-border bg-surface px-4 pt-4 pb-4 sm:px-6">
         <Link href={returnTo} className="mb-3 inline-flex items-center gap-1 text-sm text-text-muted hover:text-accent">
           <ArrowLeft size={14} /> {BACK_LABELS[returnTo.split("?")[0]] ?? "Creators"}
         </Link>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
-            <Avatar name={creator.name} size="lg" src={photo} />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-semibold tracking-tight text-text">{creator.name}</h1>
-                {creator.contentPillar && <Badge tone="accent">{creator.contentPillar}</Badge>}
-              </div>
-              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
-                {creator.profileUrl ? (
-                  <a href={creator.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-accent">
-                    @{creator.username} <ExternalLink size={12} />
-                  </a>
-                ) : (
-                  <a href={anchor("profile")} className="hover:text-accent">
-                    No profile link yet — add one under Profile
-                  </a>
-                )}
-                {creator.businessEmail && (
-                  <a href={`mailto:${creator.businessEmail}`} className="inline-flex min-w-0 items-center gap-1 break-all hover:text-accent">
-                    <Mail size={12} /> {creator.businessEmail}
-                  </a>
-                )}
-                <span>
-                  {client?.name ? `${client.name} · ` : ""}
-                  <Badge tone="info" title="Campaign">{campaign.name}</Badge>
-                </span>
-                {otherPartnerships.length > 0 && (
-                  <span className="flex items-center gap-1 text-xs">
-                    Also in:
-                    {otherPartnerships.map((p) => (
-                      <Link key={p.id} href={creatorSectionHref(p.id, "overview", returnTo)} className="rounded-md bg-surface-2 px-1.5 py-0.5 hover:text-accent">
-                        {p.campaignName}
-                      </Link>
-                    ))}
-                  </span>
-                )}
-              </div>
-              <div className="mt-3 flex items-start gap-2 rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent">
-                <ArrowRight size={15} className="mt-0.5 shrink-0" />
-                <span>
-                  <span className="font-semibold">Next:</span> {step.text}
-                  {step.anchor && step.anchor !== "stage" && (
-                    <>
-                      {" "}
-                      <a href={anchor(step.anchor as Parameters<typeof creatorSectionHref>[1])} className="font-medium underline">
-                        {NEXT_LINK_LABELS[step.anchor] ?? "Open it"}
-                      </a>
-                    </>
-                  )}
-                </span>
-              </div>
-              {flagged && (
-                <div className="mt-2">
-                  <Callout
-                    tone="warn"
-                    title={staleStageLine(partnership.stage, flagged)}
-                    actions={<StageFlagButtons partnershipId={partnership.id} name={creator.name} stage={partnership.stage} suggested={flagged} />}
-                  >
-                    {partnership.emailStageQuote ? <>&ldquo;{partnership.emailStageQuote}&rdquo;</> : "From their latest emails."} Nothing moves backward by itself — move them, or keep the stage.
-                  </Callout>
-                </div>
+        <div className="flex min-w-0 items-start gap-3">
+          <Avatar name={creator.name} size="lg" src={photo} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-semibold tracking-tight text-text">{creator.name}</h1>
+              {creator.contentPillar && <Badge tone="accent">{creator.contentPillar}</Badge>}
+            </div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
+              {creator.profileUrl ? (
+                <a href={creator.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-accent">
+                  @{creator.username} <ExternalLink size={12} />
+                </a>
+              ) : (
+                <a href={anchor("profile")} className="hover:text-accent">
+                  No profile link yet — add one under Profile
+                </a>
               )}
-              <EmailStatusLines
-                partnershipId={partnership.id}
-                stage={partnership.stage}
-                summary={partnership.emailSummary}
-                summaryAt={partnership.emailSummaryAt}
-                whoseTurn={activity.whoseTurn}
-                soundsLikeNo={partnership.emailSoundsLikeNo}
-                move={undoable.get(partnership.id) ?? null}
-              />
-              <div className="mt-2">
-                <StatusNote partnershipId={partnership.id} note={statusNoteView(partnership)} />
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted">
-                {archived ? (
-                  <>
-                    <span>
-                      <ArchiveLine until={partnership.archivedUntil?.toISOString() ?? null} by={partnership.archivedByName} reason={partnership.archiveReason} />
-                    </span>
-                    <RestoreButton partnershipId={partnership.id} name={creator.name} />
-                  </>
-                ) : listedOnToday(partnership.stage) ? (
-                  <ArchiveControl partnershipId={partnership.id} name={creator.name} label="Archive" />
-                ) : null}
-              </div>
-              {partnership.clientApproval === "pending" ? (
-                <div className="mt-2">
-                  <Callout tone="warn" title={`Waiting on ${client?.name ?? "the client"}'s approval`} actions={<ApprovalButtons partnershipId={partnership.id} name={creator.name} who="agency" />}>
-                    Hold off reaching out until they approve — in their portal, or approve for them here.
-                  </Callout>
-                </div>
-              ) : partnership.clientApproval ? (
-                <p className="mt-2 text-xs text-text-muted">
+              {creator.businessEmail && (
+                <a href={`mailto:${creator.businessEmail}`} className="inline-flex min-w-0 items-center gap-1 break-all hover:text-accent">
+                  <Mail size={12} /> {creator.businessEmail}
+                </a>
+              )}
+              {client?.name && <span>{client.name}</span>}
+              {otherPartnerships.length > 0 && (
+                <span className="flex items-center gap-1 text-xs">
+                  Also in:
+                  {otherPartnerships.map((p) => (
+                    <Link key={p.id} href={creatorSectionHref(p.id, "overview", returnTo)} className="rounded-md bg-surface-2 px-1.5 py-0.5 hover:text-accent">
+                      {p.campaignName}
+                    </Link>
+                  ))}
+                </span>
+              )}
+              {partnership.clientApproval && partnership.clientApproval !== "pending" && (
+                <span className="text-xs">
                   {partnership.clientApproval === "approved" ? "Approved for outreach" : "Passed on"} by {partnership.approvalByName ?? "someone"}
                   {partnership.approvalAt ? ` on ${shortDate(partnership.approvalAt)}` : ""}
                   {partnership.approvalNote ? <>: &ldquo;{partnership.approvalNote}&rdquo;</> : null}
-                </p>
-              ) : null}
+                </span>
+              )}
             </div>
           </div>
-          <div className="w-full space-y-3 sm:w-72">
-            <StageControl partnershipId={partnership.id} stage={partnership.stage} exitReason={partnership.exitReason} autoNote={autoNote} />
-            <CampaignPicker partnershipId={partnership.id} campaignId={campaign.id} campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))} />
-            <OwnerPicker partnershipId={partnership.id} ownerId={partnership.ownerId} teammates={team} meId={me?.id ?? null} />
+        </div>
+
+        <div data-header-controls className="mt-4 flex flex-wrap items-start gap-x-6 gap-y-3">
+          <StageControl partnershipId={partnership.id} stage={partnership.stage} exitReason={partnership.exitReason} autoNote={autoNote} />
+          <OwnerPicker partnershipId={partnership.id} ownerId={partnership.ownerId} teammates={team} meId={me?.id ?? null} />
+          <CampaignPicker partnershipId={partnership.id} campaignId={campaign.id} campaigns={campaigns.map((c) => ({ id: c.id, name: c.name }))} />
+          <div className="flex items-center gap-2 self-center text-xs text-text-muted">
+            {archived ? (
+              <>
+                <ArchiveLine until={partnership.archivedUntil?.toISOString() ?? null} by={partnership.archivedByName} reason={partnership.archiveReason} />
+                <RestoreButton partnershipId={partnership.id} name={creator.name} />
+              </>
+            ) : listedOnToday(partnership.stage) ? (
+              <ArchiveControl partnershipId={partnership.id} name={creator.name} label="Archive" />
+            ) : null}
           </div>
         </div>
-        <nav aria-label="Jump to" className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          {[
-            ["conversation", `Conversation${events.length ? ` (${events.length})` : ""}`],
-            ["agreement", "Deal"],
-            ["shipping", "Shipping"],
-            ["content", "Content"],
-            ["history", "History"],
-            ["profile", "Profile"],
-          ].map(([key, label]) => (
-            <a key={key} href={`#${key}`} className="text-text-muted hover:text-accent">
-              {label}
-            </a>
-          ))}
-        </nav>
+
+        {/* The one thing to do next. A stage that looks out of date, or an approval that's due, is asked here. */}
+        <div
+          data-next-card
+          className={cn(
+            "mt-4 max-w-3xl rounded-lg px-3.5 py-3 text-sm",
+            flagged || partnership.clientApproval === "pending" ? "border border-warn-line bg-warn-soft text-warn" : "bg-accent-soft text-accent",
+          )}
+        >
+          <div className="flex items-start gap-2">
+            <ArrowRight size={15} className="mt-0.5 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <span className="font-semibold">Next:</span> {step.text}
+              {step.anchor && step.anchor !== "stage" && (
+                <>
+                  {" "}
+                  <a href={anchor(step.anchor as Parameters<typeof creatorSectionHref>[1])} className="font-medium underline">
+                    {NEXT_LINK_LABELS[step.anchor] ?? "Open it"}
+                  </a>
+                </>
+              )}
+              {flagged && (
+                <>
+                  <p className="mt-1.5 text-[13px] text-text-muted">
+                    {staleStageLine(partnership.stage, flagged)}
+                    {partnership.emailStageQuote ? <>: &ldquo;{partnership.emailStageQuote}&rdquo;</> : "."} Nothing moves backward by itself.
+                  </p>
+                  <div className="mt-2">
+                    <StageFlagButtons partnershipId={partnership.id} name={creator.name} stage={partnership.stage} suggested={flagged} />
+                  </div>
+                </>
+              )}
+              {!flagged && partnership.clientApproval === "pending" && (
+                <>
+                  <p className="mt-1.5 text-[13px] text-text-muted">
+                    Waiting on {client?.name ?? "the client"}&rsquo;s approval: hold off reaching out until they approve, in their portal or here for them.
+                  </p>
+                  <div className="mt-2">
+                    <ApprovalButtons partnershipId={partnership.id} name={creator.name} who="agency" />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 max-w-3xl space-y-2">
+          <EmailStatusLines
+            partnershipId={partnership.id}
+            stage={partnership.stage}
+            summary={partnership.emailSummary}
+            summaryAt={partnership.emailSummaryAt}
+            whoseTurn={activity.whoseTurn}
+            soundsLikeNo={partnership.emailSoundsLikeNo}
+            move={undoable.get(partnership.id) ?? null}
+          />
+          <StatusNote partnershipId={partnership.id} note={statusNoteView(partnership)} />
+        </div>
       </div>
+      <JumpBar
+        sections={[
+          { id: "conversation", label: `Conversation${events.length ? ` (${events.length})` : ""}` },
+          { id: "agreement", label: "Deal" },
+          { id: "shipping", label: "Shipping" },
+          { id: "content", label: "Content" },
+          { id: "history", label: "History" },
+          { id: "profile", label: "Profile" },
+        ]}
+      />
 
       <div className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
         {/* Conversation, grouped by email thread */}
-        <Card id="conversation" className="scroll-mt-4 p-4">
+        <Card id="conversation" className="scroll-mt-16 p-4">
           <CardHeader
             title="Conversation"
             icon={<MessageSquare size={14} />}
-            description={`${gmailAccount ? `Email with their saved addresses is picked up from ${gmailAccount.email} by itself.` : "No mailbox is connected, so email isn't tracked yet."} Log Instagram DMs with I messaged them / They replied.`}
+            description={gmailAccount ? "Their emails show up here by themselves; log DMs yourself." : "No mailbox is connected yet, so log messages yourself."}
+            info={`${gmailAccount ? `Email with their saved addresses is picked up from ${gmailAccount.email} by itself.` : "No mailbox is connected, so email isn't tracked yet."} Log Instagram DMs with I messaged them / They replied, or anything else from the ⋯ menu on Today.`}
             actions={
               <>
                 {conversationBadge}
@@ -430,8 +441,8 @@ export default async function CreatorDetailPage({
         </Card>
 
         {/* The deal */}
-        <Card id="agreement" className="scroll-mt-4 p-4">
-          <CardHeader title="Deal" icon={<Handshake size={14} />} description="What you agreed: verbal or signed, product and fee, the videos. A contract PDF fills in whatever is blank. Payment itself is tracked in accounting." />
+        <Card id="agreement" className="scroll-mt-16 p-4">
+          <CardHeader title="Deal" icon={<Handshake size={14} />} description="What you agreed: product, fee and videos." info="Verbal or signed, product and fee, the videos. A contract PDF fills in whatever is blank here. Payment itself is tracked in accounting." />
           <div className="mt-3 space-y-3">
             <Contracts partnershipId={partnership.id} contracts={contractRows} differences={differences} />
             <AgreementEditor
@@ -450,9 +461,9 @@ export default async function CreatorDetailPage({
         </Card>
 
         {/* Shipping */}
-        <div id="shipping" className="grid scroll-mt-4 gap-5 lg:grid-cols-2">
+        <div id="shipping" className="grid scroll-mt-16 gap-5 lg:grid-cols-2">
           <Card className="p-4">
-            <CardHeader title="Shipping address" icon={<MapPin size={14} />} description="Saving a complete address moves an Agreed creator to Ready to ship." />
+            <CardHeader title="Shipping address" icon={<MapPin size={14} />} info="Saving a complete address moves an Agreed creator to Ready to ship." />
             <div className="mt-3 space-y-3">
               {partnership.addressLine1 || partnership.city || partnership.addressRaw ? (
                 <pre className="whitespace-pre-wrap font-sans text-sm text-text">{formatAddress(partnership) || partnership.addressRaw}</pre>
@@ -474,7 +485,7 @@ export default async function CreatorDetailPage({
             </div>
           </Card>
           <Card className="p-4 lg:col-span-2">
-            <CardHeader title="Shipment" description={`${shipmentSummary(shipments)}. Marking it shipped moves them to Shipped; delivered moves them to Waiting on video.`} />
+            <CardHeader title="Shipment" description={`${shipmentSummary(shipments)}.`} info="Marking it shipped moves them to Shipped; delivered moves them to Waiting on video." />
             {shipments.length > 1 && (
               <div className="mt-3">
                 <Callout tone="warn">There are {shipments.length} shipment records. Check tracking and dates to tell separate parcels from duplicates.</Callout>
@@ -512,8 +523,8 @@ export default async function CreatorDetailPage({
         </div>
 
         {/* Content */}
-        <Card id="content" className="scroll-mt-4 p-4">
-          <CardHeader title="Content" icon={<Clapperboard size={14} />} description="The brief, and the videos they posted. Adding a video link moves them to Posted." />
+        <Card id="content" className="scroll-mt-16 p-4">
+          <CardHeader title="Content" icon={<Clapperboard size={14} />} description="The brief, and the videos they posted." info="Adding a video link moves them to Posted." />
           <div className="mt-3">
             <BriefEditor partnershipId={partnership.id} briefUrl={partnership.briefUrl} briefSentAt={partnership.briefSentAt ? shortDate(partnership.briefSentAt) : null} />
           </div>
@@ -546,7 +557,7 @@ export default async function CreatorDetailPage({
         </Card>
 
         {/* Stage history — every move, who or what made it; folded */}
-        <Card id="history" className="scroll-mt-4 p-4">
+        <Card id="history" className="scroll-mt-16 p-4">
           <details>
             <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-text">
               <HistoryIcon size={14} /> Stage history{history.length ? ` (${history.length})` : ""}
@@ -559,7 +570,7 @@ export default async function CreatorDetailPage({
         </Card>
 
         {/* Profile — folded unless something's missing */}
-        <Card id="profile" className="scroll-mt-4 p-4">
+        <Card id="profile" className="scroll-mt-16 p-4">
           <details open={!creator.profileUrl}>
             <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-text">
               <User size={14} /> Profile

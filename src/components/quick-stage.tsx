@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { X } from "lucide-react";
+import { Fragment, useState } from "react";
+import { ChevronDown, X } from "lucide-react";
 import { stagesByGroup, stageLabel, stageHint, isTerminal, EXIT_REASONS_BY_STAGE } from "@/lib/stages";
 import type { CmStage } from "@/lib/db/schema";
-import { Button, IconButton, Select } from "@/components/ui";
+import { Button, IconButton, Select, Spinner, StagePill } from "@/components/ui";
+import { Menu, MenuItem, MenuLabel } from "@/components/menu";
 import { api, useSave } from "@/components/use-save";
 import { VideoLinkPrompt, needsVideo } from "@/components/partnership-actions";
 
@@ -21,6 +22,7 @@ export function QuickStage({
   onMoved,
   className = "w-40",
   asMove = false,
+  asPill = false,
 }: {
   partnershipId: string;
   name: string;
@@ -30,6 +32,8 @@ export function QuickStage({
   className?: string;
   /** On a board card the column already says the stage: show "Move to…" instead. */
   asMove?: boolean;
+  /** On a Today row: the stage as a small pill that opens the stage menu (design review 2026-09-30, D5). */
+  asPill?: boolean;
 }) {
   const { pending, run } = useSave();
   const [closingAs, setClosingAs] = useState<CmStage | null>(null);
@@ -57,40 +61,17 @@ export function QuickStage({
     }
   };
 
-  return (
-    <div className="space-y-2">
-      <Select
-        compact
-        aria-label={`Stage for ${name}`}
-        title={stageHint(stage)}
-        value={asMove ? "" : shown}
-        disabled={pending}
-        className={className}
-        onChange={(e) => {
-          const to = e.target.value as CmStage;
-          setAskVideo(false);
-          if (isTerminal(to)) setClosingAs(to);
-          else {
-            setClosingAs(null);
-            setStage(to);
-          }
-        }}
-      >
-        {asMove && (
-          <option value="" disabled>
-            Move to…
-          </option>
-        )}
-        {stagesByGroup().map((g) => (
-          <optgroup key={g.group} label={g.label}>
-            {g.stages.map((s) => (
-              <option key={s.value} value={s.value} disabled={asMove && s.value === stage}>
-                {s.label}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </Select>
+  const choose = (to: CmStage) => {
+    setAskVideo(false);
+    if (isTerminal(to)) setClosingAs(to);
+    else {
+      setClosingAs(null);
+      setStage(to);
+    }
+  };
+
+  const prompts = (
+    <>
       {askVideo && <VideoLinkPrompt pending={pending} onSubmit={(url) => setStage("posted", undefined, url)} onCancel={() => setAskVideo(false)} />}
       {closingAs && (
         <div className="rounded-lg border border-info-line bg-accent-soft p-2.5 text-xs">
@@ -110,6 +91,66 @@ export function QuickStage({
           </Button>
         </div>
       )}
+    </>
+  );
+
+  if (asPill) {
+    return (
+      <>
+        <Menu
+          label={`Stage for ${name}: ${stageLabel(shown)} — change it`}
+          align="start"
+          triggerClassName="inline-flex shrink-0 items-center gap-0.5 rounded-full text-text-faint hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+          trigger={
+            <>
+              <StagePill stage={shown} />
+              {pending ? <Spinner size={12} className="text-accent" /> : <ChevronDown size={13} aria-hidden />}
+            </>
+          }
+        >
+          {stagesByGroup().map((g) => (
+            <Fragment key={g.group}>
+              <MenuLabel>{g.label}</MenuLabel>
+              {g.stages.map((s) => (
+                <MenuItem key={s.value} active={s.value === shown} disabled={pending || s.value === shown} onSelect={() => choose(s.value)}>
+                  {isTerminal(s.value) ? `${s.label}…` : s.label}
+                </MenuItem>
+              ))}
+            </Fragment>
+          ))}
+        </Menu>
+        {(askVideo || closingAs) && <div className="basis-full">{prompts}</div>}
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Select
+        compact
+        aria-label={`Stage for ${name}`}
+        title={stageHint(stage)}
+        value={asMove ? "" : shown}
+        disabled={pending}
+        className={className}
+        onChange={(e) => choose(e.target.value as CmStage)}
+      >
+        {asMove && (
+          <option value="" disabled>
+            Move to…
+          </option>
+        )}
+        {stagesByGroup().map((g) => (
+          <optgroup key={g.group} label={g.label}>
+            {g.stages.map((s) => (
+              <option key={s.value} value={s.value} disabled={asMove && s.value === stage}>
+                {s.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </Select>
+      {prompts}
     </div>
   );
 }

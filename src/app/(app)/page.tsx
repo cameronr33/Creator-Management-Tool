@@ -10,7 +10,7 @@ import { TodayList } from "@/components/today-list";
 import { AToZStrip } from "@/components/a-to-z";
 import { MineToggle } from "@/components/mine-toggle";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
-import { summarizeGmailHealth } from "@/lib/gmail-health";
+import { emailCheckedLine, summarizeGmailHealth } from "@/lib/gmail-health";
 import { resolveCampaign } from "@/lib/campaigns";
 import { getSelectedView } from "@/lib/view-cookie";
 import { chipLabels, listTeammates, memberForUser } from "@/lib/owners";
@@ -34,17 +34,21 @@ export default async function TodayPage() {
   const toDo = rows.filter((r) => r.section !== "waiting").length;
   const waiting = rows.filter((r) => r.section === "waiting").length;
   const scope = view === "mine" ? ` · yours and unassigned${hiddenSummary ? ` (${hiddenSummary})` : ""}` : "";
+  // Email that's fine is one quiet line; the banner is for when something needs you (D6).
+  const emailFine = health.state === "checked";
   return <>
     <PageHeader title="Today" client={client.name} campaign={campaign?.name ?? null}
-      subtitle={`${toDo ? `${toDo} thing${toDo === 1 ? "" : "s"} to do · ${waiting} waiting on others` : "Nothing to do right now"}${archivedCount ? ` · ${archivedCount} archived` : ""}${scope}`}
-      help="Everyone who needs something from you, grouped by what to do next. Each row shows the campaign, the latest message and whose turn it is. Fix a stage with the menu on the right; the button under the name does the next step. Mine shows yours and unassigned ones."
-      helpAnchor="daily-loop" actions={<><MineToggle view={view} /><Button href="/creators/new" variant="primary" icon={<Plus size={15} />}>Add creator</Button></>} />
+      subtitle={<>{`${toDo ? `${toDo} thing${toDo === 1 ? "" : "s"} to do · ${waiting} waiting on others` : "Nothing to do right now"}${archivedCount ? ` · ${archivedCount} archived` : ""}${scope}`}{emailFine && <span className="text-text-faint"> · <Mail size={12} className="mr-0.5 inline align-[-1px]" aria-hidden />{emailCheckedLine(health)}</span>}</>}
+      help="Everyone who needs something from you, grouped by what to do next. Each row shows the stage (click it to change it), the latest message and whose turn it is; the campaign shows on All campaigns. The button under the name does the next step and ⋯ has the rest. Mine shows yours and unassigned ones."
+      helpAnchor="daily-loop" actions={<><MineToggle view={view} />{emailFine && account && <CheckEmailButton />}<Button href="/creators/new" variant="primary" icon={<Plus size={15} />}>Add creator</Button></>} />
     <div className="space-y-4 p-4 sm:p-6">
       <AToZStrip counts={stageCounts} />
-      <Callout tone={health.tone} icon={<Mail size={16} />} title={health.label}
-        actions={<>{account && <CheckEmailButton />}<Button size="sm" variant="ghost" href="/settings#email-sync">Email settings</Button></>}>
-        {health.detail}
-      </Callout>
+      {!emailFine && (
+        <Callout tone={health.tone} icon={<Mail size={16} />} title={health.label}
+          actions={<>{account && <CheckEmailButton />}<Button size="sm" variant="ghost" href="/settings#email-sync">Email settings</Button></>}>
+          {health.detail}
+        </Callout>
+      )}
       {rows.length === 0
         ? (totalCreators > 0
           ? <EmptyState title="All caught up" hint={`Nobody needs anything from you right now. Posted and closed deals don't show here.${hiddenSummary ? ` ${hiddenSummary} — switch to Everyone to see them.` : ""}`} />

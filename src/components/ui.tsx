@@ -111,12 +111,16 @@ export function CardHeader({
   description,
   icon,
   actions,
+  info,
   className = "",
 }: {
   title: ReactNode;
+  /** One short line: what this card is. */
   description?: ReactNode;
   icon?: ReactNode;
   actions?: ReactNode;
+  /** How it works, read once — behind a small ⓘ instead of above the content every time (design review 2026-09-30). */
+  info?: string;
   className?: string;
 }) {
   return (
@@ -125,6 +129,7 @@ export function CardHeader({
         <div className="flex items-center gap-1.5">
           {icon && <span className="text-text-faint">{icon}</span>}
           <SectionTitle>{title}</SectionTitle>
+          {info && <HelpPopover help={info} label={`How ${typeof title === "string" ? title : "this"} works`} />}
         </div>
         {description && <p className="mt-1 max-w-prose text-[13px] leading-relaxed text-text-muted">{description}</p>}
       </div>

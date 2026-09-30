@@ -95,9 +95,11 @@ export function StageControl({
   };
 
   return (
-    <div className="w-full max-w-xs space-y-1.5">
-      <Field label="Stage">
+    <div className="w-full max-w-xs space-y-1.5 sm:w-auto">
+      <Field label="Stage" inline>
         <Select
+          compact
+          className="w-44"
           value={shown}
           disabled={pending}
           onChange={(e) => {

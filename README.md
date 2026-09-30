@@ -271,13 +271,26 @@ built from two files:
   (`--accent`, `-hover`, `-soft`, `-ring`), four semantic tones
   (`info`/`good`/`warn`/`bad`, each with `-soft` background and `-line`
   hairline), the sidebar palette and the raw brand colours. Add a colour here
-  or don't add it.
+  or don't add it. Also here (design review, 2026-09-30): three shadows —
+  `shadow-control` (things you type in or press, Pipeline cards),
+  `shadow-card` (cards; its hairline replaces a border) and `shadow-float`
+  (menus, toasts, pop-ups, a dragged card) — and no other shadow; the field
+  edge `--border-field` (3.1:1); three motion speeds (`--duration-quick` /
+  `-normal` / `-gentle`) with one ease-out, and a reduced-motion rule that
+  stops everything but spinners.
 - `src/components/ui.tsx` — the primitives: `PageHeader` (title, client badge,
   one-line purpose, `?` link to Help), `Card`/`CardHeader`, `Button`
   (`primary` = the one thing to do here, `secondary`, `ghost`, `danger`,
   `link`), `IconButton` (label required), `Input`/`Select`/`Textarea`,
   `Field` (label + hint + error), `Callout`, `Badge`, `StagePill` (tooltip =
   the stage's hint), `Segmented`, `EmptyState`, `StatTile`.
+
+Waiting always shows (interaction review, 2026-09-30): every page has a
+`loading.tsx` outline; `useSave()` keeps its spinner until the refreshed page
+has landed and holds the toast until then; switching client, campaign or
+Mine / Everyone dims the page through `MainPendingProvider`
+(`src/components/main-pending.tsx`); toasts pause while you're on them; and
+Undo covers quick buttons, a stage you picked, bulk moves, Approve and Pass.
 
 Two conventions make the tool teachable:
 
