@@ -245,6 +245,8 @@ function main() {
   const rawErrors: string[] = [];
   // The lib files whose error words a route passes straight to the toast are scanned too.
   const errorFiles = ["lib/api-helpers.ts", "components/use-save.ts", "lib/campaigns.ts", "lib/creator-emails.ts"];
+  // The marker below is honoured only in the lib files a route imports — never in a route or these hand-listed files.
+  const noMarker = new Set(errorFiles);
   // The email check's own messages reach the toast only as UserErrors.
   check("the email check's messages for people are UserErrors", /throw new UserError\("No mailbox connected — connect one in Settings\."\)/.test(read("lib/gmail-sync.ts")) && !/throw new Error\("Email check incomplete/.test(read("lib/gmail-sync-outcome.ts")));
   const walkApi = (dir: string) => {
@@ -270,7 +272,7 @@ function main() {
       // Neither skip may cover a line that also answers a request or hands words on.
       const handsOn = /\breturn\b|NextResponse|badRequest|\.json\(|\berror:|\bmessage:|set[A-Z]\w*\(|toast\(/.test(line);
       if (/^console\.(?:error|warn|log)\([^;]*\);?$/.test(line.trim()) && !handsOn) continue; // one statement that only logs may say anything
-      if (/\/\/ log-only: \S.{8,}$/.test(line) && !handsOn) continue; // raw words kept for the log or a stored status no one is shown — said so, with why
+      if (/\/\/ log-only: \S.{8,}$/.test(line) && !handsOn && !noMarker.has(f) && !f.startsWith("app/api")) continue; // raw words kept for the log or a stored status no one is shown — said so, with why
       if (/\b(?:e|err|error|ex|cause)\.message\b|\(\w+ as Error\)\.message\b|String\((?:e|err|error)\)|\$\{(?:e|err|error)\}|\.errors\[0\]/.test(line)) rawErrors.push(`${f}: ${line.trim().slice(0, 80)}`);
     }
     for (const m of read(f).match(/"(?:Unauthorized|Invalid request|Invalid fields|Invalid bulk action|Invalid undo|Invalid archive|Not found|Partnership not found|Invalid partnership id|No client selected)"|belongs to a different client|Couldn't pass on this creator|HTTP \$\{r\.status\}/g) ?? []) rawErrors.push(`${f}: ${m}`);
