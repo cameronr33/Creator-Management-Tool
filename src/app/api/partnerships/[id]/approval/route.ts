@@ -10,11 +10,11 @@ import { approve, pass, undoApproval, undoPass } from "@/lib/approvals";
  * POST /api/partnerships/[id]/approval { decision: "approve"|"pass", note? } —
  * the agency approving or passing on the client's behalf. Recorded under the
  * teammate's name; passing closes the deal as We passed · Client passed.
- * { decision: "undo_approve", decidedAt, prior } / { decision: "undo_pass",
+ * { decision: "undo_approve", decidedAt } / { decision: "undo_pass",
  * transitionId } takes your own decision back within ten minutes.
  */
 const undoSchema = z.union([
-  z.object({ decision: z.literal("undo_approve"), decidedAt: z.string().max(40), prior: z.enum(["pending", "none"]) }),
+  z.object({ decision: z.literal("undo_approve"), decidedAt: z.string().max(40) }),
   z.object({ decision: z.literal("undo_pass"), transitionId: z.string().uuid() }),
 ]);
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const by = { name: session.user.name ?? "A teammate", kind: "agency" as const, userId: session.user.id };
   if (undo.success) {
     if (undo.data.decision === "undo_approve") {
-      const r = await undoApproval(row.clientId, [{ id, clientApproval: undo.data.prior === "pending" ? "pending" : null }], by, undo.data.decidedAt);
+      const r = await undoApproval(row.clientId, [id], by, undo.data.decidedAt);
       return r.undone ? NextResponse.json({ ok: true }) : badRequest("That approval can't be undone any more.");
     }
     const r = await undoPass(row.clientId, id, by, undo.data.transitionId);

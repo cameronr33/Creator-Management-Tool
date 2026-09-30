@@ -53,13 +53,17 @@ const schema = z.discriminatedUnion("action", [
     prior: z.array(z.object({ id: z.string().uuid(), campaignId: z.string().uuid() })).min(1).max(500),
     movedTo: z.string().uuid(),
   }),
-  z.object({
-    action: z.literal("undo_approve"),
-    ids: z.array(z.string()).min(1).max(500),
-    decidedAt: z.string().max(40),
-    prior: z.array(z.object({ id: z.string().uuid(), clientApproval: z.enum(["pending"]).nullable() })).min(1).max(500),
-  }),
+  z.object({ action: z.literal("undo_approve"), ids: z.array(z.string()).min(1).max(500), decidedAt: z.string().max(40) }),
 ]);
+
+/**
+ * A bulk Undo's answer: nothing undone is an error (they changed since, or ten
+ * minutes passed), a partial one says how many (review 2026-09-30).
+ */
+function undoAnswer(done: number, of: number, verb: string) {
+  if (!done) return badRequest("Nothing could be undone — they've changed since, or it's been more than ten minutes.");
+  return NextResponse.json({ ok: true, done, message: done < of ? `${done} of ${of} ${verb} — the rest changed since` : `${done} ${verb}` });
+}
 
 /**
  * POST /api/partnerships/bulk — the Creators table's bulk bar (and a single
@@ -115,7 +119,7 @@ export async function POST(req: NextRequest) {
     const moves = await db.select({ id: cmStageTransitions.id, partnershipId: cmStageTransitions.partnershipId }).from(cmStageTransitions).where(inArray(cmStageTransitions.id, d.transitionIds));
     let undone = 0;
     for (const m of moves) if (own.has(m.partnershipId) && (await undoMove(m.id, session.user.id)).ok) undone++;
-    return NextResponse.json({ ok: true, undone, kept: d.transitionIds.length - undone });
+    return undoAnswer(undone, d.transitionIds.length, "undone");
   }
   if (d.action === "restore_campaign") {
     const own = new Set(d.ids);
@@ -126,15 +130,14 @@ export async function POST(req: NextRequest) {
       if (bad) return bad;
     }
     const r = await restoreCampaigns(prior, d.movedTo);
-    return NextResponse.json({ ok: true, ...r });
+    return undoAnswer(r.restored, prior.length, "moved back");
   }
   if (d.action === "undo_approve") {
     const client = await resolveClient(await getSelectedClientSlug());
     if (!client) return badRequest("No client selected");
-    const own = new Set(d.ids);
     const by = { name: session.user.name ?? "A teammate", kind: "agency" as const, userId: session.user.id };
-    const r = await undoApproval(client.id, d.prior.filter((p) => own.has(p.id)), by, d.decidedAt);
-    return NextResponse.json({ ok: true, ...r });
+    const r = await undoApproval(client.id, d.ids, by, d.decidedAt);
+    return undoAnswer(r.undone, d.ids.length, "undone");
   }
   if (d.action === "restore_owner") {
     // Only the deals this request was checked for.

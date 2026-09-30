@@ -52,6 +52,22 @@ export function TodayList({
   const [seenRows, setSeenRows] = useState(rows);
   const [ghosts, setGhosts] = useState<Ghost[]>([]);
   const [pulse, setPulse] = useState<{ section: TodaySection; n: number } | null>(null);
+  // Rows you pressed something on in the last minute. A row that vanished
+  // without that just left the view (Mine / Everyone, another campaign or
+  // client) — it isn't "Done" (review 2026-09-30).
+  const [acted, setActed] = useState<Set<string>>(() => new Set());
+  const markActed = (id: string) => {
+    setActed((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+    setTimeout(
+      () =>
+        setActed((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        }),
+      60_000,
+    );
+  };
   if (seenRows !== rows) {
     const now = new Map(rows.map((r) => [r.partnershipId, r]));
     const before = groupBySection(seenRows);
@@ -59,6 +75,7 @@ export function TodayList({
     for (const r of seenRows) {
       const next = now.get(r.partnershipId);
       if (next && next.section === r.section) continue;
+      if (!next && !acted.has(r.partnershipId)) continue;
       left.push({ row: r, to: next?.section ?? null, index: before.get(r.section)?.indexOf(r) ?? 0 });
     }
     setSeenRows(rows);
@@ -116,7 +133,7 @@ export function TodayList({
                   it.ghost ? (
                     <GhostRow key={`left-${it.row.partnershipId}`} ghost={it} />
                   ) : (
-                    <TodayItem key={it.row.partnershipId} row={it.row} meId={meId} team={team} showCampaign={showCampaign} />
+                    <TodayItem key={it.row.partnershipId} row={it.row} meId={meId} team={team} showCampaign={showCampaign} onActed={markActed} />
                   ),
                 )}
               </ul>
@@ -177,7 +194,20 @@ function href(r: TodayRow, section: CreatorSection) {
   return creatorSectionHref(r.partnershipId, section, "/");
 }
 
-function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: string | null; team: TeammateOption[]; showCampaign: boolean }) {
+function TodayItem({
+  row: r,
+  meId,
+  team,
+  showCampaign,
+  onActed,
+}: {
+  row: TodayRow;
+  meId: string | null;
+  team: TeammateOption[];
+  showCampaign: boolean;
+  /** Any press in the row (its menus too — React events cross portals) marks it as acted on. */
+  onActed: (id: string) => void;
+}) {
   const turn = whoseTurnText(r.whoseTurn);
   const [panel, setPanelState] = useState<"log" | "archive" | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -188,7 +218,7 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
   };
   const owner = r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: team.find((t) => t.id === r.ownerId)?.label ?? "?" } : null;
   return (
-    <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start">
+    <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start" onClickCapture={() => onActed(r.partnershipId)}>
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <Avatar name={r.name} src={r.photoUrl} />
         <div className="min-w-0 flex-1">

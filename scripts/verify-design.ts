@@ -163,6 +163,9 @@ function main() {
   check("search shows it's working while results load", /useMainPending/.test(read("components/creators-filter-bar.tsx")) && /Spinner/.test(read("components/creators-filter-bar.tsx")));
   console.log("\n── rows, bars, drags, focus ──");
   const todayList = read("components/today-list.tsx");
+  check("…but only a row you acted on (or one that moved section) — a view or client switch isn't \"Done\" (review 2026-09-30)", /acted\.has\(/.test(todayList) && /onClickCapture/.test(todayList));
+  check("a menu opens where it fits and never runs off the screen (review 2026-09-30)", /maxHeight/.test(menu) && /spaceAbove/.test(menu));
+  check("MainPending's start is stable, so a search pushes the address once (review 2026-09-30)", /const start = useCallback/.test(read("components/main-pending.tsx")));
   check("a Today row that leaves says where it went and folds away (I4)", /row-leave/.test(todayList) && /Moved to/.test(todayList) && /@keyframes row-leave/.test(css));
   const table = read("components/creators-table.tsx");
   check("the bulk bar floats at the bottom instead of pushing the table down (I6)", /sticky bottom-4/.test(table) && !/sticky top-0/.test(table));

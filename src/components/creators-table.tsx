@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, ArchiveRestore, Check, ExternalLink, ImageDown, Mail, NotebookPen, Trash2, X } from "lucide-react";
 import { Avatar, Badge, Button, Checkbox, Field, Select, StagePill } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -68,6 +68,9 @@ export function CreatorsTable({
 
   // Shift-click ticks everything between this row and the last one you ticked (I6).
   const lastTicked = useRef<number | null>(null);
+  useEffect(() => {
+    lastTicked.current = null; // a new list: its rows aren't the ones you ticked before
+  }, [rows]);
   const tick = (i: number, on: boolean, shift: boolean) => {
     const last = lastTicked.current;
     const [from, to] = shift && last !== null ? [Math.min(last, i), Math.max(last, i)] : [i, i];
@@ -103,7 +106,7 @@ export function CreatorsTable({
   const undoCampaign = (movedTo: string) => (d: Record<string, unknown>, ids: string[]) =>
     Array.isArray(d.prior) && d.prior.length ? () => void undoVia(BULK, { action: "restore_campaign", ids, prior: d.prior, movedTo }, "Moved back") : null;
   const undoApprove = (d: Record<string, unknown>, ids: string[]) =>
-    typeof d.decidedAt === "string" && Array.isArray(d.prior) && d.prior.length ? () => void undoVia(BULK, { action: "undo_approve", ids, decidedAt: d.decidedAt, prior: d.prior }, "Approvals undone") : null;
+    typeof d.decidedAt === "string" ? () => void undoVia(BULK, { action: "undo_approve", ids, decidedAt: d.decidedAt }, "Approvals undone") : null;
 
   // Assign the ticked ones; the toast's Undo puts back who owned each before (2026-09-29).
   const assignTo = async (to: string | null) => {

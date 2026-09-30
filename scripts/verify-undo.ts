@@ -438,37 +438,74 @@ async function live() {
     await db.update(schema.cmPartnerships).set({ campaignId }).where(eq(schema.cmPartnerships.id, hop)); // someone moved it back by hand
     check("…but never over a move someone made since", (await restoreCampaigns([{ id: hop, campaignId: campaignB }], campaignB)).restored === 0);
 
+    // Review 2026-09-30: undoMove must not take a pass apart, and must put a closed deal's reason back.
+    const reopened = await add("__verify_un_reopen");
+    await changeStage(reopened, "in_conversation", me.id);
+    await moveStage({ partnershipId: reopened, to: "no_response", source: "manual", userId: me.id, expectFrom: "in_conversation", exitReason: "went_dark" });
+    const reopen = await moveStage({ partnershipId: reopened, to: "in_conversation", source: "manual", userId: me.id, expectFrom: "no_response" });
+    const backToClosed = reopen.status === "moved" ? await undoMove(reopen.transitionId, me.id) : null;
+    const [reRow] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, reopened));
+    check("undoing a reopen puts the deal back as it was closed, reason and all", !!backToClosed?.ok && reRow.stage === "no_response" && reRow.exitReason === "went_dark", JSON.stringify({ backToClosed, s: reRow.stage, x: reRow.exitReason }));
+
+    // Identity, not names (review 2026-09-30): same name, different person.
     const decider = { name: "__verify Sam", kind: "agency" as const, userId: me.id };
+    const namesake = { name: "__verify Sam", kind: "agency" as const, userId: someoneElse };
+    const portalNamesake = { name: "__verify Sam", kind: "client" as const, clientUserId: "00000000-0000-0000-0000-00000000c11e" };
     const notesOf = async (id: string) => (await eventsOf(id)).filter((e) => e.kind === "note");
     const ap = await add("__verify_un_approve");
     await db.update(schema.cmPartnerships).set({ clientApproval: "pending" }).where(eq(schema.cmPartnerships.id, ap));
     const a1 = await approve(client.id, [ap], decider);
-    check("Approve says what to undo it with, and what each one was before", a1.approved === 1 && !!a1.decidedAt && a1.prior.length === 1 && a1.prior[0].clientApproval === "pending");
-    check("someone else can't undo your approval", !(await undoApproval(client.id, a1.prior, { ...decider, name: "__verify Kim" }, a1.decidedAt ?? "")).undone);
-    const ua = await undoApproval(client.id, a1.prior, decider, a1.decidedAt ?? "");
+    check("Approve says what to undo it with", a1.approved === 1 && !!a1.decidedAt);
+    check("a teammate with the same name can't undo your approval", !(await undoApproval(client.id, [ap], namesake, a1.decidedAt ?? "")).undone);
+    check("…nor a person at the client with the same name", !(await undoApproval(client.id, [ap], portalNamesake, a1.decidedAt ?? "")).undone);
+    // The note-removal cutoff must not depend on the laptop's time zone (review 2026-09-30).
+    const zone = process.env.TZ;
+    process.env.TZ = "Australia/Sydney";
+    const ua = await undoApproval(client.id, [ap], decider, a1.decidedAt ?? "");
+    process.env.TZ = zone;
+    if (zone === undefined) delete process.env.TZ;
     const [apRow] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, ap));
-    check("Undo puts it back to waiting for approval and takes the note off the timeline", ua.undone === 1 && apRow.clientApproval === "pending" && apRow.approvalAt === null && (await notesOf(ap)).length === 0, JSON.stringify({ ua, a: apRow.clientApproval, n: (await notesOf(ap)).length }));
-    check("…once", (await undoApproval(client.id, a1.prior, decider, a1.decidedAt ?? "")).undone === 0);
+    check("Undo puts it back to waiting for approval and takes the note off the timeline, whatever the time zone", ua.undone === 1 && apRow.clientApproval === "pending" && apRow.approvalAt === null && apRow.approvalDecider === null && (await notesOf(ap)).length === 0, JSON.stringify({ ua, a: apRow.clientApproval, n: (await notesOf(ap)).length }));
+    check("…once", (await undoApproval(client.id, [ap], decider, a1.decidedAt ?? "")).undone === 0);
+    const noAsk = await add("__verify_un_approve_noask");
+    const a3 = await approve(client.id, [noAsk], decider);
+    await undoApproval(client.id, [noAsk], decider, a3.decidedAt ?? "");
+    const [noAskRow] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, noAsk));
+    check("…and one that wasn't waiting goes back to no approval asked (kept on the server, not sent by the page)", a3.approved === 1 && noAskRow.clientApproval === null);
     const apLate = await add("__verify_un_approve_late");
     await db.update(schema.cmPartnerships).set({ clientApproval: "pending" }).where(eq(schema.cmPartnerships.id, apLate));
-    const a2 = await approve(client.id, [apLate], decider);
-    await db.update(schema.cmPartnerships).set({ approvalAt: new Date(Date.now() - UNDO_WINDOW_MS - 60_000) }).where(eq(schema.cmPartnerships.id, apLate));
-    check("…and not after ten minutes", (await undoApproval(client.id, a2.prior, decider, a2.decidedAt ?? "")).undone === 0);
+    await approve(client.id, [apLate], decider);
+    const oldMoment = new Date(Date.now() - UNDO_WINDOW_MS - 60_000);
+    await db.update(schema.cmPartnerships).set({ approvalAt: oldMoment }).where(eq(schema.cmPartnerships.id, apLate));
+    check("…and not after ten minutes, even with the right moment", (await undoApproval(client.id, [apLate], decider, oldMoment.toISOString())).undone === 0);
 
     const ps = await add("__verify_un_pass");
     await db.update(schema.cmPartnerships).set({ clientApproval: "pending" }).where(eq(schema.cmPartnerships.id, ps));
+    // An older note with the same words (an earlier pass) must survive this Undo, west of UTC too.
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId: ps, direction: "outbound", channel: "other", kind: "note", body: "Passed on by __verify Sam: an earlier pass", createdAt: new Date(Date.now() - 3 * 3_600_000) });
     const p1 = await pass(client.id, ps, decider, "Not a fit");
     check("Pass closes it and says what to undo it with", p1.ok && (await stageOf(ps)) === "passed" && !!p1.transitionId);
-    check("someone else can't undo your pass", !(await undoPass(client.id, ps, { ...decider, name: "__verify Kim" }, p1.transitionId ?? "")).ok && (await stageOf(ps)) === "passed");
+    check("a teammate with the same name can't undo your pass", !(await undoPass(client.id, ps, namesake, p1.transitionId ?? "")).ok && (await stageOf(ps)) === "passed");
+    check("…nor a person at the client with the same name", !(await undoPass(client.id, ps, portalNamesake, p1.transitionId ?? "")).ok && (await stageOf(ps)) === "passed");
+    check("the plain stage Undo can't take a pass apart (the approval would stay passed)", !(await undoMove(p1.transitionId ?? "", me.id)).ok && (await stageOf(ps)) === "passed");
+    process.env.TZ = "America/Los_Angeles";
     const up = await undoPass(client.id, ps, decider, p1.transitionId ?? "");
+    process.env.TZ = zone;
+    if (zone === undefined) delete process.env.TZ;
     const [psRow] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, ps));
-    check("Undo reopens it where it was, waiting for approval, with no note left", up.ok && psRow.stage === "shortlisted" && psRow.clientApproval === "pending" && psRow.exitReason === null && (await notesOf(ps)).length === 0, JSON.stringify({ up, s: psRow.stage, a: psRow.clientApproval, x: psRow.exitReason }));
+    const psNotes = (await notesOf(ps)).map((n) => n.body);
+    check("Undo reopens it where it was, waiting for approval, and removes only this pass's note", up.ok && psRow.stage === "shortlisted" && psRow.clientApproval === "pending" && psRow.exitReason === null && psNotes.length === 1 && psNotes[0] === "Passed on by __verify Sam: an earlier pass", JSON.stringify({ up, s: psRow.stage, a: psRow.clientApproval, x: psRow.exitReason, psNotes }));
     check("…once", !(await undoPass(client.id, ps, decider, p1.transitionId ?? "")).ok);
+    const psLate = await add("__verify_un_pass_late");
+    await db.update(schema.cmPartnerships).set({ clientApproval: "pending" }).where(eq(schema.cmPartnerships.id, psLate));
+    const p2 = await pass(client.id, psLate, decider, null);
+    if (p2.transitionId) await db.update(schema.cmStageTransitions).set({ changedAt: new Date(Date.now() - UNDO_WINDOW_MS - 60_000) }).where(eq(schema.cmStageTransitions.id, p2.transitionId));
+    check("…and a pass can't be undone after ten minutes", !(await undoPass(client.id, psLate, decider, p2.transitionId ?? "")).ok && (await stageOf(psLate)) === "passed");
   } finally {
     if (creatorIds.length) await db.delete(schema.cmCreators).where(inArray(schema.cmCreators.id, creatorIds));
     await db.delete(schema.cmCampaigns).where(inArray(schema.cmCampaigns.id, [campaignId, campaignB]));
   }
-  check("test rows cleaned up", (await db.select().from(schema.cmCampaigns).where(eq(schema.cmCampaigns.id, campaignId))).length === 0);
+  check("test rows cleaned up", (await db.select().from(schema.cmCampaigns).where(inArray(schema.cmCampaigns.id, [campaignId, campaignB]))).length === 0);
 }
 
 async function main() {

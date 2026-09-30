@@ -16,13 +16,13 @@ export async function POST(req: NextRequest) {
   // Undo your own decision within ten minutes (interaction review 2026-09-30).
   const undo = z
     .union([
-      z.object({ partnershipId: z.string().uuid(), decision: z.literal("undo_approve"), decidedAt: z.string().max(40), prior: z.enum(["pending", "none"]) }),
+      z.object({ partnershipId: z.string().uuid(), decision: z.literal("undo_approve"), decidedAt: z.string().max(40) }),
       z.object({ partnershipId: z.string().uuid(), decision: z.literal("undo_pass"), transitionId: z.string().uuid() }),
     ])
     .safeParse(body);
   if (undo.success) {
     if (undo.data.decision === "undo_approve") {
-      const r = await undoApproval(person.clientId, [{ id: undo.data.partnershipId, clientApproval: undo.data.prior === "pending" ? "pending" : null }], by, undo.data.decidedAt);
+      const r = await undoApproval(person.clientId, [undo.data.partnershipId], by, undo.data.decidedAt);
       return r.undone ? NextResponse.json({ ok: true }) : badRequest("That approval can't be undone any more.");
     }
     const r = await undoPass(person.clientId, undo.data.partnershipId, by, undo.data.transitionId);
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return badRequest("Choose approve or pass");
   if (parsed.data.decision === "approve") {
     const r = await approve(person.clientId, [parsed.data.partnershipId], by, parsed.data.note);
-    return r.approved ? NextResponse.json({ ok: true, decidedAt: r.decidedAt, prior: r.prior }) : badRequest("That creator isn't waiting for your approval");
+    return r.approved ? NextResponse.json({ ok: true, decidedAt: r.decidedAt }) : badRequest("That creator isn't waiting for your approval");
   }
   const r = await pass(person.clientId, parsed.data.partnershipId, by, parsed.data.note);
   return r.ok ? NextResponse.json({ ok: true, transitionId: r.transitionId }) : badRequest("That creator isn't waiting for your approval");

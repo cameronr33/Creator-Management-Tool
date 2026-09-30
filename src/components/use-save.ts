@@ -170,10 +170,11 @@ export function useSave() {
    * decides whether it can still be undone; a network failure can be retried.
    */
   async function undoVia(url: string, body: unknown, done = "Undone") {
-    const r = await api<{ stage?: CmStage | null; undone?: number; restored?: number }>(url, body).catch(
-      () => ({ ok: false, status: 0, data: { error: "Couldn't reach the server" } }) as ApiResult<{ stage?: CmStage | null }>,
+    const r = await api<{ stage?: CmStage | null; message?: string }>(url, body).catch(
+      () => ({ ok: false, status: 0, data: { error: "Couldn't reach the server" } }) as ApiResult<{ stage?: CmStage | null; message?: string }>,
     );
-    if (r.ok) toast(r.data.stage ? `${done} — back to ${stageLabel(r.data.stage)}` : done, { tone: "good" });
+    // A bulk undo says how many it managed ("2 of 3 undone — the rest changed since").
+    if (r.ok) toast(r.data.message ? `${done}: ${r.data.message}` : r.data.stage ? `${done} — back to ${stageLabel(r.data.stage)}` : done, { tone: "good" });
     else if (r.status === 0 || r.status >= 500) toast(r.data.error ?? "Couldn't undo it", { tone: "bad", action: { label: "Try again", onClick: () => void undoVia(url, body, done) } });
     else toast(r.data.error ?? "Couldn't undo it", { tone: "bad" });
     startTransition(() => router.refresh());

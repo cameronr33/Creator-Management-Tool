@@ -35,8 +35,7 @@ export function ApprovalButtons({
       success: decision === "approve" ? `${name} approved` : `Passed on ${name}`,
       undoWith: (d) => {
         if (decision === "approve") {
-          const prior = (d.prior as { clientApproval: string | null }[] | undefined)?.[0]?.clientApproval === "pending" ? "pending" : "none";
-          return typeof d.decidedAt === "string" ? () => void undoVia(url, { ...base, decision: "undo_approve", decidedAt: d.decidedAt, prior }, `Undone — ${name} is waiting for approval again`) : null;
+          return typeof d.decidedAt === "string" ? () => void undoVia(url, { ...base, decision: "undo_approve", decidedAt: d.decidedAt }, `Undone — ${name} is waiting for approval again`) : null;
         }
         return typeof d.transitionId === "string" ? () => void undoVia(url, { ...base, decision: "undo_pass", transitionId: d.transitionId }, `Undone — ${name} is back`) : null;
       },

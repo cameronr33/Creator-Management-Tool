@@ -81,11 +81,13 @@ them. Changing one requires a human decision and an explanation in the commit.
    (2026-09-30, owner: interaction review I14, "Undo where it was missing".)
    A stage a person picked themselves (the dropdown, a drag, a bulk move) can
    be undone by that person, within ten minutes, while it's still the latest
-   move (`undoMove`; an Undo is never itself undone). Approve and Pass can be
-   undone by whoever decided, at that exact moment, within ten minutes
-   (`undoApproval`, `undoPass`: compare-and-set, the pass's prior approval
-   kept on the server in the move's meta). Still no new automation. Anchor:
-   `verify-undo.ts`.
+   move (`undoMove`; an Undo is never itself undone, and never takes a pass
+   apart — the pass has its own). Approve and Pass can be undone by whoever
+   decided — by identity (`approval_decider`: the login or the client
+   person), never by display name — at that exact moment, within ten minutes
+   (`undoApproval`, `undoPass`: compare-and-set; what it was before is kept
+   on the server — `approval_was_pending`, the pass move's meta — never taken
+   from the browser). Still no new automation. Anchor: `verify-undo.ts`.
    (2026-09-29, owner: "flag it, one click to fix".) The email reader may
    also say where the deal stands from the messages alone
    (`stage_from_messages`, with a line verified in mailbox mail). When that

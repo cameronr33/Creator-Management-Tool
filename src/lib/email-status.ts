@@ -16,7 +16,7 @@ import {
 import { STAGES, canonicalStage, isTerminal, stageIndex, stageLabel } from "@/lib/stages";
 import { hasCompleteAddress } from "@/lib/address";
 import { lastManualChangeAt } from "@/lib/email-ingest";
-import { moveStage, describeVideo } from "@/lib/stage-moves";
+import { moveStage, describeVideo, type ExitReason } from "@/lib/stage-moves";
 import { displayNames } from "@/lib/email-body";
 import { READER_MODEL, anthropic, serviceUnavailable, withModelFallback } from "@/lib/claude";
 import { NO_FACTS, applyDealFill, cleanFacts, type DealFacts, type EmailDeal } from "@/lib/deal-facts";
@@ -652,6 +652,9 @@ export async function undoMove(transitionId: string, userId: string | null, now 
   const [t] = await db.select().from(cmStageTransitions).where(eq(cmStageTransitions.id, transitionId)).limit(1);
   if (!t) return { ok: false, error: "That move no longer exists." };
   if (t.undoneAt) return { ok: false, error: "That move was already undone." };
+  const tMeta = (t.meta ?? {}) as { priorExitReason?: string | null; decidedBy?: string; priorApproval?: unknown };
+  // A pass has its own Undo (it puts the approval back too): never take it apart here (review 2026-09-30).
+  if (tMeta.priorApproval !== undefined || tMeta.decidedBy !== undefined) return { ok: false, error: "Use Undo on the pass itself — or reopen them by hand." };
   const byPerson = t.source === "manual" && t.reason !== "undo";
   if (t.source !== "email" && !byPerson) return { ok: false, error: "That move can't be undone — change it by hand instead." };
   if (byPerson) {
@@ -673,6 +676,8 @@ export async function undoMove(transitionId: string, userId: string | null, now 
     source: "manual",
     userId,
     expectFrom: t.toStage,
+    // Back to a closed stage: its reason goes back too ("No response · went dark").
+    exitReason: (tMeta.priorExitReason ?? null) as ExitReason | null,
     exact: true,
     reason: "undo",
     meta: { undoOf: t.id },

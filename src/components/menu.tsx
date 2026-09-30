@@ -38,7 +38,7 @@ export function Menu({
   /** A row's id, so a panel it opened can hand focus back to this button. */
   moreFor?: string;
 }) {
-  const [at, setAt] = useState<{ top?: number; bottom?: number; left?: number; right?: number } | null>(null);
+  const [at, setAt] = useState<{ top?: number; bottom?: number; left?: number; right?: number; maxHeight?: number } | null>(null);
   const button = useRef<HTMLButtonElement | null>(null);
   const panel = useRef<HTMLDivElement | null>(null);
   const open = at !== null;
@@ -52,9 +52,14 @@ export function Menu({
     if (open) return close();
     const r = button.current?.getBoundingClientRect();
     if (!r) return;
-    const below = r.bottom + 280 < window.innerHeight;
+    // Open where there's more room, and never taller than that room — a long
+    // menu (the stage list) scrolls inside it (review 2026-09-30).
+    const spaceBelow = window.innerHeight - r.bottom - 12;
+    const spaceAbove = r.top - 12;
+    const below = spaceBelow >= 320 || spaceBelow >= spaceAbove;
     setAt({
       ...(below ? { top: r.bottom + 4 } : { bottom: window.innerHeight - r.top + 4 }),
+      maxHeight: Math.max(120, below ? spaceBelow : spaceAbove),
       ...(align === "end" ? { right: Math.max(8, window.innerWidth - r.right) } : { left: Math.max(8, r.left) }),
     });
   };

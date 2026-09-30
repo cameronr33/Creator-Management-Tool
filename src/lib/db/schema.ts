@@ -378,6 +378,13 @@ export const cmPartnerships = pgTable(
     approvalByName: text("approval_by_name"),
     approvalAt: timestamp("approval_at"),
     approvalNote: text("approval_note"),
+    /**
+     * Who decided, by identity — "agency:<users.id>" or "client:<client user id>" —
+     * so only that person can undo it (review 2026-09-30: names aren't identities).
+     */
+    approvalDecider: text("approval_decider"),
+    /** Whether it was waiting for approval before this decision — what Undo puts back (kept here, never taken from the browser). */
+    approvalWasPending: boolean("approval_was_pending"),
 
     /**
      * The deal as the latest email reading found it (product, fee, terms),

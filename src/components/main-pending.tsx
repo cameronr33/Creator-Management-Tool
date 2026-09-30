@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useState, useTransition, type ReactNode } from "react";
 import { Spinner, cn } from "@/components/ui";
 
 /**
@@ -26,13 +26,14 @@ export function MainPendingProvider({ children }: { children: ReactNode }) {
   const [pending, startTransition] = useTransition();
   const [label, setLabel] = useState<string | null>(null);
   const [dim, setDim] = useState(true);
-  const start: MainPending["start"] = (fn, opts = {}) => {
+  // Stable (review 2026-09-30): a new start() on every pending flip re-armed the search debounce and pushed the address twice.
+  const start = useCallback<MainPending["start"]>((fn, opts = {}) => {
     setLabel(opts.label ?? null);
     setDim(opts.dim ?? true);
     startTransition(async () => {
       await fn();
     });
-  };
+  }, []);
   return <Ctx.Provider value={{ pending, label, dim, start }}>{children}</Ctx.Provider>;
 }
 
