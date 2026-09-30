@@ -26,6 +26,7 @@ export function Menu({
   trigger,
   triggerClassName = DEFAULT_TRIGGER,
   align = "end",
+  moreFor,
 }: {
   /** The button's accessible name and tooltip ("More for Josh"). */
   label: string;
@@ -34,6 +35,8 @@ export function Menu({
   trigger?: ReactNode;
   triggerClassName?: string;
   align?: "start" | "end";
+  /** A row's id, so a panel it opened can hand focus back to this button. */
+  moreFor?: string;
 }) {
   const [at, setAt] = useState<{ top?: number; bottom?: number; left?: number; right?: number } | null>(null);
   const button = useRef<HTMLButtonElement | null>(null);
@@ -101,6 +104,7 @@ export function Menu({
         onMouseDown={(e) => e.stopPropagation()}
         aria-haspopup="menu"
         aria-expanded={open}
+        data-more-for={moreFor}
         aria-label={label}
         title={label}
         className={triggerClassName}
@@ -115,7 +119,7 @@ export function Menu({
             aria-label={label}
             onMouseDown={(e) => e.stopPropagation()}
             style={{ position: "fixed", ...at }}
-            className="z-50 min-w-44 max-w-72 overflow-y-auto rounded-lg border border-border bg-surface py-1 text-sm shadow-float"
+            className="z-50 min-w-44 max-w-72 animate-pop-in overflow-y-auto rounded-lg border border-border bg-surface py-1 text-sm shadow-float"
           >
             <CloseMenu.Provider value={() => close()}>{children}</CloseMenu.Provider>
           </div>,

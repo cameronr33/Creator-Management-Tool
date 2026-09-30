@@ -199,6 +199,26 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * A Today row that just left (today-list.tsx): it says where it went for a
+ * moment, then folds away. Reduced motion: it simply goes.
+ */
+@keyframes row-leave {
+  0%,
+  60% {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  100% {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+.row-leave {
+  display: grid;
+  animation: row-leave 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* A toast's time-left line (toast.tsx). */
 @keyframes toast-timer {
   from { transform: scaleX(1); }

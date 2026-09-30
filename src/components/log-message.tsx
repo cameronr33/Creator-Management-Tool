@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Field, FieldGroup, Input, Segmented } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
@@ -92,6 +92,11 @@ export function LogMessagePanel({
   const [choice, setChoice] = useState<WhenChoice>("today");
   const [picked, setPicked] = useState(defaultPickedDate);
   const outbound = direction === "outbound";
+  // Opened from ⋯: focus lands on the first choice; Escape closes (interaction review 2026-09-30).
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    panelRef.current?.querySelector<HTMLElement>('[aria-pressed="true"], input, button')?.focus();
+  }, []);
 
   const save = async () => {
     const what = how === "ig_dm" ? "DM" : how === "email" ? "email" : "call";
@@ -112,7 +117,16 @@ export function LogMessagePanel({
   };
 
   return (
-    <div className="w-full space-y-2 rounded-lg border border-border bg-surface-2/60 p-2.5">
+    <div
+      ref={panelRef}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          onClose();
+        }
+      }}
+      className="w-full space-y-2 rounded-lg border border-border bg-surface-2/60 p-2.5"
+    >
       <FieldGroup label="What happened">
         <Segmented<"outbound" | "inbound">
           aria-label="What happened"

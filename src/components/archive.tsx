@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, ArchiveRestore } from "lucide-react";
 import { Button, Field, FieldGroup, Input, Segmented } from "@/components/ui";
@@ -67,6 +67,11 @@ export function ArchiveControl({
   const [remind, setRemind] = useState<Remind>("never");
   const [picked, setPicked] = useState(ymd(startOfDay(30)));
   const [why, setWhy] = useState("");
+  // Open: focus lands on the first choice; Escape closes (interaction review 2026-09-30).
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (open) panelRef.current?.querySelector<HTMLElement>('[aria-pressed="true"], input, button')?.focus();
+  }, [open]);
 
   const save = async () => {
     if (remind === "pick" && !picked) return;
@@ -99,7 +104,16 @@ export function ArchiveControl({
     );
   }
   return (
-    <div className="w-full space-y-2 rounded-lg border border-border bg-surface-2/60 p-2.5">
+    <div
+      ref={panelRef}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          setOpen(false);
+        }
+      }}
+      className="w-full space-y-2 rounded-lg border border-border bg-surface-2/60 p-2.5"
+    >
       <FieldGroup label="Remind me">
         <Segmented<Remind>
           aria-label="Remind me"

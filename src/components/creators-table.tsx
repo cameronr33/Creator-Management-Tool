@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Archive, ArchiveRestore, Check, ExternalLink, ImageDown, Mail, NotebookPen, Trash2, X } from "lucide-react";
 import { Avatar, Badge, Button, Checkbox, Field, Select, StagePill } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -66,13 +66,23 @@ export function CreatorsTable({
   const chosen = [...selected].filter((id) => visible.has(id));
   const all = rows.length > 0 && chosen.length === rows.length;
 
-  const toggle = (id: string, on: boolean) =>
+  // Shift-click ticks everything between this row and the last one you ticked (I6).
+  const lastTicked = useRef<number | null>(null);
+  const tick = (i: number, on: boolean, shift: boolean) => {
+    const last = lastTicked.current;
+    const [from, to] = shift && last !== null ? [Math.min(last, i), Math.max(last, i)] : [i, i];
     setSelected((prev) => {
       const next = new Set(prev);
-      if (on) next.add(id);
-      else next.delete(id);
+      for (let k = from; k <= to; k++) {
+        const id = rows[k]?.partnershipId;
+        if (!id) continue;
+        if (on) next.add(id);
+        else next.delete(id);
+      }
       return next;
     });
+    lastTicked.current = i;
+  };
 
   // Each bulk change says what it did once the list has caught up; stage, campaign and approval moves offer Undo.
   const bulk = async (
@@ -110,8 +120,97 @@ export function CreatorsTable({
   return (
     <PendingDim>
     <div className="space-y-3">
+      <div className="overflow-x-auto rounded-xl bg-surface shadow-card">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs font-semibold text-text-muted">
+              <th className="w-10 px-4 py-2.5">
+                <Checkbox
+                  checked={all}
+                  indeterminate={chosen.length > 0}
+                  onChange={(on) => setSelected(on ? new Set(rows.map((r) => r.partnershipId)) : new Set())}
+                  label={all ? "Clear selection" : "Select every creator shown"}
+                />
+              </th>
+              <th className="px-4 py-2.5 font-semibold">Creator</th>
+              {!scopeName && <th className="px-4 py-2.5 font-semibold">Campaign</th>}
+              <th className="px-4 py-2.5 font-semibold">Stage</th>
+              <th className="px-4 py-2.5 font-semibold">Owner</th>
+              <th className="px-4 py-2.5 font-semibold">Where things stand</th>
+              <th className="px-4 py-2.5 text-right font-semibold">Followers</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {rows.map((r, i) => {
+              const on = selected.has(r.partnershipId);
+              return (
+                <tr key={r.partnershipId} className={on ? "bg-accent-soft/60" : "transition hover:bg-surface-2/60"}>
+                  <td
+                    className="cursor-pointer px-4 py-2.5"
+                    onClick={(e) => {
+                      if (e.target === e.currentTarget) tick(i, !on, e.shiftKey);
+                    }}
+                  >
+                    <Checkbox checked={on} onChange={(v, how) => tick(i, v, how.shiftKey)} label={`Select ${r.name}`} />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar name={r.name} src={r.photoUrl} />
+                      <div className="min-w-0">
+                        <Link href={`/creators/${r.partnershipId}?returnTo=/creators`} className="font-medium text-text hover:text-accent">
+                          {r.name}
+                        </Link>
+                        <div className="flex items-center gap-1.5 text-xs text-text-muted">
+                          {r.profileUrl ? (
+                            <a href={r.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-accent">
+                              @{r.username}
+                              <ExternalLink size={11} />
+                            </a>
+                          ) : (
+                            <span>No profile link yet</span>
+                          )}
+                          {r.businessEmail && (
+                            <span title={`Email tracked: ${r.businessEmail}`} aria-label="Email tracked">
+                              <Mail size={11} />
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  {!scopeName && <td className="px-4 py-2.5 text-text-muted">{r.campaignName}</td>}
+                  <td className="px-4 py-2.5">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <StagePill stage={r.stage} />
+                      {r.clientApproval === "pending" && r.stage === "shortlisted" && <Badge tone="warn">Awaiting approval</Badge>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-1.5 text-xs text-text-muted">
+                      <OwnerMenu partnershipId={r.partnershipId} name={r.name} owner={r.owner} meId={meId} team={teammates} />
+                      {r.owner && <span className="truncate">{r.owner.id === meId ? "You" : r.owner.name.split(" ")[0]}</span>}
+                    </div>
+                  </td>
+                  <td className="max-w-md px-4 py-2.5 text-text-muted">
+                    <div className="flex items-start gap-1.5">
+                      {r.whoseTurn === "us" && <Badge tone="warn">Your turn</Badge>}
+                      <span className="line-clamp-2 min-w-0" title={r.standing.text}>
+                        {r.standing.ours && <NotebookPen size={12} className="mr-1 inline align-[-1px] text-accent" />}
+                        <span className={r.standing.ours ? "text-text" : undefined}>{r.standing.text}</span>
+                        {r.standing.at && <span className="text-text-faint"> · {relativeDays(r.standing.at)}</span>}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 text-right tabular">{compactNumber(r.followers)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {/* The bar floats at the bottom of the screen, so ticking a row never pushes the table down (I6). */}
       {chosen.length > 0 && (
-        <div className="sticky top-0 z-10 flex flex-wrap items-end gap-3 rounded-xl border border-accent-ring bg-surface p-3 shadow-float">
+        <div className="sticky bottom-4 z-10 flex animate-toast-in flex-wrap items-end gap-3 rounded-xl border border-accent-ring bg-surface p-3 shadow-float">
           <div className="flex items-center gap-2 self-center text-sm font-medium text-text">
             {chosen.length} selected
             <Button size="sm" variant="ghost" icon={<X size={13} />} onClick={() => setSelected(new Set())}>
@@ -255,89 +354,6 @@ export function CreatorsTable({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl bg-surface shadow-card">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs font-semibold text-text-muted">
-              <th className="w-10 px-4 py-2.5">
-                <Checkbox
-                  checked={all}
-                  indeterminate={chosen.length > 0}
-                  onChange={(on) => setSelected(on ? new Set(rows.map((r) => r.partnershipId)) : new Set())}
-                  label={all ? "Clear selection" : "Select every creator shown"}
-                />
-              </th>
-              <th className="px-4 py-2.5 font-semibold">Creator</th>
-              {!scopeName && <th className="px-4 py-2.5 font-semibold">Campaign</th>}
-              <th className="px-4 py-2.5 font-semibold">Stage</th>
-              <th className="px-4 py-2.5 font-semibold">Owner</th>
-              <th className="px-4 py-2.5 font-semibold">Where things stand</th>
-              <th className="px-4 py-2.5 text-right font-semibold">Followers</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {rows.map((r) => {
-              const on = selected.has(r.partnershipId);
-              return (
-                <tr key={r.partnershipId} className={on ? "bg-accent-soft/60" : "transition hover:bg-surface-2/60"}>
-                  <td className="px-4 py-2.5">
-                    <Checkbox checked={on} onChange={(v) => toggle(r.partnershipId, v)} label={`Select ${r.name}`} />
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <Avatar name={r.name} src={r.photoUrl} />
-                      <div className="min-w-0">
-                        <Link href={`/creators/${r.partnershipId}?returnTo=/creators`} className="font-medium text-text hover:text-accent">
-                          {r.name}
-                        </Link>
-                        <div className="flex items-center gap-1.5 text-xs text-text-muted">
-                          {r.profileUrl ? (
-                            <a href={r.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 hover:text-accent">
-                              @{r.username}
-                              <ExternalLink size={11} />
-                            </a>
-                          ) : (
-                            <span>No profile link yet</span>
-                          )}
-                          {r.businessEmail && (
-                            <span title={`Email tracked: ${r.businessEmail}`} aria-label="Email tracked">
-                              <Mail size={11} />
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  {!scopeName && <td className="px-4 py-2.5 text-text-muted">{r.campaignName}</td>}
-                  <td className="px-4 py-2.5">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <StagePill stage={r.stage} />
-                      {r.clientApproval === "pending" && r.stage === "shortlisted" && <Badge tone="warn">Awaiting approval</Badge>}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1.5 text-xs text-text-muted">
-                      <OwnerMenu partnershipId={r.partnershipId} name={r.name} owner={r.owner} meId={meId} team={teammates} />
-                      {r.owner && <span className="truncate">{r.owner.id === meId ? "You" : r.owner.name.split(" ")[0]}</span>}
-                    </div>
-                  </td>
-                  <td className="max-w-md px-4 py-2.5 text-text-muted">
-                    <div className="flex items-start gap-1.5">
-                      {r.whoseTurn === "us" && <Badge tone="warn">Your turn</Badge>}
-                      <span className="line-clamp-2 min-w-0" title={r.standing.text}>
-                        {r.standing.ours && <NotebookPen size={12} className="mr-1 inline align-[-1px] text-accent" />}
-                        <span className={r.standing.ours ? "text-text" : undefined}>{r.standing.text}</span>
-                        {r.standing.at && <span className="text-text-faint"> · {relativeDays(r.standing.at)}</span>}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5 text-right tabular">{compactNumber(r.followers)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
     </div>
     </PendingDim>
   );

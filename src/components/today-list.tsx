@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Archive, CalendarClock, ChevronDown, ChevronRight, Mail, MapPin, MessageCircle, NotebookPen, PackageCheck, Truck, Clapperboard, ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Archive, CalendarClock, Check, ChevronDown, ChevronRight, Mail, MapPin, MessageCircle, NotebookPen, PackageCheck, Truck, Clapperboard, ArrowRight } from "lucide-react";
 import { Avatar, Badge, Button, Card } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { QuickStage } from "@/components/quick-stage";
@@ -43,18 +43,51 @@ export function TodayList({
 }) {
   // "Waiting on them" starts folded: nothing to do there today.
   const [open, setOpen] = useState<Set<TodaySection>>(new Set());
-  const bySection = new Map<TodaySection, TodayRow[]>();
-  for (const r of rows) bySection.set(r.section, [...(bySection.get(r.section) ?? []), r]);
-  const shown = TODAY_SECTIONS.filter((s) => (bySection.get(s.key)?.length ?? 0) > 0);
+  const bySection = groupBySection(rows);
+
+  // A row that leaves its section (it moved on, or off Today) stays a moment
+  // to say where it went, then folds away; the section it went to pulses
+  // (interaction review 2026-09-30, I4).
+  const [seenRows, setSeenRows] = useState(rows);
+  const [ghosts, setGhosts] = useState<Ghost[]>([]);
+  const [pulse, setPulse] = useState<{ section: TodaySection; n: number } | null>(null);
+  if (seenRows !== rows) {
+    const now = new Map(rows.map((r) => [r.partnershipId, r]));
+    const before = groupBySection(seenRows);
+    const left: Ghost[] = [];
+    for (const r of seenRows) {
+      const next = now.get(r.partnershipId);
+      if (next && next.section === r.section) continue;
+      left.push({ row: r, to: next?.section ?? null, index: before.get(r.section)?.indexOf(r) ?? 0 });
+    }
+    setSeenRows(rows);
+    if (left.length) {
+      setGhosts(left);
+      const to = left.find((g) => g.to)?.to;
+      if (to) setPulse((p) => ({ section: to, n: (p?.n ?? 0) + 1 }));
+    }
+  }
+  useEffect(() => {
+    if (!ghosts.length) return;
+    const t = setTimeout(() => setGhosts([]), 1200);
+    return () => clearTimeout(t);
+  }, [ghosts]);
+
+  const shown = TODAY_SECTIONS.filter((s) => (bySection.get(s.key)?.length ?? 0) > 0 || ghosts.some((g) => g.row.section === s.key));
 
   return (
     <div className="space-y-4">
       {shown.map((s) => {
-        const list = bySection.get(s.key)!;
+        const list = bySection.get(s.key) ?? [];
         const foldable = s.key === "waiting";
         const folded = foldable && !open.has(s.key);
+        // Real rows, with any that just left put back where they were.
+        const items: ({ ghost: false; row: TodayRow } | ({ ghost: true } & Ghost))[] = list.map((row) => ({ ghost: false as const, row }));
+        for (const g of ghosts.filter((x) => x.row.section === s.key)) items.splice(Math.min(g.index, items.length), 0, { ghost: true, ...g });
         return (
-          <Card key={s.key} className="overflow-hidden" id={`today-${s.key}`}>
+          <div key={s.key} className="relative">
+          {pulse?.section === s.key && <span key={pulse.n} aria-hidden className="pointer-events-none absolute inset-0 animate-ring-pulse rounded-xl" />}
+          <Card className="overflow-hidden" id={`today-${s.key}`}>
             {foldable ? (
               <button
                 type="button"
@@ -78,15 +111,51 @@ export function TodayList({
             )}
             {!folded && (
               <ul className="divide-y divide-border">
-                {list.map((r) => (
-                  <TodayItem key={r.partnershipId} row={r} meId={meId} team={team} showCampaign={showCampaign} />
-                ))}
+                {items.map((it) =>
+                  it.ghost ? (
+                    <GhostRow key={`left-${it.row.partnershipId}`} ghost={it} />
+                  ) : (
+                    <TodayItem key={it.row.partnershipId} row={it.row} meId={meId} team={team} showCampaign={showCampaign} />
+                  ),
+                )}
               </ul>
             )}
           </Card>
+          </div>
         );
       })}
     </div>
+  );
+}
+
+interface Ghost {
+  row: TodayRow;
+  /** Where it went: another section, or null when it's off Today. */
+  to: TodaySection | null;
+  index: number;
+}
+
+function groupBySection(rows: TodayRow[]) {
+  const by = new Map<TodaySection, TodayRow[]>();
+  for (const r of rows) by.set(r.section, [...(by.get(r.section) ?? []), r]);
+  return by;
+}
+
+/** A row that just left: "✓ Moved to Waiting on them", then it folds away. */
+function GhostRow({ ghost: g }: { ghost: Ghost }) {
+  const to = g.to ? TODAY_SECTIONS.find((s) => s.key === g.to)?.title : null;
+  return (
+    <li className="row-leave" aria-hidden>
+      <div className="min-h-0 overflow-hidden">
+        <div className="flex items-center gap-3 bg-good-soft px-4 py-3">
+          <Avatar name={g.row.name} src={g.row.photoUrl} />
+          <span className="text-sm font-semibold text-text">{g.row.name}</span>
+          <span className="inline-flex items-center gap-1 text-sm text-good">
+            <Check size={14} aria-hidden /> {to ? `Moved to ${to}` : "Done — off Today for now"}
+          </span>
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -109,8 +178,13 @@ function href(r: TodayRow, section: CreatorSection) {
 
 function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: string | null; team: TeammateOption[]; showCampaign: boolean }) {
   const turn = whoseTurnText(r.whoseTurn);
-  const [panel, setPanel] = useState<"log" | "archive" | null>(null);
+  const [panel, setPanelState] = useState<"log" | "archive" | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
+  // Closing a panel opened from ⋯ puts focus back on ⋯ (interaction review 2026-09-30).
+  const setPanel = (p: "log" | "archive" | null) => {
+    setPanelState(p);
+    if (!p) requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-more-for="${r.partnershipId}"]`)?.focus());
+  };
   const owner = r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: team.find((t) => t.id === r.ownerId)?.label ?? "?" } : null;
   return (
     <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start">
@@ -158,7 +232,7 @@ function TodayItem({ row: r, meId, team, showCampaign }: { row: TodayRow; meId: 
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <NextAction row={r} />
-            <Menu label={`More for ${r.name}`}>
+            <Menu label={`More for ${r.name}`} moreFor={r.partnershipId}>
               <MenuItem icon={<CalendarClock size={14} />} onSelect={() => setPanel("log")}>
                 Log with a date or another way…
               </MenuItem>

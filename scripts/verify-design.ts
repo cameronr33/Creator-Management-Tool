@@ -161,6 +161,25 @@ function main() {
   check("Mine / Everyone shows your choice at once", /useOptimistic/.test(read("components/mine-toggle.tsx")));
   for (const f of ["client-switcher.tsx", "campaign-switcher.tsx"]) check(`${f.replace(".tsx", "")} dims the page and says it's switching`, /useMainPending/.test(read(`components/${f}`)));
   check("search shows it's working while results load", /useMainPending/.test(read("components/creators-filter-bar.tsx")) && /Spinner/.test(read("components/creators-filter-bar.tsx")));
+  console.log("\n── rows, bars, drags, focus ──");
+  const todayList = read("components/today-list.tsx");
+  check("a Today row that leaves says where it went and folds away (I4)", /row-leave/.test(todayList) && /Moved to/.test(todayList) && /@keyframes row-leave/.test(css));
+  const table = read("components/creators-table.tsx");
+  check("the bulk bar floats at the bottom instead of pushing the table down (I6)", /sticky bottom-4/.test(table) && !/sticky top-0/.test(table));
+  check("shift-click ticks a range, and the whole first cell ticks the row (I6)", /shift/.test(table) && /lastTicked/.test(table));
+  const board = read("components/pipeline-board.tsx");
+  check("starting a drag doesn't open every empty column (I9)", !/const folded = !dragId/.test(board) && /if \(folded\) \{[\s\S]{0,2500}onDrop=/.test(board));
+  check("a picked-up Pipeline card lifts (S5)", /shadow-float/.test(board));
+  for (const f of ["log-message.tsx", "archive.tsx"]) {
+    const src = read(`components/${f}`);
+    check(`${f.replace(".tsx", "")}: the panel takes focus and Escape closes it (I10)`, /e\.key === "Escape"/.test(src) && /focus\(\)/.test(src));
+  }
+  check("menus open with a short fade (I11)", /animate-pop-in/.test(menu));
+  const help = read("components/help-popover.tsx");
+  check("the ? help closes on a click outside or Escape (I11)", /pointerdown/.test(help) && /Escape/.test(help) && /HelpPopover/.test(ui));
+  const confirm = read("components/confirm-button.tsx");
+  check("a confirm lands on the safe No, Escape cancels, and it disarms by itself (I13)", /autoFocus/.test(confirm) && /Escape/.test(confirm) && /setTimeout|setInterval/.test(confirm));
+  check("a contract PDF can be dropped onto the Deal (I17)", /onDrop/.test(read("components/contracts.tsx")) && /Drop the PDF/.test(read("components/contracts.tsx")));
   check("every button gives a press, and a pending button keeps its width", /secondary: [`"][^`"]*active:/.test(ui) && /ghost: [`"][^`"]*active:/.test(ui) && /invisible/.test(ui));
 }
 

@@ -189,26 +189,57 @@ export function PipelineBoard({
         const colCards = items.filter((c) => col.stages.includes(c.stage));
         const dropStage = col.stages[0];
         // Empty stages (and Closed, until opened) fold to a slim strip so the whole
-        // pipeline fits on one screen; they open while a card is being dragged.
-        const folded = !dragId && !(closing && col.key === "closed") && (colCards.length === 0 || (col.key === "closed" && !showClosed));
+        // pipeline fits on one screen. While dragging they stay slim — the board
+        // doesn't jump under the pointer — and the one you're over opens to take
+        // the card (interaction review 2026-09-30, I9).
+        const folded = !(closing && col.key === "closed") && (colCards.length === 0 || (col.key === "closed" && !showClosed));
+        const dropHere = () => {
+          if (dragId) {
+            if (col.key === "closed") setClosing({ id: dragId, stage: null });
+            else move(dragId, dropStage);
+          }
+          setDragId(null);
+          setOverCol(null);
+        };
         if (folded) {
           const isClosed = col.key === "closed" && colCards.length > 0;
+          const over = !!dragId && overCol === col.key;
+          const count = <span className="rounded-full bg-surface px-1.5 text-[11px] font-semibold tabular ring-1 ring-inset ring-border">{colCards.length}</span>;
           return (
-            <button
+            <div
               key={col.key}
-              type="button"
-              disabled={!isClosed}
-              onClick={() => isClosed && setShowClosed(true)}
-              title={isClosed ? `Show ${colCards.length} closed` : `${col.label} — nobody here. ${col.hint}`}
-              aria-label={isClosed ? `Show ${colCards.length} closed` : `${col.label}: empty`}
+              onDragOver={(e) => {
+                if (!dragId) return;
+                e.preventDefault();
+                setOverCol(col.key);
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOverCol((c) => (c === col.key ? null : c));
+              }}
+              onDrop={dropHere}
               className={cn(
-                "flex w-10 shrink-0 flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-surface-2/40 py-3 text-xs text-text-faint transition",
-                isClosed && "cursor-pointer border-solid hover:border-accent-ring hover:text-accent",
+                "flex shrink-0 flex-col items-center gap-2 rounded-xl border border-dashed py-3 text-xs transition-[width,background-color,border-color,color] duration-(--duration-normal)",
+                over ? "w-40 border-accent-ring bg-accent-soft text-accent" : "w-10 border-border bg-surface-2/40 text-text-faint",
               )}
             >
-              <span className="rounded-full bg-surface px-1.5 text-[11px] font-semibold tabular ring-1 ring-inset ring-border">{colCards.length}</span>
-              <span className="font-medium [writing-mode:vertical-rl]">{col.label}</span>
-            </button>
+              {isClosed && !dragId ? (
+                <button
+                  type="button"
+                  onClick={() => setShowClosed(true)}
+                  title={`Show ${colCards.length} closed`}
+                  aria-label={`Show ${colCards.length} closed`}
+                  className="flex flex-col items-center gap-2 hover:text-accent"
+                >
+                  {count}
+                  <span className="font-medium [writing-mode:vertical-rl]">{col.label}</span>
+                </button>
+              ) : (
+                <div className="flex flex-col items-center gap-2 px-2 text-center" title={`${col.label} — nobody here. ${col.hint}`} aria-label={`${col.label}: empty`}>
+                  {count}
+                  <span className={cn("font-medium", !over && "[writing-mode:vertical-rl]")}>{over ? `Drop in ${col.label}` : col.label}</span>
+                </div>
+              )}
+            </div>
           );
         }
         return (
@@ -219,14 +250,7 @@ export function PipelineBoard({
               setOverCol(col.key);
             }}
             onDragLeave={() => setOverCol((c) => (c === col.key ? null : c))}
-            onDrop={() => {
-              if (dragId) {
-                if (col.key === "closed") setClosing({ id: dragId, stage: null });
-                else move(dragId, dropStage);
-              }
-              setDragId(null);
-              setOverCol(null);
-            }}
+            onDrop={dropHere}
             className={cn(
               "flex w-60 shrink-0 flex-col rounded-xl border bg-surface-2/60 transition",
               overCol === col.key ? "border-accent-ring ring-2 ring-accent-soft" : "border-border",
@@ -313,7 +337,12 @@ function PipelineCard({
 }) {
   const router = useRouter();
   const pressedOnControl = useRef(false);
-  const [panel, setPanel] = useState<"move" | "log" | "archive" | null>(null);
+  const [panel, setPanelState] = useState<"move" | "log" | "archive" | null>(null);
+  // Closing a panel opened from ⋯ puts focus back on ⋯ (interaction review 2026-09-30).
+  const setPanel = (p: "move" | "log" | "archive" | null) => {
+    setPanelState(p);
+    if (!p) requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-more-for="${c.partnershipId}"]`)?.focus());
+  };
   const [noteOpen, setNoteOpen] = useState(false);
   const href = `/creators/${c.partnershipId}?returnTo=/pipeline`;
   const turn = whoseTurnText(c.whoseTurn);
@@ -330,6 +359,10 @@ function PipelineCard({
           return;
         }
         e.dataTransfer.effectAllowed = "move";
+        // The drag image is taken now: the card lifts in it, then fades in place (S5).
+        const el = e.currentTarget;
+        el.classList.add("shadow-float", "-rotate-1");
+        requestAnimationFrame(() => el.classList.remove("shadow-float", "-rotate-1"));
         onDragStart();
       }}
       onDragEnd={onDragEnd}
@@ -344,7 +377,7 @@ function PipelineCard({
           <OwnerMenu partnershipId={c.partnershipId} name={c.name} owner={c.owner} meId={meId} team={team} />
         </span>
         <span {...noDrag}>
-          <Menu label={`More for ${c.name}`}>
+          <Menu label={`More for ${c.name}`} moreFor={c.partnershipId}>
             <MenuItem icon={<MoveRight size={14} />} onSelect={() => setPanel("move")}>
               Move to…
             </MenuItem>

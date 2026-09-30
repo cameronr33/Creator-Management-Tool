@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, RotateCw, Trash2, Upload } from "lucide-react";
+import { FileText, FileUp, RotateCw, Trash2, Upload } from "lucide-react";
 import { Badge, Button, Callout, IconButton, Input, Spinner } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
@@ -64,6 +64,9 @@ export function Contracts({ partnershipId, contracts, differences }: { partnersh
   const { pending, run } = useSave();
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
+  // A PDF dragged over the contracts lights them up as a drop target (I17).
+  const [dropping, setDropping] = useState(false);
+  const dragDepth = useRef(0);
   const reading = contracts.some((c) => c.downloaded && !c.stale && !c.readError && (c.readStatus === "pending" || c.readStatus === "reading"));
 
   // While a file is being read, look again every few seconds (for two minutes at most).
@@ -101,7 +104,38 @@ export function Contracts({ partnershipId, contracts, differences }: { partnersh
   const keepMine = (d: OfferedDifference) => run(() => api(`/api/partnerships/${partnershipId}`, { dismissDeal: d.key }, "PATCH"));
 
   return (
-    <div className="space-y-3">
+    <div
+      className="relative space-y-3"
+      onDragEnter={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        dragDepth.current++;
+        setDropping(true);
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+      }}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (!dragDepth.current) setDropping(false);
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return;
+        e.preventDefault();
+        dragDepth.current = 0;
+        setDropping(false);
+        const file = e.dataTransfer.files[0];
+        if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") {
+          toast("That isn't a PDF", { tone: "bad", detail: "Contracts need to be PDF files." });
+          return;
+        }
+        upload(file);
+      }}
+    >
+      {dropping && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex animate-fade-in items-center justify-center gap-2 rounded-lg border-2 border-dashed border-accent-ring bg-accent-soft/95 text-sm font-semibold text-accent">
+          <FileUp size={18} aria-hidden /> Drop the PDF to upload it
+        </div>
+      )}
       {differences.length > 0 && (
         <Callout tone="info" title="Something here differs from what's recorded">
           <ul className="mt-1 space-y-2">
@@ -181,7 +215,7 @@ export function Contracts({ partnershipId, contracts, differences }: { partnersh
         <Button size="sm" icon={<Upload size={13} />} pending={pending} onClick={() => input.current?.click()}>
           Upload contract (PDF)
         </Button>
-        <span className="text-xs text-text-faint">Blank fields below fill in from it. PDFs attached to their emails are picked up too.</span>
+        <span className="text-xs text-text-faint">Or drop a PDF here. Blank fields below fill in from it; PDFs attached to their emails are picked up too.</span>
       </div>
     </div>
   );

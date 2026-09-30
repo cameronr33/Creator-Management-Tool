@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { ArrowLeft, CircleHelp, Loader2 } from "lucide-react";
 import type { CmStage } from "@/lib/db/schema";
 import { stageHint, stageLabel, stageStyle } from "@/lib/stages";
+import { HelpPopover } from "@/components/help-popover";
 
 /**
  * The design system. Every screen builds from these so the same action
@@ -73,23 +74,7 @@ export function PageHeader({
               </Badge>
             )}
             {help ? (
-              <details className="group relative">
-                <summary
-                  className="inline-flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full text-text-faint transition hover:bg-surface-2 hover:text-accent [&::-webkit-details-marker]:hidden"
-                  title="How this page works"
-                  aria-label="How this page works"
-                >
-                  <CircleHelp size={15} />
-                </summary>
-                <div className="absolute z-20 mt-1 max-w-md rounded-lg border border-border bg-surface p-3 text-[13px] leading-relaxed text-text-muted shadow-float">
-                  {help}
-                  {helpAnchor && (
-                    <Link href={`/help#${helpAnchor}`} className="mt-1.5 block font-medium text-accent hover:underline">
-                      Full guide →
-                    </Link>
-                  )}
-                </div>
-              </details>
+              <HelpPopover help={help} helpAnchor={helpAnchor} />
             ) : (
               helpAnchor && (
                 <Link
@@ -745,7 +730,8 @@ export function Checkbox({
 }: {
   checked: boolean;
   indeterminate?: boolean;
-  onChange: (checked: boolean) => void;
+  /** `shiftKey`: a shift-click, for ticking a range. */
+  onChange: (checked: boolean, how: { shiftKey: boolean }) => void;
   /** Screen-reader label — required, the box has no visible text. */
   label: string;
   disabled?: boolean;
@@ -758,7 +744,9 @@ export function Checkbox({
       }}
       checked={checked}
       disabled={disabled}
-      onChange={(e) => onChange(e.target.checked)}
+      // A click (or Space) carries shiftKey; onChange alone doesn't.
+      onClick={(e) => onChange(e.currentTarget.checked, { shiftKey: e.shiftKey })}
+      onChange={() => {}}
       aria-label={label}
       className="h-4 w-4 cursor-pointer rounded border-border-strong accent-accent disabled:cursor-not-allowed"
     />
