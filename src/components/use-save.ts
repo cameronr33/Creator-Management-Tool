@@ -33,7 +33,13 @@ export interface QuickUndo {
   partnershipId: string;
 }
 
-export type ApiData<T> = T & { ok?: boolean; error?: string; stageChanged?: StageChange | null; undo?: QuickUndo | null };
+/** A stage a person just picked (src/lib/email-status.ts undoMove: theirs, within ten minutes). */
+export interface MoveUndo {
+  transitionId: string;
+  partnershipId: string;
+}
+
+export type ApiData<T> = T & { ok?: boolean; error?: string; stageChanged?: StageChange | null; undo?: QuickUndo | null; undoMove?: MoveUndo | null };
 
 export interface ApiResult<T = Record<string, unknown>> {
   ok: boolean;
@@ -64,8 +70,12 @@ export interface RunOptions {
   success?: string;
   /** Skip router.refresh() — for saves whose UI already reflects the change. */
   refresh?: boolean;
-  /** Offer Undo on the success toast when the server recorded the press. */
+  /** Offer Undo on the success toast when the server recorded the press or the move. */
   undo?: boolean;
+  /** The success toast worked out from the answer (bulk counts). */
+  successFrom?: (data: Record<string, unknown>) => string;
+  /** Offer Undo with your own way back (Approve, Pass, bulk moves); null when there's nothing to undo. */
+  undoWith?: (data: Record<string, unknown>) => (() => void) | null;
 }
 
 export const UNDO_TOAST_MS = 10_000;
@@ -103,17 +113,29 @@ export function useSave() {
 
     if (r.ok) {
       const undo = opts.undo ? r.data.undo : null;
+      const moveUndo = opts.undo && !undo ? r.data.undoMove : null;
+      const custom = opts.undoWith?.(r.data as Record<string, unknown>) ?? null;
+      const message = opts.successFrom ? opts.successFrom(r.data as Record<string, unknown>) : opts.success;
       const show = () => {
+        if (moveUndo || custom) {
+          toast(message ?? "Saved", {
+            tone: "good",
+            detail: r.data.stageChanged ? describeStageChange(r.data.stageChanged) : undefined,
+            action: { label: "Undo", onClick: custom ?? (() => void undoVia(`/api/partnerships/${moveUndo!.partnershipId}/undo`, { transitionId: moveUndo!.transitionId })) },
+            durationMs: UNDO_TOAST_MS,
+          });
+          return;
+        }
         if (undo) {
           // One toast: what happened, the stage move it caused, and Undo.
-          toast(opts.success ?? "Saved", {
+          toast(message ?? "Saved", {
             tone: "good",
             detail: r.data.stageChanged ? describeStageChange(r.data.stageChanged) : undefined,
             action: { label: "Undo", onClick: () => void undoPress(undo) },
             durationMs: UNDO_TOAST_MS,
           });
         } else {
-          if (opts.success) toast(opts.success, { tone: "good" });
+          if (message) toast(message, { tone: "good" });
           if (r.data.stageChanged) toast(describeStageChange(r.data.stageChanged));
         }
       };
@@ -143,5 +165,19 @@ export function useSave() {
     router.refresh();
   }
 
-  return { pending: saving || refreshing, run };
+  /**
+   * Any other Undo: post to its route, say what happened, refresh. The server
+   * decides whether it can still be undone; a network failure can be retried.
+   */
+  async function undoVia(url: string, body: unknown, done = "Undone") {
+    const r = await api<{ stage?: CmStage | null; undone?: number; restored?: number }>(url, body).catch(
+      () => ({ ok: false, status: 0, data: { error: "Couldn't reach the server" } }) as ApiResult<{ stage?: CmStage | null }>,
+    );
+    if (r.ok) toast(r.data.stage ? `${done} — back to ${stageLabel(r.data.stage)}` : done, { tone: "good" });
+    else if (r.status === 0 || r.status >= 500) toast(r.data.error ?? "Couldn't undo it", { tone: "bad", action: { label: "Try again", onClick: () => void undoVia(url, body, done) } });
+    else toast(r.data.error ?? "Couldn't undo it", { tone: "bad" });
+    startTransition(() => router.refresh());
+  }
+
+  return { pending: saving || refreshing, run, undoVia };
 }

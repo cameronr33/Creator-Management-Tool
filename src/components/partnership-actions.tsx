@@ -87,7 +87,7 @@ export function StageControl({
     setChoosing(to);
     const r = await run(
       () => api(`/api/partnerships/${partnershipId}/stage`, { stage: to, exitReason: reason, videoUrl }),
-      { success: `Stage set to ${stageLabel(to)}` },
+      { success: `Stage set to ${stageLabel(to)}`, undo: true },
     );
     setAskVideo(!r.ok && needsVideo(r.data));
     if (!r.ok) setChoosing(null);

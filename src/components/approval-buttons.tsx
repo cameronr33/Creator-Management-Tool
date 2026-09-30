@@ -23,18 +23,24 @@ export function ApprovalButtons({
   /** "See what the client sees": shown, but nothing is saved. */
   readOnly?: boolean;
 }) {
-  const { pending, run } = useSave();
+  const { pending, run, undoVia } = useSave();
   const [passing, setPassing] = useState(false);
   const [note, setNote] = useState("");
+  const url = who === "agency" ? `/api/partnerships/${partnershipId}/approval` : "/api/client/approve";
+  const base = who === "agency" ? {} : { partnershipId };
 
+  // Undo takes your own decision back within ten minutes (interaction review 2026-09-30).
   const decide = (decision: "approve" | "pass") =>
-    run(
-      () =>
-        who === "agency"
-          ? api(`/api/partnerships/${partnershipId}/approval`, { decision, note: note || undefined })
-          : api("/api/client/approve", { partnershipId, decision, note: note || undefined }),
-      { success: decision === "approve" ? `${name} approved` : `Passed on ${name}` },
-    );
+    run(() => api(url, { ...base, decision, note: note || undefined }), {
+      success: decision === "approve" ? `${name} approved` : `Passed on ${name}`,
+      undoWith: (d) => {
+        if (decision === "approve") {
+          const prior = (d.prior as { clientApproval: string | null }[] | undefined)?.[0]?.clientApproval === "pending" ? "pending" : "none";
+          return typeof d.decidedAt === "string" ? () => void undoVia(url, { ...base, decision: "undo_approve", decidedAt: d.decidedAt, prior }, `Undone — ${name} is waiting for approval again`) : null;
+        }
+        return typeof d.transitionId === "string" ? () => void undoVia(url, { ...base, decision: "undo_pass", transitionId: d.transitionId }, `Undone — ${name} is back`) : null;
+      },
+    });
 
   if (passing) {
     return (

@@ -1,9 +1,10 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cmPartnerships } from "@/lib/db/schema";
+import { cmPartnerships, cmStageTransitions } from "@/lib/db/schema";
 import { refreshFromInstagram } from "@/lib/instagram";
-import { approve } from "@/lib/approvals";
+import { approve, undoApproval } from "@/lib/approvals";
+import { undoMove } from "@/lib/email-status";
 import { resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { z } from "zod";
@@ -14,7 +15,7 @@ import {
   assertCampaignInSelectedClient,
 } from "@/lib/api-helpers";
 import { changeStage } from "@/lib/mutations";
-import { moveToCampaign, removePartnerships } from "@/lib/campaigns";
+import { moveToCampaign, removePartnerships, restoreCampaigns } from "@/lib/campaigns";
 import { STAGE_VALUES } from "@/lib/stages";
 import { memberForUser, restoreOwners, setOwner, takeUnassigned } from "@/lib/owners";
 import { restoreArchived, setArchived } from "@/lib/archive";
@@ -43,6 +44,20 @@ const schema = z.discriminatedUnion("action", [
     ids: z.array(z.string()).min(1).max(500),
     prior: z.array(z.object({ id: z.string().uuid(), ownerId: z.string().uuid().nullable() })).min(1).max(500),
     expected: z.string().uuid().nullable(),
+  }),
+  // The bulk toasts' Undo (interaction review 2026-09-30): each server-checked, a change made since stands.
+  z.object({ action: z.literal("undo_moves"), ids: z.array(z.string()).min(1).max(500), transitionIds: z.array(z.string().uuid()).min(1).max(500) }),
+  z.object({
+    action: z.literal("restore_campaign"),
+    ids: z.array(z.string()).min(1).max(500),
+    prior: z.array(z.object({ id: z.string().uuid(), campaignId: z.string().uuid() })).min(1).max(500),
+    movedTo: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("undo_approve"),
+    ids: z.array(z.string()).min(1).max(500),
+    decidedAt: z.string().max(40),
+    prior: z.array(z.object({ id: z.string().uuid(), clientApproval: z.enum(["pending"]).nullable() })).min(1).max(500),
   }),
 ]);
 
@@ -95,6 +110,32 @@ export async function POST(req: NextRequest) {
     const restored = await restoreArchived([...new Set(d.ids)]);
     return NextResponse.json({ ok: true, restored });
   }
+  if (d.action === "undo_moves") {
+    const own = new Set(d.ids);
+    const moves = await db.select({ id: cmStageTransitions.id, partnershipId: cmStageTransitions.partnershipId }).from(cmStageTransitions).where(inArray(cmStageTransitions.id, d.transitionIds));
+    let undone = 0;
+    for (const m of moves) if (own.has(m.partnershipId) && (await undoMove(m.id, session.user.id)).ok) undone++;
+    return NextResponse.json({ ok: true, undone, kept: d.transitionIds.length - undone });
+  }
+  if (d.action === "restore_campaign") {
+    const own = new Set(d.ids);
+    const prior = d.prior.filter((p) => own.has(p.id));
+    // Only back into this client's campaigns.
+    for (const c of new Set([d.movedTo, ...prior.map((p) => p.campaignId)])) {
+      const bad = await assertCampaignInSelectedClient(c);
+      if (bad) return bad;
+    }
+    const r = await restoreCampaigns(prior, d.movedTo);
+    return NextResponse.json({ ok: true, ...r });
+  }
+  if (d.action === "undo_approve") {
+    const client = await resolveClient(await getSelectedClientSlug());
+    if (!client) return badRequest("No client selected");
+    const own = new Set(d.ids);
+    const by = { name: session.user.name ?? "A teammate", kind: "agency" as const, userId: session.user.id };
+    const r = await undoApproval(client.id, d.prior.filter((p) => own.has(p.id)), by, d.decidedAt);
+    return NextResponse.json({ ok: true, ...r });
+  }
   if (d.action === "restore_owner") {
     // Only the deals this request was checked for.
     const allowed = new Set(d.ids);
@@ -112,11 +153,14 @@ export async function POST(req: NextRequest) {
   let moved = 0;
   let unchanged = 0;
   let needVideo = 0;
+  const transitionIds: string[] = [];
   for (const id of [...new Set(d.ids)]) {
     const r = await changeStage(id, d.stage, session.user.id, { exitReason: d.exitReason });
-    if (r.status === "moved") moved++;
-    else if (r.status === "needs_video") needVideo++;
+    if (r.status === "moved") {
+      moved++;
+      transitionIds.push(r.transitionId);
+    } else if (r.status === "needs_video") needVideo++;
     else unchanged++;
   }
-  return NextResponse.json({ ok: true, moved, unchanged, needVideo });
+  return NextResponse.json({ ok: true, moved, unchanged, needVideo, transitionIds });
 }

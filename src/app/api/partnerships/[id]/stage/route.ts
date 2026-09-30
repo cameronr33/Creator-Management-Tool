@@ -45,5 +45,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     // useSave announces automatic continuations ("Agreed → Shipping", because
     // their address is already on file) like any other automatic move.
     stageChanged: result.status === "moved" && result.continued ? { from: parsed.data.stage, to: result.to } : null,
+    // A stage you picked can be undone for ten minutes (src/lib/email-status.ts undoMove).
+    undoMove: result.status === "moved" ? { transitionId: result.transitionId, partnershipId: id } : null,
   });
 }

@@ -32,6 +32,9 @@ import { moveStage } from "../src/lib/stage-moves";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
 import { changeStage } from "../src/lib/mutations";
 import { lastManualChangeAt } from "../src/lib/email-ingest";
+import { undoMove } from "../src/lib/email-status";
+import { approve, pass, undoApproval, undoPass } from "../src/lib/approvals";
+import { moveToCampaign, restoreCampaigns } from "../src/lib/campaigns";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail?: string) {
@@ -123,6 +126,7 @@ async function live() {
   }
   const agency = { kind: "agency" as const, userId: me.id };
   let campaignId = "00000000-0000-0000-0000-000000000000";
+  let campaignB = "00000000-0000-0000-0000-000000000000";
   const creatorIds: string[] = [];
   const add = async (h: string) => {
     const r = await createCreatorWithPartnership({ clientId: client.id, name: h, links: [`https://www.instagram.com/${h}`], campaignId });
@@ -395,9 +399,74 @@ async function live() {
     const byClient = await recordShipment({ partnershipId: portalSide, status: "shipped" }, { kind: "client", id: "00000000-0000-0000-0000-000000000009", name: "Rob Client" });
     const recorded = await db.select().from(schema.cmQuickActions).where(eq(schema.cmQuickActions.partnershipId, portalSide));
     check("the brand marking it shipped in the portal is never an undoable press here", byClient.ok && byClient.undo === null && recorded.length === 0);
+
+    // Interaction review 2026-09-30 (owner: I14): Undo where it was missing.
+    console.log("\n── Undo a stage you picked, a bulk campaign move, Approve and Pass ──");
+    const someoneElse = "00000000-0000-0000-0000-00000000abcd";
+    const transitionOf = async (id: string) => (await db.select().from(schema.cmStageTransitions).where(eq(schema.cmStageTransitions.id, id)))[0];
+    const picked = await add("__verify_un_picked");
+    await changeStage(picked, "contacted", me.id);
+    const mv = await moveStage({ partnershipId: picked, to: "in_conversation", source: "manual", userId: me.id, expectFrom: "contacted" });
+    const tid = mv.status === "moved" ? mv.transitionId : "";
+    check("someone else can't undo the stage you picked", !(await undoMove(tid, someoneElse)).ok && (await stageOf(picked)) === "in_conversation");
+    const back = await undoMove(tid, me.id);
+    check("you can: it goes back where it was, and the move is marked undone", back.ok && (await stageOf(picked)) === "contacted" && !!(await transitionOf(tid))?.undoneAt, JSON.stringify(back));
+    check("…once", !(await undoMove(tid, me.id)).ok);
+    const undoRow = (await db.select().from(schema.cmStageTransitions).where(and(eq(schema.cmStageTransitions.partnershipId, picked), eq(schema.cmStageTransitions.reason, "undo"))))[0];
+    check("an Undo can't itself be undone", !!undoRow && !(await undoMove(undoRow.id, me.id)).ok);
+
+    const lateOne = await add("__verify_un_picked_late");
+    await changeStage(lateOne, "contacted", me.id);
+    const mvLate = await moveStage({ partnershipId: lateOne, to: "in_conversation", source: "manual", userId: me.id, expectFrom: "contacted" });
+    if (mvLate.status === "moved") await db.update(schema.cmStageTransitions).set({ changedAt: new Date(Date.now() - UNDO_WINDOW_MS - 60_000) }).where(eq(schema.cmStageTransitions.id, mvLate.transitionId));
+    check("not after ten minutes", mvLate.status === "moved" && !(await undoMove(mvLate.transitionId, me.id)).ok && (await stageOf(lateOne)) === "in_conversation");
+
+    const since = await add("__verify_un_picked_since");
+    await changeStage(since, "contacted", me.id);
+    const mvA = await moveStage({ partnershipId: since, to: "in_conversation", source: "manual", userId: me.id, expectFrom: "contacted" });
+    await moveStage({ partnershipId: since, to: "awaiting_address", source: "manual", userId: me.id, expectFrom: "in_conversation" });
+    check("not once the stage has moved again", mvA.status === "moved" && !(await undoMove(mvA.transitionId, me.id)).ok && (await stageOf(since)) === "awaiting_address");
+
+    campaignB = await ensureCampaignByName(client.id, "__verify_undo_b__");
+    const hop = await add("__verify_un_campaign");
+    const hopped = await moveToCampaign([hop], campaignB);
+    check("a bulk campaign move says where each one was", hopped.moved === 1 && hopped.prior.length === 1 && hopped.prior[0].campaignId === campaignId);
+    const restored = await restoreCampaigns(hopped.prior, campaignB);
+    const [hopRow] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, hop));
+    check("…and Undo puts it back", restored.restored === 1 && hopRow.campaignId === campaignId);
+    await moveToCampaign([hop], campaignB);
+    await db.update(schema.cmPartnerships).set({ campaignId }).where(eq(schema.cmPartnerships.id, hop)); // someone moved it back by hand
+    check("…but never over a move someone made since", (await restoreCampaigns([{ id: hop, campaignId: campaignB }], campaignB)).restored === 0);
+
+    const decider = { name: "__verify Sam", kind: "agency" as const, userId: me.id };
+    const notesOf = async (id: string) => (await eventsOf(id)).filter((e) => e.kind === "note");
+    const ap = await add("__verify_un_approve");
+    await db.update(schema.cmPartnerships).set({ clientApproval: "pending" }).where(eq(schema.cmPartnerships.id, ap));
+    const a1 = await approve(client.id, [ap], decider);
+    check("Approve says what to undo it with, and what each one was before", a1.approved === 1 && !!a1.decidedAt && a1.prior.length === 1 && a1.prior[0].clientApproval === "pending");
+    check("someone else can't undo your approval", !(await undoApproval(client.id, a1.prior, { ...decider, name: "__verify Kim" }, a1.decidedAt ?? "")).undone);
+    const ua = await undoApproval(client.id, a1.prior, decider, a1.decidedAt ?? "");
+    const [apRow] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, ap));
+    check("Undo puts it back to waiting for approval and takes the note off the timeline", ua.undone === 1 && apRow.clientApproval === "pending" && apRow.approvalAt === null && (await notesOf(ap)).length === 0, JSON.stringify({ ua, a: apRow.clientApproval, n: (await notesOf(ap)).length }));
+    check("…once", (await undoApproval(client.id, a1.prior, decider, a1.decidedAt ?? "")).undone === 0);
+    const apLate = await add("__verify_un_approve_late");
+    await db.update(schema.cmPartnerships).set({ clientApproval: "pending" }).where(eq(schema.cmPartnerships.id, apLate));
+    const a2 = await approve(client.id, [apLate], decider);
+    await db.update(schema.cmPartnerships).set({ approvalAt: new Date(Date.now() - UNDO_WINDOW_MS - 60_000) }).where(eq(schema.cmPartnerships.id, apLate));
+    check("…and not after ten minutes", (await undoApproval(client.id, a2.prior, decider, a2.decidedAt ?? "")).undone === 0);
+
+    const ps = await add("__verify_un_pass");
+    await db.update(schema.cmPartnerships).set({ clientApproval: "pending" }).where(eq(schema.cmPartnerships.id, ps));
+    const p1 = await pass(client.id, ps, decider, "Not a fit");
+    check("Pass closes it and says what to undo it with", p1.ok && (await stageOf(ps)) === "passed" && !!p1.transitionId);
+    check("someone else can't undo your pass", !(await undoPass(client.id, ps, { ...decider, name: "__verify Kim" }, p1.transitionId ?? "")).ok && (await stageOf(ps)) === "passed");
+    const up = await undoPass(client.id, ps, decider, p1.transitionId ?? "");
+    const [psRow] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, ps));
+    check("Undo reopens it where it was, waiting for approval, with no note left", up.ok && psRow.stage === "shortlisted" && psRow.clientApproval === "pending" && psRow.exitReason === null && (await notesOf(ps)).length === 0, JSON.stringify({ up, s: psRow.stage, a: psRow.clientApproval, x: psRow.exitReason }));
+    check("…once", !(await undoPass(client.id, ps, decider, p1.transitionId ?? "")).ok);
   } finally {
     if (creatorIds.length) await db.delete(schema.cmCreators).where(inArray(schema.cmCreators.id, creatorIds));
-    await db.delete(schema.cmCampaigns).where(eq(schema.cmCampaigns.id, campaignId));
+    await db.delete(schema.cmCampaigns).where(inArray(schema.cmCampaigns.id, [campaignId, campaignB]));
   }
   check("test rows cleaned up", (await db.select().from(schema.cmCampaigns).where(eq(schema.cmCampaigns.id, campaignId))).length === 0);
 }

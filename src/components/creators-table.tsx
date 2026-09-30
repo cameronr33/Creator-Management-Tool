@@ -8,7 +8,6 @@ import { Avatar, Badge, Button, Checkbox, Field, Select, StagePill } from "@/com
 import { ConfirmButton } from "@/components/confirm-button";
 import { OwnerMenu, ownerToast, type OwnerInfo, type TeammateOption } from "@/components/owner-controls";
 import { api, useSave } from "@/components/use-save";
-import { toast } from "@/components/toast";
 import { PendingDim } from "@/components/main-pending";
 import { stagesByGroup } from "@/lib/stages";
 import { compactNumber, relativeDays } from "@/lib/format";
@@ -59,7 +58,7 @@ export function CreatorsTable({
   /** Showing Creators → Archived: the bar offers Restore instead of Archive. */
   archivedView?: boolean;
 }) {
-  const { pending, run } = useSave();
+  const { pending, run, undoVia } = useSave();
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const visible = useMemo(() => new Set(rows.map((r) => r.partnershipId)), [rows]);
@@ -75,13 +74,26 @@ export function CreatorsTable({
       return next;
     });
 
-  const bulk = async (body: Record<string, unknown>, describe: (d: Record<string, number>) => string) => {
-    const r = await run(() => api<Record<string, number>>("/api/partnerships/bulk", { ...body, ids: chosen }));
-    if (r.ok) {
-      toast(describe(r.data), { tone: "good" });
-      setSelected(new Set());
-    }
+  // Each bulk change says what it did once the list has caught up; stage, campaign and approval moves offer Undo.
+  const bulk = async (
+    body: Record<string, unknown>,
+    describe: (d: Record<string, number>) => string,
+    undoWith?: (d: Record<string, unknown>, ids: string[]) => (() => void) | null,
+  ) => {
+    const ids = chosen;
+    const r = await run(() => api<Record<string, number>>("/api/partnerships/bulk", { ...body, ids }), {
+      successFrom: (d) => describe(d as Record<string, number>),
+      undoWith: undoWith ? (d) => undoWith(d, ids) : undefined,
+    });
+    if (r.ok) setSelected(new Set());
   };
+  const BULK = "/api/partnerships/bulk";
+  const undoMoves = (d: Record<string, unknown>, ids: string[]) =>
+    Array.isArray(d.transitionIds) && d.transitionIds.length ? () => void undoVia(BULK, { action: "undo_moves", ids, transitionIds: d.transitionIds }, "Moves undone") : null;
+  const undoCampaign = (movedTo: string) => (d: Record<string, unknown>, ids: string[]) =>
+    Array.isArray(d.prior) && d.prior.length ? () => void undoVia(BULK, { action: "restore_campaign", ids, prior: d.prior, movedTo }, "Moved back") : null;
+  const undoApprove = (d: Record<string, unknown>, ids: string[]) =>
+    typeof d.decidedAt === "string" && Array.isArray(d.prior) && d.prior.length ? () => void undoVia(BULK, { action: "undo_approve", ids, decidedAt: d.decidedAt, prior: d.prior }, "Approvals undone") : null;
 
   // Assign the ticked ones; the toast's Undo puts back who owned each before (2026-09-29).
   const assignTo = async (to: string | null) => {
@@ -113,8 +125,10 @@ export function CreatorsTable({
               disabled={pending}
               onChange={(e) =>
                 e.target.value &&
-                bulk({ action: "set_stage", stage: e.target.value }, (d) =>
-                  `${d.moved ?? 0} moved${d.needVideo ? ` · ${d.needVideo} need their video link first (open them to add it)` : ""}${d.unchanged ? ` · ${d.unchanged} already there` : ""}`,
+                bulk(
+                  { action: "set_stage", stage: e.target.value },
+                  (d) => `${d.moved ?? 0} moved${d.needVideo ? ` · ${d.needVideo} need their video link first (open them to add it)` : ""}${d.unchanged ? ` · ${d.unchanged} already there` : ""}`,
+                  undoMoves,
                 )
               }
               className="w-44"
@@ -139,8 +153,10 @@ export function CreatorsTable({
                 disabled={pending}
                 onChange={(e) =>
                   e.target.value &&
-                  bulk({ action: "set_campaign", campaignId: e.target.value }, (d) =>
-                    `${d.moved ?? 0} moved${d.skipped ? ` · ${d.skipped} skipped (already in that campaign)` : ""}`,
+                  bulk(
+                    { action: "set_campaign", campaignId: e.target.value },
+                    (d) => `${d.moved ?? 0} moved${d.skipped ? ` · ${d.skipped} skipped (already in that campaign)` : ""}`,
+                    undoCampaign(e.target.value),
                   )
                 }
                 className="w-48"
@@ -186,7 +202,7 @@ export function CreatorsTable({
                 icon={<Check size={13} />}
                 pending={pending}
                 title="Approve for outreach on the client's behalf — recorded under your name"
-                onClick={() => bulk({ action: "approve" }, (d) => `${d.approved ?? 0} approved for outreach`)}
+                onClick={() => bulk({ action: "approve" }, (d) => `${d.approved ?? 0} approved for outreach`, undoApprove)}
               >
                 Approve for outreach
               </Button>

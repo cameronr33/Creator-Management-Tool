@@ -127,9 +127,9 @@ export async function deleteCampaign(clientId: string, id: string): Promise<Remo
  * once: rows whose creator is already there (or appears twice in this
  * selection) are skipped and reported, never merged.
  */
-export async function moveToCampaign(ids: string[], campaignId: string): Promise<{ moved: number; skipped: number }> {
+export async function moveToCampaign(ids: string[], campaignId: string): Promise<{ moved: number; skipped: number; prior: { id: string; campaignId: string }[] }> {
   const unique = [...new Set(ids)];
-  if (!unique.length) return { moved: 0, skipped: 0 };
+  if (!unique.length) return { moved: 0, skipped: 0, prior: [] };
   const rows = await db
     .select({ id: cmPartnerships.id, creatorId: cmPartnerships.creatorId, campaignId: cmPartnerships.campaignId })
     .from(cmPartnerships)
@@ -138,6 +138,7 @@ export async function moveToCampaign(ids: string[], campaignId: string): Promise
     (await db.select({ creatorId: cmPartnerships.creatorId }).from(cmPartnerships).where(eq(cmPartnerships.campaignId, campaignId))).map((r) => r.creatorId),
   );
   const take: string[] = [];
+  const prior: { id: string; campaignId: string }[] = [];
   let skipped = 0;
   for (const r of rows) {
     if (r.campaignId === campaignId) continue; // already there — nothing to do
@@ -147,11 +148,31 @@ export async function moveToCampaign(ids: string[], campaignId: string): Promise
     }
     already.add(r.creatorId); // the same creator twice in one selection moves once
     take.push(r.id);
+    prior.push({ id: r.id, campaignId: r.campaignId });
   }
   if (take.length) {
     await db.update(cmPartnerships).set({ campaignId, updatedAt: new Date() }).where(inArray(cmPartnerships.id, take));
   }
-  return { moved: take.length, skipped };
+  return { moved: take.length, skipped, prior };
+}
+
+/**
+ * Undo a campaign move (interaction review 2026-09-30): each back to the
+ * campaign it came from — only while it's still in `movedTo` (a move someone
+ * made since stands) and never onto a creator already in that campaign. One
+ * statement.
+ */
+export async function restoreCampaigns(prior: { id: string; campaignId: string }[], movedTo: string): Promise<{ restored: number }> {
+  if (!prior.length) return { restored: 0 };
+  const values = sql.join(prior.map((p) => sql`(${p.id}::uuid, ${p.campaignId}::uuid)`), sql`, `);
+  const res = await db.execute(sql`
+    update ${cmPartnerships} p set campaign_id = v.campaign, updated_at = now()
+    from (values ${values}) as v(id, campaign)
+    where p.id = v.id and p.campaign_id = ${movedTo}::uuid
+      and not exists (select 1 from ${cmPartnerships} q where q.creator_id = p.creator_id and q.campaign_id = v.campaign)
+    returning p.id
+  `);
+  return { restored: (res.rows as unknown[]).length };
 }
 
 /* ── The campaign scope (sidebar selector) ──────────────────────── */

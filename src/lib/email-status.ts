@@ -638,16 +638,26 @@ export async function readPendingConversations(opts: { model?: AssessFn } = {}):
 /* ── Undo ───────────────────────────────────────────────────────── */
 
 /**
- * Take back an automatic move: only the latest move on the partnership, only
- * while the stage is still what that move set. Puts the stage back exactly,
+ * Take back a move: one the email reader made, or (interaction review
+ * 2026-09-30, owner: I14) a stage a person picked themselves — only by that
+ * person, within ten minutes, like the quick buttons' Undo. Either way only
+ * the latest move on the partnership, only while the stage is still what that
+ * move set. Puts the stage back exactly (a person's move, reason "undo"),
  * removes a shipment or video record the move created (if nobody has touched
- * it since), and restores a shipment status the move changed.
+ * it since), and restores a shipment status the move changed. An Undo is
+ * never itself undone.
  */
-export async function undoMove(transitionId: string, userId: string | null): Promise<{ ok: true; stage: CmStage } | { ok: false; error: string }> {
+export const PERSON_UNDO_WINDOW_MS = 10 * 60_000;
+export async function undoMove(transitionId: string, userId: string | null, now = new Date()): Promise<{ ok: true; stage: CmStage } | { ok: false; error: string }> {
   const [t] = await db.select().from(cmStageTransitions).where(eq(cmStageTransitions.id, transitionId)).limit(1);
   if (!t) return { ok: false, error: "That move no longer exists." };
   if (t.undoneAt) return { ok: false, error: "That move was already undone." };
-  if (t.source !== "email") return { ok: false, error: "Only a move made from their email can be undone — change it by hand instead." };
+  const byPerson = t.source === "manual" && t.reason !== "undo";
+  if (t.source !== "email" && !byPerson) return { ok: false, error: "That move can't be undone — change it by hand instead." };
+  if (byPerson) {
+    if (!userId || t.changedBy !== userId) return { ok: false, error: "Only the person who moved it can undo that — change it by hand instead." };
+    if (now.getTime() - t.changedAt.getTime() > PERSON_UNDO_WINDOW_MS) return { ok: false, error: "That was more than ten minutes ago — change it by hand instead." };
+  }
   if (!t.fromStage) return { ok: false, error: "The first stage can't be undone." };
   const [latest] = await db
     .select({ id: cmStageTransitions.id })

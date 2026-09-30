@@ -116,7 +116,7 @@ export function PipelineBoard({
           exitReason: exitReason === undefined ? undefined : exitReason,
           videoUrl,
         }),
-      { success: `${card.name} → ${stageLabel(toStage)}` },
+      { success: `${card.name} → ${stageLabel(toStage)}`, undo: true },
     );
     if (!r.ok) {
       setItems(before);

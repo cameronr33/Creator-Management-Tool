@@ -47,6 +47,7 @@ export function QuickStage({
     setChoosing(to);
     const r = await run(() => api<{ stage?: CmStage }>(`/api/partnerships/${partnershipId}/stage`, { stage: to, exitReason, videoUrl }), {
       success: `${name} → ${stageLabel(to)}`,
+      undo: true,
     });
     setAskVideo(!r.ok && needsVideo(r.data));
     if (!r.ok) setChoosing(null);
