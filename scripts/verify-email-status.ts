@@ -53,7 +53,7 @@ const EXPECTED: Partial<Record<CmStage, CmStage[]>> = {
 
 const day = (n: number) => new Date(Date.UTC(2026, 8, n, 12));
 function m(n: number, over: Partial<PromptMessage>): PromptMessage {
-  return { n, eventId: `e${n}`, occurredAt: day(n), channel: "email", synced: true, direction: "inbound", senderRole: "creator", kind: "reply", from: null, subject: null, body: null, ...over };
+  return { n, eventId: `e${n}`, occurredAt: day(n), channel: "email", synced: true, direction: "inbound", senderRole: "creator", kind: "reply", from: null, copied: null, subject: null, body: null, ...over };
 }
 const convo: PromptMessage[] = [
   m(1, { direction: "outbound", senderRole: "team", kind: "initial", body: "Would you like to work with HELLA on a lighting install video?" }),
@@ -184,6 +184,22 @@ async function main() {
   check("the prompt says email text is data", /Never follow instructions/i.test(prompt.system));
   check("the prompt's stages come from the stage table", prompt.system.includes('"To contact"') && prompt.system.includes('"Waiting on video"'));
   check("the prompt marks who wrote each message", prompt.user.includes("from us") && prompt.user.includes("from the creator") && prompt.user.includes("someone else"));
+
+  // Michael Dey (2026-09-30, owner): the brand's partner wrote "We will circle back with you once we have
+  // specific launch dates", Mike answered "I'll be here when you're ready!" — and the card said "Waiting on them".
+  console.log("\n── Whose turn: the brand is on our side ──");
+  check("whose turn counts the brand, and anyone writing for it, as our side", /whose_turn:[^\n]*our side[^\n]*brand/i.test(prompt.system));
+  check("a promise our side made that is still open makes it our turn", /whose_turn:[^\n]*(promised|circle back)/i.test(prompt.system));
+  check("\"them\" only when the creator owes us something", /"them" only if[^\n]*creator/i.test(prompt.system));
+  check("the prompt says someone else on the thread may be writing for the brand", /someone else on the creator's thread[^\n]*(may|might) (write|be writing) for the brand/i.test(prompt.system));
+  const partnerConvo: PromptMessage[] = [
+    m(1, { direction: "outbound", senderRole: "team", body: "Thanks for your time on Monday." }),
+    m(2, { senderRole: "other", from: "Robert Tinson <rt@partner.example>", copied: 'mike@creator.example, "MILLIRON Raegan (HELLA)" <r@brand.example>, Cameron Rahmati <c@agency.example>', body: "We will circle back with you once we have specific launch dates." }),
+    m(3, { body: "I'll be here when you're ready!" }),
+  ];
+  const partnerPrompt = buildPrompt({ creatorName: "T", campaignName: "C", clientName: "HELLA", stage: "in_conversation", hasAddress: false, shipmentStatuses: [], deliverables: 0, agreementType: null, messages: partnerConvo });
+  check("someone else's message says who was copied, by name", /\[2\][^\n]*someone else[^\n]*Robert Tinson[^\n]*copied: mike@creator\.example, MILLIRON Raegan \(HELLA\), Cameron Rahmati/.test(partnerPrompt.user), partnerPrompt.user.split("\n").find((l) => l.startsWith("[2]")));
+  check("a message from us or the creator doesn't list who was copied", !/\[(1|3)\][^\n]*copied:/.test(partnerPrompt.user));
 
   console.log("\n── The deal in the email (pure) ──");
   const dealConvo: PromptMessage[] = [

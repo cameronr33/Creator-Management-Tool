@@ -100,6 +100,7 @@ function pure() {
     senderRole: "creator",
     kind: "reply",
     from: null,
+    copied: null,
     subject: null,
     body: "hello",
     ...m,
