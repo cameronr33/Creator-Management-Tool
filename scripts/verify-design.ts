@@ -267,8 +267,10 @@ function main() {
     for (const m of read(f).match(/["'`](?:Invalid [a-zA-Z ]+|[A-Z][a-z]+ not found[^"'`]*|Missing [^"'`]*|Expected [^"'`]*)["'`]/g) ?? []) if (!/cron/.test(m)) rawErrors.push(`${f}: ${m}`);
     // Second review: a caught error's own words, however it's spelled (err.message, error.message, e.message).
     for (const line of read(f).split("\n")) {
-      if (/^console\.(?:error|warn|log)\(/.test(line.trim()) && !/\breturn\b|NextResponse|badRequest/.test(line)) continue; // a line that only logs may say anything
-      if (/\/\/ log-only: \S.{8,}$/.test(line)) continue; // raw words kept for the log or a stored status no one is shown — said so, with why
+      // Neither skip may cover a line that also answers a request or hands words on.
+      const handsOn = /\breturn\b|NextResponse|badRequest|\.json\(|\berror:|\bmessage:|set[A-Z]\w*\(|toast\(/.test(line);
+      if (/^console\.(?:error|warn|log)\([^;]*\);?$/.test(line.trim()) && !handsOn) continue; // one statement that only logs may say anything
+      if (/\/\/ log-only: \S.{8,}$/.test(line) && !handsOn) continue; // raw words kept for the log or a stored status no one is shown — said so, with why
       if (/\b(?:e|err|error|ex|cause)\.message\b|\(\w+ as Error\)\.message\b|String\((?:e|err|error)\)|\$\{(?:e|err|error)\}|\.errors\[0\]/.test(line)) rawErrors.push(`${f}: ${line.trim().slice(0, 80)}`);
     }
     for (const m of read(f).match(/"(?:Unauthorized|Invalid request|Invalid fields|Invalid bulk action|Invalid undo|Invalid archive|Not found|Partnership not found|Invalid partnership id|No client selected)"|belongs to a different client|Couldn't pass on this creator|HTTP \$\{r\.status\}/g) ?? []) rawErrors.push(`${f}: ${m}`);

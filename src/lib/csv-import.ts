@@ -295,7 +295,7 @@ export async function applyImport(clientId: string, parsed: ParsedFile, userId?:
       if (row.email) result.withEmail++;
       await writeNumbers(r.creatorId, row);
     } catch (e) {
-      result.failed.push({ line: row.line, message: userMessage(e, "Couldn't save this row. Check its numbers are whole numbers and not too large, then import it again.", `[csv-import] line ${row.line}`) });
+      result.failed.push({ line: row.line, message: userMessage(e, "Couldn't save this row. If a number in it is very large, check it; otherwise import it again.", `[csv-import] line ${row.line}`) });
     }
   }
   return result;
