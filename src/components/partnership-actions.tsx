@@ -189,11 +189,11 @@ export function StageControl({
 /* ── Timeline: anything that isn't a templated message ─────────── */
 
 const HAPPENINGS = [
-  { value: "dm_out", label: "We sent them a DM", direction: "outbound", channel: "ig_dm", kind: "outbound" },
-  { value: "email_out", label: "We emailed them from our own inbox", direction: "outbound", channel: "email", kind: "outbound" },
-  { value: "call", label: "We spoke on the phone", direction: "outbound", channel: "phone", kind: "outbound" },
+  { value: "dm_out", label: "I sent them a DM", direction: "outbound", channel: "ig_dm", kind: "outbound" },
+  { value: "email_out", label: "I emailed them from my own inbox", direction: "outbound", channel: "email", kind: "outbound" },
+  { value: "call", label: "I called them", direction: "outbound", channel: "phone", kind: "outbound" },
   { value: "reply_dm", label: "They replied by DM", direction: "inbound", channel: "ig_dm", kind: "reply" },
-  { value: "reply_email", label: "They replied to our own inbox", direction: "inbound", channel: "email", kind: "reply" },
+  { value: "reply_email", label: "They replied to my own inbox", direction: "inbound", channel: "email", kind: "reply" },
   { value: "note", label: "Internal note", direction: "outbound", channel: "other", kind: "note" },
 ] as const;
 
@@ -323,7 +323,7 @@ export function ShipmentControls({
           aria-label="Shipment status"
           value={(shipment?.status as ShipState | undefined) ?? null}
           disabled={pending}
-          onChange={(s) => save(s, `Shipment marked ${s}`)}
+          onChange={(s) => save(s, `Shipment: ${SHIP_STATES.find((x) => x.value === s)?.label ?? s}`)}
           options={SHIP_STATES.map((s) => ({ value: s.value, label: s.label, title: s.title }))}
         />
       </FieldGroup>

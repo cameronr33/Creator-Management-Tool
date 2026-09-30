@@ -27,7 +27,7 @@ export async function requireAgency() {
   if (!session?.user) {
     return {
       session: null,
-      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      error: NextResponse.json({ error: "You've been signed out. Sign in again, then try that once more." }, { status: 401 }),
     };
   }
   if (isClientSession(session)) {
@@ -46,7 +46,7 @@ export async function requireClientUser() {
   // Re-checked in the database every time: a login turned off, removed or re-invited ends at once.
   const person = isClientSession(session) ? await activeClientPerson(session) : null;
   if (!person) {
-    return { person: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+    return { person: null, error: NextResponse.json({ error: "You've been signed out. Sign in again, then try that once more." }, { status: 401 }) };
   }
   return { person, error: null };
 }
@@ -60,7 +60,7 @@ export function requireCronSecret(request: Request) {
   const got = Buffer.from(request.headers.get("authorization") ?? "");
   const expected = Buffer.from(`Bearer ${secret}`);
   if (got.length !== expected.length || !timingSafeEqual(got, expected)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Missing or wrong cron secret" }, { status: 401 });
   }
   return null;
 }
@@ -69,7 +69,7 @@ export function badRequest(message: string, details?: unknown) {
   return NextResponse.json({ error: message, details }, { status: 400 });
 }
 
-export function notFound(message = "Not found") {
+export function notFound(message = "That isn't here any more. Reload the page.") {
   return NextResponse.json({ error: message }, { status: 404 });
 }
 
@@ -88,17 +88,17 @@ export function isUuid(id: string): boolean {
  * limit, not an access-control boundary.
  */
 export async function assertPartnershipInSelectedClient(partnershipId: string) {
-  if (!isUuid(partnershipId)) return badRequest("Invalid partnership id");
+  if (!isUuid(partnershipId)) return badRequest("This creator isn't in the client you have selected. Reload the page.");
   const client = await resolveClient(await getSelectedClientSlug());
-  if (!client) return notFound("No client selected");
+  if (!client) return notFound("Pick a client in the sidebar first.");
   const [row] = await db
     .select({ clientId: cmCreators.clientId })
     .from(cmPartnerships)
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
     .where(eq(cmPartnerships.id, partnershipId))
     .limit(1);
-  if (!row) return notFound("Partnership not found");
-  if (row.clientId !== client.id) return notFound("Partnership belongs to a different client");
+  if (!row) return notFound("This creator isn't here any more — they may have been removed. Reload the page.");
+  if (row.clientId !== client.id) return notFound("This creator isn't in the client you have selected. Reload the page.");
   return null;
 }
 
@@ -106,21 +106,21 @@ export async function assertPartnershipInSelectedClient(partnershipId: string) {
 export async function assertCreatorInSelectedClient(creatorId: string) {
   if (!isUuid(creatorId)) return badRequest("Invalid creator id");
   const client = await resolveClient(await getSelectedClientSlug());
-  if (!client) return notFound("No client selected");
+  if (!client) return notFound("Pick a client in the sidebar first.");
   const [row] = await db
     .select({ clientId: cmCreators.clientId })
     .from(cmCreators)
     .where(eq(cmCreators.id, creatorId))
     .limit(1);
   if (!row) return notFound("Creator not found");
-  if (row.clientId !== client.id) return notFound("Creator belongs to a different client");
+  if (row.clientId !== client.id) return notFound("This creator isn't in the client you have selected. Reload the page.");
   return null;
 }
 
 /** The body names a client: it must be the one selected in the sidebar. */
 export async function assertClientIsSelected(clientId: string) {
   const client = await resolveClient(await getSelectedClientSlug());
-  if (!client) return notFound("No client selected");
+  if (!client) return notFound("Pick a client in the sidebar first.");
   if (client.id !== clientId) return notFound("That client isn't the one selected — reload the page");
   return null;
 }
@@ -128,9 +128,9 @@ export async function assertClientIsSelected(clientId: string) {
 /** Many partnerships at once (bulk actions): every one must be in the selected client. */
 export async function assertPartnershipsInSelectedClient(ids: string[]) {
   if (ids.length === 0) return badRequest("Nothing selected");
-  if (!ids.every(isUuid)) return badRequest("Invalid partnership id");
+  if (!ids.every(isUuid)) return badRequest("Some of those creators aren't in the client you have selected. Reload the page.");
   const client = await resolveClient(await getSelectedClientSlug());
-  if (!client) return notFound("No client selected");
+  if (!client) return notFound("Pick a client in the sidebar first.");
   const rows = await db
     .select({ id: cmPartnerships.id, clientId: cmCreators.clientId })
     .from(cmPartnerships)
@@ -145,9 +145,9 @@ export async function assertPartnershipsInSelectedClient(ids: string[]) {
 export async function assertCampaignInSelectedClient(campaignId: string) {
   if (!isUuid(campaignId)) return badRequest("Invalid campaign id");
   const client = await resolveClient(await getSelectedClientSlug());
-  if (!client) return notFound("No client selected");
+  if (!client) return notFound("Pick a client in the sidebar first.");
   const [row] = await db.select({ clientId: cmCampaigns.clientId }).from(cmCampaigns).where(eq(cmCampaigns.id, campaignId)).limit(1);
   if (!row) return notFound("Campaign not found");
-  if (row.clientId !== client.id) return notFound("That campaign belongs to a different client");
+  if (row.clientId !== client.id) return notFound("That campaign isn't in the client you have selected. Reload the page.");
   return null;
 }

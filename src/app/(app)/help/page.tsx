@@ -282,7 +282,7 @@ export default async function HelpPage() {
             <Term word="Exit reason">Why a deal closed, split by who ended it: we passed, they declined, or they stopped replying.</Term>
             <Term word="Timeline">Every message in or out, plus notes. Emails arrive on it by themselves.</Term>
             <Term word="Logged by hand">
-              A DM, call or email from your own inbox that you record yourself: one click for just now, or the calendar button beside it for an
+              A DM, call or email from your own inbox that you record yourself: one click for just now, or Log a message… in a row&rsquo;s ⋯ menu for an
               earlier day (up to {LOG_MAX_PAST_DAYS} days back). A message dated before someone&apos;s last change to the stage never moves the
               stage. Email the connected mailbox can see needs no logging.
             </Term>

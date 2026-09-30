@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return badRequest("Invalid fields", parsed.error.flatten());
+  if (!parsed.success) return badRequest("Couldn't save that. Reload the page and try again.", parsed.error.flatten());
 
   const data = parsed.data;
   const update: Record<string, unknown> = { updatedAt: new Date() };

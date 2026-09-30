@@ -242,6 +242,31 @@ function main() {
   check("no sentence at 11px (R18)", !/text-\[11px\] leading-relaxed/.test(actions) && !/!text-\[11px\]/.test(board));
   check("Today's section cards use the card title and description sizes (R19)", /<SectionTitle>/.test(todayList) && /text-\[13px\] text-text-muted">\{hint\}/.test(todayList));
   check("the loading outline fits a phone (R27)", /skeleton mt-2 h-4 w-72 max-w-full/.test(read("app/(app)/loading.tsx")));
+  // Interface review 2026-09-30 (owner picks R3, R14, R21, R22): words.
+  console.log("\n── the words people read ──");
+  const rawErrors: string[] = [];
+  const errorFiles = ["lib/api-helpers.ts", "components/use-save.ts"];
+  const walkApi = (dir: string) => {
+    for (const name of readdirSync(join(ROOT, dir))) {
+      const p = `${dir}/${name}`;
+      if (statSync(join(ROOT, p)).isDirectory()) walkApi(p);
+      else if (name === "route.ts") errorFiles.push(p);
+    }
+  };
+  walkApi("app/api/partnerships");
+  for (const f of errorFiles) {
+    for (const m of read(f).match(/"(?:Unauthorized|Invalid request|Invalid fields|Invalid bulk action|Invalid undo|Invalid archive|Not found|Partnership not found|Invalid partnership id|No client selected)"|belongs to a different client|Couldn't pass on this creator|HTTP \$\{r\.status\}|\(e as Error\)\.message/g) ?? []) rawErrors.push(`${f}: ${m}`);
+  }
+  check("every error a teammate can see says what to do next — no raw server words (R3)", rawErrors.length === 0, rawErrors.slice(0, 6).join("; "));
+  const confirmSrc = read("components/confirm-button.tsx");
+  const vagueConfirms: string[] = [];
+  for (const f of ["components/profile-editors.tsx", "components/email-status.tsx", "components/creators-table.tsx", "components/contracts.tsx", "components/creator-record-actions.tsx"]) {
+    for (const m of read(f).match(/question="(?:Remove|Unlink|Are you sure)\?"|confirmLabel="(?:Close it|Yes, do it|Delete|Remove|Unlink)"/g) ?? []) vagueConfirms.push(`${f}: ${m}`);
+  }
+  check("a confirm names what it will do, and the way out is Cancel, not a bare No (R14)", vagueConfirms.length === 0 && />\s*Cancel\s*</.test(confirmSrc) && !/>\s*No\s*</.test(confirmSrc) && !/confirmLabel = "Yes, do it"/.test(confirmSrc), vagueConfirms.join("; "));
+  const creatorsPage = read("app/(app)/creators/page.tsx");
+  check("an empty search names the search and offers Clear filters; an empty conversation says how to start (R21)", /Clear filters/.test(creatorsPage) && /No creators match “/.test(creatorsPage) && !/Nothing yet\./.test(creatorPage));
+  check("the log flow speaks as “I”, and one action has one name (R22)", !/We messaged them/.test(read("components/log-message.tsx")) && !/We sent them a DM/.test(actions) && /Log a message…/.test(todayList) && !/Log with a date or another way/.test(todayList) && !/"Open the conversation"/.test(creatorPage) && !/Shipment marked \$\{s\}/.test(actions));
   check("every button gives a press, and a pending button keeps its width", /secondary: [`"][^`"]*active:/.test(ui) && /ghost: [`"][^`"]*active:/.test(ui) && /invisible/.test(ui));
 }
 

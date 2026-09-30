@@ -70,7 +70,7 @@ export function DangerZone({
             ? `${campaignName} is the only campaign ${name} is in, so this deletes ${name} completely — conversation, shipping and videos. This can't be undone.`
             : `Remove ${name} from ${campaignName}? Their conversation, shipping and videos for ${campaignName} go; they stay in ${otherCampaigns.join(", ")}. This can't be undone.`
         }
-        confirmLabel="Remove"
+        confirmLabel={last ? `Delete ${name}` : `Remove from ${campaignName}`}
         onConfirm={async () => {
           const r = await run(() => api("/api/partnerships/bulk", { action: "delete", ids: [partnershipId] }), {
             success: last ? `${name} deleted` : `${name} removed from ${campaignName}`,
@@ -85,7 +85,7 @@ export function DangerZone({
           icon={<Trash2 size={13} />}
           pending={pending}
           question={`Delete ${name} from every campaign (${[campaignName, ...otherCampaigns].join(", ")}), with all their conversations, shipping and videos? This can't be undone.`}
-          confirmLabel="Delete"
+          confirmLabel="Delete everywhere"
           onConfirm={async () => {
             const r = await run(() => api(`/api/creators/${creatorId}`, undefined, "DELETE"), { success: `${name} deleted`, refresh: false });
             if (r.ok) router.push("/creators");

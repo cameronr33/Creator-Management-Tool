@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     .innerJoin(cmCreators, eq(cmCreators.id, cmPartnerships.creatorId))
     .where(eq(cmPartnerships.id, id))
     .limit(1);
-  if (!row) return badRequest("Not found");
+  if (!row) return badRequest("This creator isn't here any more. Reload the page.");
   const by = { name: session.user.name ?? "A teammate", kind: "agency" as const, userId: session.user.id };
   if (undo.success) {
     if (undo.data.decision === "undo_approve") {
@@ -49,5 +49,5 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json({ ok: true, ...r });
   }
   const r = await pass(row.clientId, id, by, parsed.data.note);
-  return r.ok ? NextResponse.json({ ok: true, transitionId: r.transitionId }) : badRequest("Couldn't pass on this creator");
+  return r.ok ? NextResponse.json({ ok: true, transitionId: r.transitionId }) : badRequest("Couldn't pass on them — someone may have decided already. Reload the page to see where they are.");
 }

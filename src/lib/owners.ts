@@ -128,7 +128,7 @@ export function emptyListMessage(o: { searching: boolean; total: number; hiddenA
   hint: string;
 } {
   if (o.searching && o.hiddenMatching.length) return { kind: "teammates_match", hint: `${hiddenSummary(o.hiddenMatching, { matching: true })} — switch to Everyone to see them.` };
-  if (o.searching || o.total > 0) return { kind: "no_match", hint: "Try clearing the search or the stage filter." };
+  if (o.searching || o.total > 0) return { kind: "no_match", hint: "Nothing shown matches the search and the stage filter together." };
   if (o.hiddenAll.length) return { kind: "only_teammates", hint: `${hiddenSummary(o.hiddenAll)} — switch to Everyone to see them.` };
   return { kind: "empty", hint: "Import a CSV with their names and a Campaign column, or add one by pasting their profile link." };
 }

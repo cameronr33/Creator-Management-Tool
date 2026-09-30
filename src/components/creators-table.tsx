@@ -316,8 +316,8 @@ export function CreatorsTable({
             <ConfirmButton
               label={`Delete ${chosen.length}`}
               icon={<Trash2 size={13} />}
-              question={`Delete ${chosen.length} ${where}? Their conversation, shipping and videos there go too. Anyone not in another campaign is removed completely. This can't be undone.`}
-              confirmLabel="Delete"
+              question={`Delete ${chosen.length} creator${chosen.length === 1 ? "" : "s"} ${where}? Their conversation, shipping and videos there go too. Anyone not in another campaign is removed completely. This can't be undone.`}
+              confirmLabel={`Delete ${chosen.length} creator${chosen.length === 1 ? "" : "s"}`}
               pending={pending}
               onConfirm={() =>
                 bulk({ action: "delete" }, (d) =>

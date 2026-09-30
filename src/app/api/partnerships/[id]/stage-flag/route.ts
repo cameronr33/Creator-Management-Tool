@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const scope = await assertPartnershipInSelectedClient(id);
   if (scope) return scope;
   const parsed = schema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Invalid request");
+  if (!parsed.success) return badRequest("Couldn't save that. Reload the page and try again.");
   const r = await answerStageFlag(id, parsed.data.action, parsed.data.expect, session.user.id);
   if (!r.ok) return r.stale ? NextResponse.json({ ok: false, error: r.error }, { status: 409 }) : badRequest(r.error);
   return NextResponse.json({ ok: true, stage: r.stage });

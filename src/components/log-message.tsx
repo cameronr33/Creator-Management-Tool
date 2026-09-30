@@ -135,7 +135,7 @@ export function LogMessagePanel({
           value={direction}
           onChange={setDirection}
           options={[
-            { value: "outbound", label: "We messaged them" },
+            { value: "outbound", label: "I messaged them" },
             { value: "inbound", label: "They replied" },
           ]}
         />

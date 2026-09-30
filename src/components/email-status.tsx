@@ -49,7 +49,7 @@ export function CloseAsDeclinedButton({ partnershipId }: { partnershipId: string
       label="Close as They declined"
       icon={<CircleSlash size={13} />}
       question="Close this deal as They declined?"
-      confirmLabel="Close it"
+      confirmLabel="Close as declined"
       pending={pending}
       onConfirm={() =>
         run(() => api(`/api/partnerships/${partnershipId}/stage`, { stage: "declined", exitReason: "not_interested" }), {

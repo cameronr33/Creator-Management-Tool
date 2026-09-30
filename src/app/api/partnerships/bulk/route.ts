@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   const { session, error } = await requireAgency();
   if (error) return error;
   const parsed = schema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Invalid bulk action", parsed.error.flatten());
+  if (!parsed.success) return badRequest("Couldn't save that. Reload the page and try again.", parsed.error.flatten());
   const d = parsed.data;
   const scope = await assertPartnershipsInSelectedClient(d.ids);
   if (scope) return scope;
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
   }
   if (d.action === "undo_approve") {
     const client = await resolveClient(await getSelectedClientSlug());
-    if (!client) return badRequest("No client selected");
+    if (!client) return badRequest("Pick a client in the sidebar first.");
     const by = { name: session.user.name ?? "A teammate", kind: "agency" as const, userId: session.user.id };
     const r = await undoApproval(client.id, d.ids, by, d.decidedAt);
     return undoAnswer(r.undone, d.ids.length, "undone");
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
   if (d.action === "restore_owner") {
     // Only the deals this request was checked for.
     const allowed = new Set(d.ids);
-    if (!d.prior.every((p) => allowed.has(p.id))) return badRequest("Invalid undo");
+    if (!d.prior.every((p) => allowed.has(p.id))) return badRequest("That can't be undone from here any more. Reload the page.");
     const r = await restoreOwners(d.prior, d.expected);
     return NextResponse.json({ ok: true, ...r });
   }

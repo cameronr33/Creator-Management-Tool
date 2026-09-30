@@ -148,8 +148,8 @@ export function EmailsEditor({
             iconOnly
             icon={<X size={11} />}
             label={`Unlink ${e.email}`}
-            question="Unlink?"
-            confirmLabel="Unlink"
+            question={`Stop tracking ${e.email}?`}
+            confirmLabel="Stop tracking"
             pending={pending}
             onConfirm={() => remove(e.email)}
           />
@@ -235,8 +235,8 @@ export function SocialsEditor({
                   iconOnly
                   icon={<X size={11} />}
                   label="Remove link"
-                  question="Remove?"
-                  confirmLabel="Remove"
+                  question="Remove this profile link?"
+                  confirmLabel="Remove link"
                   pending={pending}
                   onConfirm={() =>
                     run(() => api(`/api/creators/${creatorId}/socials`, { socialId: s.id }, "DELETE"), {
@@ -496,8 +496,8 @@ export function ProductEditor({
                 iconOnly
                 icon={<Trash2 size={13} />}
                 label="Remove product"
-                question="Remove?"
-                confirmLabel="Remove"
+                question="Remove this product?"
+                confirmLabel="Remove product"
                 pending={pending}
                 onConfirm={() => run(() => api("/api/products", { id: p.id }, "DELETE"), { success: "Product removed" })}
               />

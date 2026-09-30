@@ -266,7 +266,7 @@ function TodayItem({
             <NextAction row={r} />
             <Menu label={`More for ${r.name}`} moreFor={r.partnershipId}>
               <MenuItem icon={<CalendarClock size={14} />} onSelect={() => setPanel("log")}>
-                Log with a date or another way…
+                Log a message…
               </MenuItem>
               <MenuItem icon={<NotebookPen size={14} />} onSelect={() => setNoteOpen(true)}>
                 {r.statusNote ? "Edit the note" : "Add a note"}

@@ -107,8 +107,9 @@ export function useSave() {
     let r: ApiResult<T>;
     try {
       r = await fn();
-    } catch (e) {
-      r = { ok: false, status: 0, data: { error: (e as Error).message } as ApiData<T> };
+    } catch {
+      // A network failure: the browser's own words ("Failed to fetch") don't help anyone (R3).
+      r = { ok: false, status: 0, data: {} as ApiData<T> };
     }
 
     if (r.ok) {
@@ -146,7 +147,14 @@ export function useSave() {
       setSaving(false);
     } else {
       setSaving(false);
-      toast(r.data.error ?? (r.status ? `Couldn't save (HTTP ${r.status})` : "Couldn't reach the server"), {
+      toast(
+        r.data.error ??
+          (r.status === 0
+            ? "Couldn't reach the server. Check your connection and try again."
+            : r.status >= 500
+              ? "Something went wrong on our side. Try again in a moment."
+              : "Couldn't save that. Reload the page and try again."),
+        {
         tone: "bad",
       });
     }

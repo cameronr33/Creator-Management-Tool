@@ -14,13 +14,18 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
   }
   try {
     const o = await assessPartnership(id, { apply: true });
-    if (o.skipped) return NextResponse.json({ ok: false, error: `Nothing to read: ${o.skipped}.` }, { status: 400 });
+    if (o.skipped) {
+      // The reason is for the server log; a teammate gets what to do (interface review R3).
+      console.warn(`[assess] ${id} skipped: ${o.skipped}`);
+      return NextResponse.json({ ok: false, error: "Couldn't read these emails right now. Try Re-read emails again in a minute." }, { status: 400 });
+    }
     return NextResponse.json({
       ok: true,
       summary: o.assessment?.summary ?? null,
       stageChanged: o.moved ? { from: o.moved.from, to: o.moved.to } : null,
     });
   } catch (err) {
-    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : "Couldn't read the emails" }, { status: 500 });
+    console.error(`[assess] ${id}`, err);
+    return NextResponse.json({ ok: false, error: "Couldn't read these emails right now. Try Re-read emails again in a minute." }, { status: 500 });
   }
 }

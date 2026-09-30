@@ -119,7 +119,9 @@ export default async function CreatorsPage({
                 : empty.kind === "only_teammates"
                   ? "Nothing of yours here"
                   : empty.kind === "no_match"
-                    ? "No creators match"
+                    ? sp.q?.trim()
+                      ? `No creators match “${sp.q.trim()}”`
+                      : "No creators match"
                     : campaign
                       ? `No creators in ${campaign.name} yet`
                       : "No creators yet"
@@ -131,6 +133,8 @@ export default async function CreatorsPage({
                   {importButton}
                   {addButton}
                 </div>
+              ) : empty.kind === "no_match" ? (
+                <Button href={showArchived ? "/creators?archived=1" : "/creators"}>Clear filters</Button>
               ) : undefined
             }
           />

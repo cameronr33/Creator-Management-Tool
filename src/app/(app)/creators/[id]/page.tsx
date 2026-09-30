@@ -77,7 +77,7 @@ import { statusNoteView } from "@/lib/status-note";
 
 /** Where the Next: line's link goes, named for where it lands. */
 const NEXT_LINK_LABELS: Record<string, string> = {
-  conversation: "Open the conversation",
+  conversation: "Open conversation",
   agreement: "Open Deal",
   shipping: "Open Shipping",
   content: "Open Content",
@@ -391,7 +391,7 @@ export default async function CreatorDetailPage({
             }
           />
           {threads.length === 0 ? (
-            <p className="mt-3 text-sm text-text-muted">Nothing yet.</p>
+            <p className="mt-3 text-sm text-text-muted">No messages yet. After you DM them, press I messaged them; emails show up here by themselves.</p>
           ) : (
             <div className="mt-4 space-y-4">
               {threads.map((t) => {

@@ -142,7 +142,8 @@ async function main() {
     if (!broken.ok) return check("the third upload was stored", false);
     const failed = await readContract(broken.id, { reader: async () => { throw new Error("the document could not be processed"); } });
     const cf = await contract(broken.id);
-    check("a failed read is recorded, with why", failed.status === "failed" && cf.readStatus === "failed" && cf.attempts === 1 && /could not be processed/.test(cf.readError ?? ""));
+    // Interface review 2026-09-30 (owner, R3): the raw reason goes to the server log; the file's line says what to do next.
+    check("a failed read is recorded, and its line says what to do next (not the raw error)", failed.status === "failed" && cf.readStatus === "failed" && cf.attempts === 1 && /Press Read it again, or upload the PDF yourself/.test(cf.readError ?? "") && !/could not be processed/.test(cf.readError ?? ""));
     const nothing = await readContract(broken.id, { reader: async () => null });
     check("…a reading that comes back empty counts as failed too", nothing.status === "failed" && (await contract(broken.id)).attempts === 2);
     await markForReread(broken.id);

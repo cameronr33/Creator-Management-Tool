@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (result.status === "needs_video") {
     return badRequest("Add the posted video's link to move them to Posted.", { needsVideo: true });
   }
-  if (result.status === "not_found") return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (result.status === "not_found") return NextResponse.json({ error: "This creator isn't here any more. Reload the page." }, { status: 404 });
   if (result.status === "stale") {
     return NextResponse.json({ error: "Someone else just moved this creator — reload to see where they are." }, { status: 409 });
   }

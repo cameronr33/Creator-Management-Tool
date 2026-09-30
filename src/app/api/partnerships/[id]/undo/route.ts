@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const scope = await assertPartnershipInSelectedClient(id);
   if (scope) return scope;
   const parsed = schema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Invalid request");
+  if (!parsed.success) return badRequest("Couldn't save that. Reload the page and try again.");
 
   if ("actionId" in parsed.data) {
     const [a] = await db.select({ partnershipId: cmQuickActions.partnershipId }).from(cmQuickActions).where(eq(cmQuickActions.id, parsed.data.actionId)).limit(1);

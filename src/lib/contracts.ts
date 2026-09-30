@@ -141,9 +141,11 @@ export async function contractsToDownload(limit: number, ids?: string[]): Promis
 }
 
 export async function noteDownloadFailed(id: string, message: string) {
+  console.warn(`[contracts] download ${id} failed: ${message.slice(0, 300)}`);
   await db
     .update(cmContracts)
-    .set({ attempts: sql`${cmContracts.attempts} + 1`, readError: `Couldn't download: ${message.slice(0, 200)}` })
+    // What went wrong goes to the log; the file's line says what to do (interface review R3).
+    .set({ attempts: sql`${cmContracts.attempts} + 1`, readError: "Couldn't download it from the email. Press Read it again, or upload the PDF yourself." })
     .where(eq(cmContracts.id, id));
 }
 
@@ -286,7 +288,8 @@ export async function readContract(id: string, opts: { reader?: ContractReader }
         .where(eq(cmContracts.id, id));
       return { status: "skipped", why: "reading is unavailable", unavailable: true };
     }
-    return fail(err instanceof Error ? err.message : String(err));
+    console.error(`[contracts] reading ${id} failed`, err);
+    return fail("Couldn't read this file. Press Read it again, or upload the PDF yourself.");
   }
 }
 

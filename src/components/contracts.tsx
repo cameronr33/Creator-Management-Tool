@@ -200,7 +200,7 @@ export function Contracts({ partnershipId, contracts, differences }: { partnersh
                   iconOnly
                   icon={<Trash2 size={14} />}
                   question="Remove the file? What it filled in stays."
-                  confirmLabel="Remove"
+                  confirmLabel="Remove file"
                   pending={pending}
                   onConfirm={() => run(() => api(`/api/contracts/${c.id}`, undefined, "DELETE"), { success: "File removed" })}
                 />

@@ -17,8 +17,8 @@ const DISARM_MS = 8_000;
  */
 export function ConfirmButton({
   label,
-  confirmLabel = "Yes, do it",
-  question = "Are you sure?",
+  confirmLabel,
+  question,
   onConfirm,
   icon,
   size = "sm",
@@ -28,8 +28,10 @@ export function ConfirmButton({
   className = "",
 }: {
   label: string;
-  confirmLabel?: string;
-  question?: string;
+  /** Repeats the consequence: "Delete 3 creators", "Close as declined" — never "Yes". */
+  confirmLabel: string;
+  /** What will happen, in a sentence. */
+  question: string;
   onConfirm: () => void | Promise<unknown>;
   icon?: ReactNode;
   size?: ButtonSize;
@@ -86,7 +88,7 @@ export function ConfirmButton({
           {confirmLabel}
         </Button>
         <Button size="sm" variant="ghost" autoFocus onClick={cancel}>
-          No
+          Cancel
         </Button>
         <span className="text-text-faint" aria-live="off">
           Cancels in {secondsLeft}s
