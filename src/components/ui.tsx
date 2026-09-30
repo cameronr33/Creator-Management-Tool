@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { ComponentProps, ReactNode } from "react";
+import { cloneElement, isValidElement, useId, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import { ArrowLeft, CircleHelp, Loader2 } from "lucide-react";
 import type { CmStage } from "@/lib/db/schema";
 import { stageHint, stageLabel, stageStyle } from "@/lib/stages";
@@ -468,7 +468,8 @@ export function Button({
   const content =
     pending && !icon ? (
       <>
-        <span className="invisible inline-flex items-center gap-1.5">{children}</span>
+        {/* opacity-0, not invisible: the label stays in the accessibility tree while it saves (R9). */}
+        <span className="inline-flex items-center gap-1.5 opacity-0">{children}</span>
         <span className="absolute inset-0 flex items-center justify-center">{spinner}</span>
       </>
     ) : (
@@ -594,7 +595,7 @@ export function Segmented<T extends string>({
 /* ── Form controls ──────────────────────────────────────────────── */
 
 const FIELD_BASE =
-  "w-full rounded-md border border-field bg-surface text-text shadow-control placeholder:text-text-faint transition focus:border-accent-ring focus:ring-2 focus:ring-accent-soft focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70";
+  "w-full rounded-md border border-field bg-surface text-text shadow-control placeholder:text-text-faint transition focus:border-accent-ring disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70";
 
 const FIELD_INVALID = "border-bad focus:border-bad focus:ring-bad-soft";
 
@@ -611,6 +612,7 @@ export function Input({
 }: NativeInput & { compact?: boolean; invalid?: boolean }) {
   return (
     <input
+      aria-invalid={invalid || undefined}
       {...props}
       className={cn(FIELD_BASE, compact ? "h-8 px-2.5 text-xs" : "h-9 px-3 text-sm", invalid && FIELD_INVALID, className)}
     />
@@ -673,17 +675,28 @@ export function Field({
   /** Label and control side by side (for short controls in a settings row). */
   inline?: boolean;
 }) {
+  // The hint or error is tied to the control, and an error marks it invalid (review 2026-09-30, R12).
+  const noteId = `${useId()}-note`;
+  const note = error ?? hint;
+  const control =
+    note && isValidElement(children)
+      ? cloneElement(children as ReactElement<Record<string, unknown>>, { "aria-describedby": noteId, ...(error ? { "aria-invalid": true } : {}) })
+      : children;
   return (
     <label className={cn("flex min-w-0 gap-1", inline ? "flex-row items-center justify-between gap-3" : "flex-col", className)}>
       <span className="text-xs font-medium text-text-muted">
         {label}
         {required && <span className="text-bad"> *</span>}
       </span>
-      {children}
+      {control}
       {error ? (
-        <span className="text-xs text-bad">{error}</span>
+        <span id={noteId} role="alert" className="text-xs text-bad">
+          {error}
+        </span>
       ) : hint ? (
-        <span className="text-xs text-text-faint">{hint}</span>
+        <span id={noteId} className="text-xs text-text-faint">
+          {hint}
+        </span>
       ) : null}
     </label>
   );
@@ -695,9 +708,9 @@ export function Field({
  * would press it (review, 2026-09-28). The Segmented's own aria-label names
  * the group for screen readers.
  */
-export function FieldGroup({ label, hint, children, className = "" }: { label: ReactNode; hint?: ReactNode; children: ReactNode; className?: string }) {
+export function FieldGroup({ label, hint, children, className = "", inline }: { label: ReactNode; hint?: ReactNode; children: ReactNode; className?: string; inline?: boolean }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1", className)}>
+    <div className={cn("flex min-w-0 gap-1", inline ? "flex-row items-center justify-between gap-3" : "flex-col", className)}>
       <span className="text-xs font-medium text-text-muted">{label}</span>
       {children}
       {hint ? <span className="text-xs text-text-faint">{hint}</span> : null}

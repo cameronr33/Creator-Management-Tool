@@ -13,6 +13,7 @@ import type { CmStage, CmShipment } from "@/lib/db/schema";
 import { Button, Field, FieldGroup, Input, Select, Textarea, Segmented } from "@/components/ui";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
+import { ChoiceMenu } from "@/components/menu";
 import { DateChoice, defaultPickedDate, whenToIso, type WhenChoice } from "@/components/log-message";
 
 /* ── Stage ────────────────────────────────────────────────────── */
@@ -37,13 +38,23 @@ export function VideoLinkPrompt({
   onCancel: () => void;
 }) {
   const [url, setUrl] = useState("");
+  const [missing, setMissing] = useState(false);
   return (
     <div className="space-y-2 rounded-lg border border-info-line bg-accent-soft p-2.5 text-xs">
-      <Field label="Link to the posted video" hint="Posted needs the video itself. Paste its link.">
-        <Input compact autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.instagram.com/reel/…" />
+      <Field label="Link to the posted video" hint="Posted needs the video itself. Paste its link." error={missing ? "Paste the video's link first." : undefined}>
+        <Input
+          compact
+          autoFocus
+          value={url}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setMissing(false);
+          }}
+          placeholder="https://www.instagram.com/reel/…"
+        />
       </Field>
       <div className="flex gap-2">
-        <Button size="sm" variant="primary" pending={pending} disabled={!url.trim()} onClick={() => onSubmit(url.trim())}>
+        <Button size="sm" variant="primary" pending={pending} onClick={() => (url.trim() ? onSubmit(url.trim()) : setMissing(true))}>
           Save and mark Posted
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
@@ -96,32 +107,21 @@ export function StageControl({
 
   return (
     <div className="w-full max-w-xs space-y-1.5 sm:w-auto">
-      <Field label="Stage" inline>
-        <Select
-          compact
-          className="w-44"
+      <FieldGroup label="Stage" inline>
+        <ChoiceMenu<CmStage>
+          label="Stage"
           value={shown}
-          disabled={pending}
-          onChange={(e) => {
-            const to = e.target.value as CmStage;
+          pending={pending}
+          options={stagesByGroup().flatMap((g) => g.stages.map((st) => ({ value: st.value, label: st.label, group: g.label })))}
+          onChoose={(to) => {
             if (isTerminal(to)) setClosingAs(to);
             else {
               setClosingAs(null);
               setStage(to);
             }
           }}
-        >
-          {stagesByGroup().map((g) => (
-            <optgroup key={g.group} label={g.label}>
-              {g.stages.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </Select>
-      </Field>
+        />
+      </FieldGroup>
 
       {askVideo ? (
         <VideoLinkPrompt
@@ -169,28 +169,15 @@ export function StageControl({
         <>
           <p className="text-xs text-text-muted">{stageHint(stage)}</p>
           {isTerminal(stage) && (
-            <Field label="Why it ended" inline>
-              <Select
-                compact
-                className="w-44"
+            <FieldGroup label="Why it ended" inline>
+              <ChoiceMenu<string>
+                label="Why it ended"
                 value={exitReason ?? ""}
-                disabled={pending}
-                onChange={(e) =>
-                  run(
-                    () =>
-                      api(`/api/partnerships/${partnershipId}`, { exitReason: e.target.value || null }, "PATCH"),
-                    { success: "Reason saved" },
-                  )
-                }
-              >
-                <option value="">Not recorded</option>
-                {(EXIT_REASONS_BY_STAGE[stage] ?? []).map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+                pending={pending}
+                options={[{ value: "", label: "Not recorded" }, ...(EXIT_REASONS_BY_STAGE[stage] ?? []).map((r) => ({ value: r.value, label: r.label }))]}
+                onChoose={(v) => run(() => api(`/api/partnerships/${partnershipId}`, { exitReason: v || null }, "PATCH"), { success: "Reason saved" })}
+              />
+            </FieldGroup>
           )}
           {autoNote && <p className="text-[11px] leading-relaxed text-text-faint">{autoNote}</p>}
         </>
@@ -370,8 +357,10 @@ export function AddDeliverable({ partnershipId }: { partnershipId: string }) {
   const [url, setUrl] = useState("");
   const [showOverride, setShowOverride] = useState(false);
   const [publicViews, setPublicViews] = useState("");
+  const [missing, setMissing] = useState(false);
 
   const submit = async () => {
+    if (!url.trim()) return setMissing(true);
     const r = await run(
       () =>
         api("/api/deliverables", {
@@ -398,8 +387,17 @@ export function AddDeliverable({ partnershipId }: { partnershipId: string }) {
 
   return (
     <div className="w-full space-y-2 rounded-lg border border-border bg-surface-2/60 p-3">
-      <Field label="Video link" hint="Paste the link to the posted video. Saving it moves them to Posted.">
-        <Input compact value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.instagram.com/reel/…" autoFocus />
+      <Field label="Video link" hint="Paste the link to the posted video. Saving it moves them to Posted." error={missing ? "Paste the video's link first." : undefined}>
+        <Input
+          compact
+          value={url}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setMissing(false);
+          }}
+          placeholder="https://www.instagram.com/reel/…"
+          autoFocus
+        />
       </Field>
       {showOverride ? (
         <Field label="Public views — as shown in the Instagram app" hint="Only enter this if you read it off Instagram yourself; it's recorded as verified.">
@@ -411,7 +409,7 @@ export function AddDeliverable({ partnershipId }: { partnershipId: string }) {
         </Button>
       )}
       <div className="flex gap-2">
-        <Button size="sm" variant="primary" onClick={submit} pending={pending} disabled={!url}>
+        <Button size="sm" variant="primary" onClick={submit} pending={pending}>
           Save video
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
@@ -445,22 +443,23 @@ export function AgreementEditor({
 
   return (
     <div className="space-y-2.5">
-      <Field label="Agreement" inline>
-        <Select
-          compact
+      <FieldGroup label="Agreement" inline>
+        <ChoiceMenu<string>
+          label="Agreement"
           className="w-40"
           value={type}
-          disabled={pending}
-          onChange={(e) => {
-            setType(e.target.value);
-            patch({ agreementType: e.target.value || null }, "Agreement saved");
+          pending={pending}
+          options={[
+            { value: "", label: "None yet" },
+            { value: "verbal", label: "Verbal" },
+            { value: "signed", label: "Signed" },
+          ]}
+          onChoose={(v) => {
+            setType(v);
+            patch({ agreementType: v || null }, "Agreement saved");
           }}
-        >
-          <option value="">None yet</option>
-          <option value="verbal">Verbal</option>
-          <option value="signed">Signed</option>
-        </Select>
-      </Field>
+        />
+      </FieldGroup>
       <Field label="Agreed terms" hint="Deliverables, timeline, exclusivity. Saves when you click away.">
         <Textarea
           compact
@@ -509,22 +508,23 @@ export function FeeEditor({
 
   return (
     <div className="flex flex-wrap items-end gap-2">
-      <Field label="Compensation">
-        <Select
-          compact
+      <FieldGroup label="Compensation">
+        <ChoiceMenu<string>
+          label="Compensation"
           className="w-40"
           value={comp}
-          disabled={pending}
-          onChange={(e) => {
-            setComp(e.target.value);
-            save(e.target.value, fee);
+          pending={pending}
+          options={[
+            { value: "free_product", label: "Product only" },
+            { value: "flat_fee", label: "Fee only" },
+            { value: "hybrid", label: "Product + fee" },
+          ]}
+          onChoose={(v) => {
+            setComp(v);
+            save(v, fee);
           }}
-        >
-          <option value="free_product">Product only</option>
-          <option value="flat_fee">Fee only</option>
-          <option value="hybrid">Product + fee</option>
-        </Select>
-      </Field>
+        />
+      </FieldGroup>
       {comp !== "free_product" && (
         <Field label="Fee (USD)">
           <Input
@@ -555,17 +555,26 @@ export function BriefEditor({
 }) {
   const { pending, run } = useSave();
   const [url, setUrl] = useState(briefUrl ?? "");
+  const [missing, setMissing] = useState(false);
 
   const patch = (body: Record<string, unknown>, success: string) =>
     run(() => api(`/api/partnerships/${partnershipId}`, body, "PATCH"), { success });
 
   return (
     <div className="flex flex-wrap items-end gap-2">
-      <Field label="Brief link" className="min-w-0 flex-1" hint={briefSentAt ? `Sent ${briefSentAt}` : "Google Doc, Notion… saves when you click away."}>
+      <Field
+        label="Brief link"
+        className="min-w-0 flex-1"
+        hint={briefSentAt ? `Sent ${briefSentAt}` : "Google Doc, Notion… saves when you click away."}
+        error={missing ? "Add the brief link first, then mark it sent." : undefined}
+      >
         <Input
           compact
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setMissing(false);
+          }}
           onBlur={() => url !== (briefUrl ?? "") && patch({ briefUrl: url || null }, "Brief link saved")}
           placeholder="https://…"
         />
@@ -574,9 +583,8 @@ export function BriefEditor({
         <Button
           size="sm"
           pending={pending}
-          disabled={!url}
-          title={url ? "Records today as the date the brief went out" : "Add the brief link first"}
-          onClick={() => patch({ briefSentAt: new Date().toISOString() }, "Brief marked sent")}
+          title="Records today as the date the brief went out"
+          onClick={() => (url ? patch({ briefSentAt: new Date().toISOString() }, "Brief marked sent") : setMissing(true))}
           className="mb-5"
         >
           Mark brief sent

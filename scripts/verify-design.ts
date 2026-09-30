@@ -156,7 +156,7 @@ function main() {
   const saveSrc = read("components/use-save.ts");
   check("a save's spinner lasts until the refreshed page has landed (refresh inside a transition)", /startTransition\(\(\) => router\.refresh\(\)\)/.test(saveSrc) && /pending: saving \|\| refreshing/.test(saveSrc));
   check("toasts pause while the pointer is on them, and errors are announced at once", /onMouseEnter/.test(toastSrc) && /onMouseLeave/.test(toastSrc) && /aria-live="assertive"/.test(toastSrc) && /animate-toast-in/.test(toastSrc));
-  check("the Today stage dropdown shows your choice while it saves", /value=\{asMove \? "" : shown\}/.test(read("components/quick-stage.tsx")));
+  check("the Today stage dropdown shows your choice while it saves", /value=\{asMove \? null : shown\}/.test(read("components/quick-stage.tsx")));
   check("the creator page's stage dropdown shows your choice while it saves", /value=\{shown\}/.test(read("components/partnership-actions.tsx")));
   check("Mine / Everyone shows your choice at once", /useOptimistic/.test(read("components/mine-toggle.tsx")));
   for (const f of ["client-switcher.tsx", "campaign-switcher.tsx"]) check(`${f.replace(".tsx", "")} dims the page and says it's switching`, /useMainPending/.test(read(`components/${f}`)));
@@ -195,6 +195,41 @@ function main() {
   check("the email banner only shows when something needs attention; otherwise a quiet line (D6)", /health\.state === "checked"/.test(todayPage) && /emailCheckedLine/.test(todayPage));
   check("card descriptions can put how-it-works behind an ⓘ (D9)", /info\?: string/.test(ui) && /<HelpPopover[^>]*label=/.test(ui));
   check("Today's help matches what Today shows (D10)", !/Each row shows the campaign/.test(todayPage) && !/Fix a stage with the menu on the right/.test(todayPage));
+  // Interface review 2026-09-30 (owner picks R1, R6, R9, R10, R12, R15).
+  console.log("\n── keyboard and screen readers ──");
+  const offRing: string[] = [];
+  for (const file of files) {
+    const rel = relative(ROOT, file);
+    if (!rel.endsWith(".tsx")) continue;
+    for (const m of readFileSync(file, "utf8").match(/"[^"]*focus-visible:outline-none[^"]*"/g) ?? []) {
+      // Switching the ring off is allowed only with a visible replacement: the same 2px accent ring.
+      if (!/focus-visible:ring-2/.test(m) || !/focus-visible:ring-accent-ring/.test(m)) offRing.push(`${rel}: ${m.slice(0, 70)}`);
+    }
+  }
+  check("the focus ring is never switched off without a 2px accent ring in its place (R1)", offRing.length === 0, offRing.slice(0, 5).join("; "));
+  check("menu items show the focus ring inside the panel (R1)", /-outline-offset-2/.test(menu));
+  check("a menu that opens rightwards stays inside the screen (R6)", /Math\.min\(r\.left, window\.innerWidth/.test(menu));
+  check("a saving button keeps its accessible name (opacity, not visibility) (R9)", !/className="invisible/.test(ui) && /opacity-0/.test(ui));
+  const commitOnChange: string[] = [];
+  for (const f of ["creators-table.tsx", "owner-controls.tsx", "creator-record-actions.tsx", "quick-stage.tsx", "client-switcher.tsx", "campaign-switcher.tsx"]) {
+    if (/<Select\b|<select\b/.test(read(`components/${f}`))) commitOnChange.push(f);
+  }
+  const actions = read("components/partnership-actions.tsx");
+  for (const fn of ["StageControl", "AgreementEditor", "FeeEditor"]) {
+    const body = actions.split(`export function ${fn}`)[1]?.split("\nexport function")[0] ?? "";
+    if (/<Select\b/.test(body)) commitOnChange.push(`partnership-actions.tsx ${fn}`);
+  }
+  check("nothing saves while you arrow through a dropdown: choices that act are menus (R10)", commitOnChange.length === 0, commitOnChange.join(", "));
+  check("ChoiceMenu exists for a choice that acts on pick (R10)", /export function ChoiceMenu/.test(menu));
+  const disabledUntilValid: string[] = [];
+  for (const f of ["partnership-actions.tsx", "profile-editors.tsx", "archive.tsx", "log-message.tsx"]) {
+    for (const m of read(`components/${f}`).match(/disabled=\{(?:!url|!url\.trim\(\)|!value\.trim\(\)|!name\.trim\(\)|!paste\.trim\(\)|remind === "pick" && !picked|choice === "pick" && !picked)\}/g) ?? []) disabledUntilValid.push(`${f}: ${m}`);
+  }
+  check("buttons don't sit greyed out until the input is valid; pressing early says why (R12)", disabledUntilValid.length === 0, disabledUntilValid.join("; "));
+  check("a field's error is tied to its control (aria-invalid, aria-describedby) (R12)", /aria-describedby/.test(ui) && /aria-invalid/.test(ui) && /useId/.test(ui));
+  const sideBg = tokenHex("--sidebar-bg"), sideEdge = tokenHex("--sidebar-field-edge"), sideMuted = tokenHex("--sidebar-muted");
+  check("sidebar dropdown edges clear 3:1 on the navy (R15)", !!sideBg && !!sideEdge && ratio(sideEdge, sideBg) >= 3, sideEdge && sideBg ? ratio(sideEdge, sideBg).toFixed(2) : "no --sidebar-field-edge token");
+  check("sidebar small text is lifted (R15)", !!sideMuted && !!sideBg && ratio(sideMuted, sideBg) >= 9, sideMuted && sideBg ? ratio(sideMuted, sideBg).toFixed(2) : "missing");
   check("every button gives a press, and a pending button keeps its width", /secondary: [`"][^`"]*active:/.test(ui) && /ghost: [`"][^`"]*active:/.test(ui) && /invisible/.test(ui));
 }
 

@@ -64,7 +64,8 @@
   --sidebar-bg-2: #13142e;
   --sidebar-line: rgba(255, 255, 255, 0.08);
   --sidebar-text: #d5d8e4;
-  --sidebar-muted: #8c92ab;
+  --sidebar-muted: #adb2c7; /* 9.1:1 on the navy (was #8c92ab, Lc −43) — interface review 2026-09-30 */
+  --sidebar-field-edge: #606170; /* the sidebar dropdowns' edge: 3.1:1 on the navy (a field edge, not a divider) */
   --sidebar-active: #abd044;
   --sidebar-active-bg: rgba(171, 208, 68, 0.1);
   --sidebar-hover-bg: rgba(255, 255, 255, 0.06);
@@ -118,6 +119,7 @@
   --color-sidebar-line: var(--sidebar-line);
   --color-sidebar-text: var(--sidebar-text);
   --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-field-edge: var(--sidebar-field-edge);
   --color-sidebar-active: var(--sidebar-active);
   --color-sidebar-active-bg: var(--sidebar-active-bg);
   --color-sidebar-hover-bg: var(--sidebar-hover-bg);
@@ -284,7 +286,7 @@ select option {
   color: var(--sidebar-text);
 }
 .select-chevron-light {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238c92ab' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23adb2c7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
   background-repeat: no-repeat;
   background-position: right 0.5rem center;
 }

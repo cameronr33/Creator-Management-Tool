@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Settings2, UserMinus, UserPlus, UserRound } from "lucide-react";
-import { DashedChip, Field, OwnerChip, Select } from "@/components/ui";
-import { Menu, MenuItem, MenuLabel } from "@/components/menu";
+import { DashedChip, FieldGroup, OwnerChip } from "@/components/ui";
+import { ChoiceMenu, Menu, MenuItem, MenuLabel } from "@/components/menu";
 import { api } from "@/components/use-save";
 import { toast } from "@/components/toast";
 
@@ -136,14 +136,15 @@ export function OwnerPicker({ partnershipId, ownerId, teammates, meId }: { partn
   // Switched-off teammates aren't offered — unless they're the owner now.
   const options = teammates.filter((t) => t.active || t.id === ownerId);
   return (
-    <Field label="Owner" inline>
-      <Select
-        compact
+    <FieldGroup label="Owner" inline>
+      <ChoiceMenu<string>
+        label="Owner"
         className="w-48"
         value={ownerId ?? ""}
-        disabled={pending}
-        onChange={async (e) => {
-          const to = e.target.value || null;
+        pending={pending}
+        options={[{ value: "", label: "Nobody yet" }, ...options.map((t) => ({ value: t.id, label: t.id === meId ? `${t.name} (you)` : t.name }))]}
+        onChoose={async (v) => {
+          const to = v || null;
           setPending(true);
           const r = await api<{ prior?: Prior[] }>("/api/partnerships/bulk", { action: "set_owner", ids: [partnershipId], ownerId: to }).catch(() => null);
           setPending(false);
@@ -155,14 +156,7 @@ export function OwnerPicker({ partnershipId, ownerId, teammates, meId }: { partn
           ownerToast(who ? `Assigned to ${who}` : "Unassigned", r.data.prior ?? [], to, () => router.refresh());
           router.refresh();
         }}
-      >
-        <option value="">Nobody yet</option>
-        {options.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.id === meId ? `${t.name} (you)` : t.name}
-          </option>
-        ))}
-      </Select>
-    </Field>
+      />
+    </FieldGroup>
   );
 }

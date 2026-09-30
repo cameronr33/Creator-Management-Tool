@@ -123,9 +123,10 @@ export function EmailsEditor({
 }) {
   const { pending, run } = useSave();
   const [value, setValue] = useState("");
+  const [missing, setMissing] = useState(false);
 
   const add = async () => {
-    if (!value.trim()) return;
+    if (!value.trim()) return setMissing(true);
     const r = await run(() => api(`/api/creators/${creatorId}/emails`, { email: value }), {
       success: "Email added — their last 6 months of email is being checked now",
     });
@@ -157,16 +158,26 @@ export function EmailsEditor({
       <Input
         compact
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setMissing(false);
+        }}
         onKeyDown={(e) => e.key === "Enter" && add()}
         placeholder="Another email they write from"
         aria-label="Another email they write from"
         className="w-56"
         type="email"
+        invalid={missing}
+        aria-describedby={missing ? `${creatorId}-email-missing` : undefined}
       />
-      <Button size="sm" variant="ghost" icon={<Plus size={13} />} onClick={add} pending={pending} disabled={!value.trim()}>
+      <Button size="sm" variant="ghost" icon={<Plus size={13} />} onClick={add} pending={pending}>
         Link email
       </Button>
+      {missing && (
+        <span id={`${creatorId}-email-missing`} role="alert" className="basis-full text-xs text-bad">
+          Type the email address first.
+        </span>
+      )}
     </div>
   );
 }
@@ -184,7 +195,9 @@ export function SocialsEditor({
   const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
 
+  const [missing, setMissing] = useState(false);
   const add = async () => {
+    if (!url.trim()) return setMissing(true);
     const r = await run(() => api(`/api/creators/${creatorId}/socials`, { url }), { success: "Link added" });
     if (r.ok) {
       setUrl("");
@@ -242,19 +255,29 @@ export function SocialsEditor({
           <Input
             compact
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && url.trim() && add()}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setMissing(false);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && add()}
             placeholder="Paste another profile link"
             aria-label="Profile link"
             className="max-w-sm"
             autoFocus
+            invalid={missing}
+            aria-describedby={missing ? `${creatorId}-link-missing` : undefined}
           />
-          <Button size="sm" variant="primary" onClick={add} pending={pending} disabled={!url.trim()}>
+          <Button size="sm" variant="primary" onClick={add} pending={pending}>
             Add
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setAdding(false)}>
             Cancel
           </Button>
+          {missing && (
+            <span id={`${creatorId}-link-missing`} role="alert" className="basis-full text-xs text-bad">
+              Paste the profile link first.
+            </span>
+          )}
         </div>
       ) : (
         <Button variant="link" icon={<Plus size={13} />} onClick={() => setAdding(true)} className="text-xs">
@@ -372,7 +395,7 @@ export function AddressEditor({
             rows={3}
             placeholder={"Joe Hubbard\n3333 Simeon Bunker St\nSaint Charles, MO 63301"}
           />
-          <Button size="sm" onClick={() => parsePasted()} disabled={!paste.trim()} className="self-start">
+          <Button size="sm" onClick={() => (paste.trim() ? parsePasted() : setParseIssues(["Paste the address first — as they sent it."]))} className="self-start">
             Read it
           </Button>
         </div>
@@ -427,8 +450,10 @@ export function ProductEditor({
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [qty, setQty] = useState("1");
+  const [missing, setMissing] = useState(false);
 
   const add = async () => {
+    if (!name.trim()) return setMissing(true);
     const r = await run(
       () =>
         api("/api/products", {
@@ -483,8 +508,17 @@ export function ProductEditor({
 
       {open ? (
         <div className="space-y-2 rounded-lg border border-border bg-surface-2/60 p-3">
-          <Field label="Product">
-            <Input compact value={name} onChange={(e) => setName(e.target.value)} placeholder="Rallye 4000 driving lights" autoFocus />
+          <Field label="Product" error={missing ? "Name the product first." : undefined}>
+            <Input
+              compact
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setMissing(false);
+              }}
+              placeholder="Rallye 4000 driving lights"
+              autoFocus
+            />
           </Field>
           <Field label="Link (optional)">
             <Input compact value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
@@ -493,7 +527,7 @@ export function ProductEditor({
             <Input compact value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" />
           </Field>
           <div className="flex gap-2">
-            <Button size="sm" variant="primary" onClick={add} pending={pending} disabled={!name.trim()}>
+            <Button size="sm" variant="primary" onClick={add} pending={pending}>
               Add product
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>

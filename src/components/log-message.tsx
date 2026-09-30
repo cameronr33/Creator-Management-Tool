@@ -98,7 +98,9 @@ export function LogMessagePanel({
     panelRef.current?.querySelector<HTMLElement>('[aria-pressed="true"], input, button')?.focus();
   }, []);
 
+  const [noDate, setNoDate] = useState(false);
   const save = async () => {
+    if (choice === "pick" && !picked) return setNoDate(true);
     const what = how === "ig_dm" ? "DM" : how === "email" ? "email" : "call";
     const r = await run(
       () =>
@@ -150,9 +152,25 @@ export function LogMessagePanel({
           ]}
         />
       </FieldGroup>
-      <DateChoice choice={choice} picked={picked} onChoice={setChoice} onPicked={setPicked} />
+      <DateChoice
+        choice={choice}
+        picked={picked}
+        onChoice={(c) => {
+          setChoice(c);
+          setNoDate(false);
+        }}
+        onPicked={(d) => {
+          setPicked(d);
+          setNoDate(false);
+        }}
+      />
+      {noDate && (
+        <p role="alert" className="text-xs text-bad">
+          Pick the day it happened.
+        </p>
+      )}
       <div className="flex gap-1.5">
-        <Button size="sm" variant="primary" pending={pending} disabled={choice === "pick" && !picked} onClick={save}>
+        <Button size="sm" variant="primary" pending={pending} onClick={save}>
           Log it
         </Button>
         <Button size="sm" variant="ghost" disabled={pending} onClick={onClose}>

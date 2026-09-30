@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, ArchiveRestore, Check, ExternalLink, ImageDown, Mail, NotebookPen, Trash2, X } from "lucide-react";
-import { Avatar, Badge, Button, Checkbox, Field, Select, StagePill } from "@/components/ui";
+import { Avatar, Badge, Button, Checkbox, FieldGroup, StagePill } from "@/components/ui";
+import { ChoiceMenu } from "@/components/menu";
 import { ConfirmButton } from "@/components/confirm-button";
 import { OwnerMenu, ownerToast, type OwnerInfo, type TeammateOption } from "@/components/owner-controls";
 import { api, useSave } from "@/components/use-save";
@@ -220,83 +221,55 @@ export function CreatorsTable({
               Clear
             </Button>
           </div>
-          <Field label="Move to stage">
-            <Select
-              compact
-              value=""
-              disabled={pending}
-              onChange={(e) =>
-                e.target.value &&
+          <FieldGroup label="Move to stage">
+            <ChoiceMenu<string>
+              label="Move the selected to stage"
+              value={null}
+              placeholder="Choose…"
+              pending={pending}
+              options={stagesByGroup().flatMap((g) => g.stages.map((st) => ({ value: st.value, label: st.label, group: g.label })))}
+              onChoose={(stage) =>
                 bulk(
-                  { action: "set_stage", stage: e.target.value },
+                  { action: "set_stage", stage },
                   (d) => `${d.moved ?? 0} moved${d.needVideo ? ` · ${d.needVideo} need their video link first (open them to add it)` : ""}${d.unchanged ? ` · ${d.unchanged} already there` : ""}`,
                   undoMoves,
                 )
               }
-              className="w-44"
-            >
-              <option value="">Choose…</option>
-              {stagesByGroup().map((g) => (
-                <optgroup key={g.group} label={g.label}>
-                  {g.stages.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </Select>
-          </Field>
+            />
+          </FieldGroup>
           {campaigns.length > 1 && (
-            <Field label="Move to campaign">
-              <Select
-                compact
-                value=""
-                disabled={pending}
-                onChange={(e) =>
-                  e.target.value &&
+            <FieldGroup label="Move to campaign">
+              <ChoiceMenu<string>
+                label="Move the selected to campaign"
+                value={null}
+                placeholder="Choose…"
+                pending={pending}
+                className="w-48"
+                options={campaigns.map((cp) => ({ value: cp.id, label: cp.name }))}
+                onChoose={(campaignId) =>
                   bulk(
-                    { action: "set_campaign", campaignId: e.target.value },
+                    { action: "set_campaign", campaignId },
                     (d) => `${d.moved ?? 0} moved${d.skipped ? ` · ${d.skipped} skipped (already in that campaign)` : ""}`,
-                    undoCampaign(e.target.value),
+                    undoCampaign(campaignId),
                   )
                 }
-                className="w-48"
-              >
-                <option value="">Choose…</option>
-                {campaigns.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+              />
+            </FieldGroup>
           )}
-          <Field label="Assign to">
-            <Select
-              compact
-              value=""
-              disabled={pending}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!v) return;
-                const to = v === "__nobody" ? null : v;
-                assignTo(to);
-              }}
-              className="w-44"
-            >
-              <option value="">Choose…</option>
-              {meId && teammates.some((t) => t.id === meId && t.active) && <option value={meId}>Me</option>}
-              {teammates
-                .filter((t) => t.id !== meId && t.active)
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              <option value="__nobody">Nobody</option>
-            </Select>
-          </Field>
+          <FieldGroup label="Assign to">
+            <ChoiceMenu<string>
+              label="Assign the selected to"
+              value={null}
+              placeholder="Choose…"
+              pending={pending}
+              options={[
+                ...(meId && teammates.some((t) => t.id === meId && t.active) ? [{ value: meId, label: "Me" }] : []),
+                ...teammates.filter((t) => t.id !== meId && t.active).map((t) => ({ value: t.id, label: t.name })),
+                { value: "__nobody", label: "Nobody" },
+              ]}
+              onChoose={(v) => assignTo(v === "__nobody" ? null : v)}
+            />
+          </FieldGroup>
           {rows.some((r) => chosen.includes(r.partnershipId) && r.clientApproval === "pending") && (
             <div className="self-center">
               <Button

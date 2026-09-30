@@ -2,10 +2,10 @@
 
 import { Fragment, useState } from "react";
 import { ChevronDown, X } from "lucide-react";
-import { stagesByGroup, stageLabel, stageHint, isTerminal, EXIT_REASONS_BY_STAGE } from "@/lib/stages";
+import { stagesByGroup, stageLabel, isTerminal, EXIT_REASONS_BY_STAGE } from "@/lib/stages";
 import type { CmStage } from "@/lib/db/schema";
-import { Button, IconButton, Select, Spinner, StagePill } from "@/components/ui";
-import { Menu, MenuItem, MenuLabel } from "@/components/menu";
+import { Button, IconButton, Spinner, StagePill } from "@/components/ui";
+import { ChoiceMenu, Menu, MenuItem, MenuLabel } from "@/components/menu";
 import { api, useSave } from "@/components/use-save";
 import { VideoLinkPrompt, needsVideo } from "@/components/partnership-actions";
 
@@ -124,32 +124,18 @@ export function QuickStage({
     );
   }
 
+  // Pipeline "Move to…" (and anywhere else): a menu, so arrowing through it never moves anyone (R10).
   return (
     <div className="space-y-2">
-      <Select
-        compact
-        aria-label={`Stage for ${name}`}
-        title={stageHint(stage)}
-        value={asMove ? "" : shown}
-        disabled={pending}
+      <ChoiceMenu<CmStage>
+        label={asMove ? `Move ${name}` : `Stage for ${name}`}
+        value={asMove ? null : shown}
+        placeholder="Move to…"
+        pending={pending}
         className={className}
-        onChange={(e) => choose(e.target.value as CmStage)}
-      >
-        {asMove && (
-          <option value="" disabled>
-            Move to…
-          </option>
-        )}
-        {stagesByGroup().map((g) => (
-          <optgroup key={g.group} label={g.label}>
-            {g.stages.map((s) => (
-              <option key={s.value} value={s.value} disabled={asMove && s.value === stage}>
-                {s.label}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </Select>
+        options={stagesByGroup().flatMap((g) => g.stages.map((st) => ({ value: st.value, label: isTerminal(st.value) ? `${st.label}…` : st.label, group: g.label, disabled: asMove && st.value === stage })))}
+        onChoose={choose}
+      />
       {prompts}
     </div>
   );

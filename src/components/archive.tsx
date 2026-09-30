@@ -73,8 +73,9 @@ export function ArchiveControl({
     if (open) panelRef.current?.querySelector<HTMLElement>('[aria-pressed="true"], input, button')?.focus();
   }, [open]);
 
+  const [noDate, setNoDate] = useState(false);
   const save = async () => {
-    if (remind === "pick" && !picked) return;
+    if (remind === "pick" && !picked) return setNoDate(true);
     const until = remind === "1m" ? startOfDay(30) : remind === "3m" ? startOfDay(91) : remind === "pick" ? new Date(`${picked}T00:00`) : null;
     const r = await run(() => api(`/api/partnerships/${partnershipId}/archive`, { archived: true, until: until?.toISOString() ?? null, reason: why.trim() || null }));
     if (!r.ok) return;
@@ -128,15 +129,26 @@ export function ArchiveControl({
         />
       </FieldGroup>
       {remind === "pick" && (
-        <Field label="On">
-          <Input compact type="date" className="w-44" value={picked} min={ymd(startOfDay(1))} max={ymd(startOfDay(365))} onChange={(e) => setPicked(e.target.value)} />
+        <Field label="On" error={noDate ? "Pick the day to be reminded." : undefined}>
+          <Input
+            compact
+            type="date"
+            className="w-44"
+            value={picked}
+            min={ymd(startOfDay(1))}
+            max={ymd(startOfDay(365))}
+            onChange={(e) => {
+              setPicked(e.target.value);
+              setNoDate(false);
+            }}
+          />
         </Field>
       )}
       <Field label="Why (optional)">
         <Input compact maxLength={200} value={why} placeholder="e.g. waiting for HELLA's next launch" onChange={(e) => setWhy(e.target.value)} />
       </Field>
       <div className="flex gap-1.5">
-        <Button size="sm" variant="primary" icon={<Archive size={13} />} pending={pending} disabled={remind === "pick" && !picked} onClick={save}>
+        <Button size="sm" variant="primary" icon={<Archive size={13} />} pending={pending} onClick={save}>
           Archive
         </Button>
         <Button size="sm" variant="ghost" disabled={pending} onClick={() => setOpen(false)}>

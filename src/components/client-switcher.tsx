@@ -1,14 +1,20 @@
 "use client";
 
-import { useRef } from "react";
 import { useMainPending } from "@/components/main-pending";
+import { ChoiceMenu } from "@/components/menu";
 import { selectClient } from "@/app/actions";
 import type { ActiveClient } from "@/lib/queries";
+
+/** The navy sidebar's switchers: a field on the dark ground, edge 3.1:1 (interface review 2026-09-30, R15). */
+export const SIDEBAR_SWITCH =
+  "inline-flex h-9 w-full items-center justify-between gap-2 rounded-md border border-sidebar-field-edge bg-sidebar-bg-2 px-3 text-left text-sm font-medium text-white transition hover:border-white/50 disabled:opacity-60";
 
 /**
  * The one control that decides whose data every page shows. It sits under
  * a visible "Client" label in the sidebar, and every page header repeats
  * the client name, so working in the wrong client's data is hard to miss.
+ * A menu, not a dropdown: arrowing through a closed dropdown would switch
+ * client at every step (R10).
  */
 export function ClientSwitcher({
   clients,
@@ -17,7 +23,6 @@ export function ClientSwitcher({
   clients: ActiveClient[];
   activeSlug: string;
 }) {
-  const formRef = useRef<HTMLFormElement>(null);
   const { pending, start } = useMainPending();
 
   if (clients.length === 0) {
@@ -29,27 +34,18 @@ export function ClientSwitcher({
   }
 
   return (
-    <form ref={formRef} action={selectClient}>
-      <select
-        name="slug"
-        defaultValue={activeSlug}
-        disabled={pending}
-        onChange={(e) => {
-          const form = formRef.current;
-          if (!form) return;
-          const name = e.target.selectedOptions[0]?.textContent ?? "the client";
-          const data = new FormData(form);
-          start(() => selectClient(data), { label: `Switching to ${name}…` });
-        }}
-        className="select-chevron-light h-9 w-full appearance-none rounded-md border border-sidebar-line bg-sidebar-bg-2 pl-3 pr-8 text-sm font-medium text-white transition hover:border-white/20 focus:border-brand-lime focus-visible:outline-none disabled:opacity-60"
-        aria-label="Active client"
-      >
-        {clients.map((c) => (
-          <option key={c.id} value={c.slug}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-    </form>
+    <ChoiceMenu<string>
+      label="Active client"
+      value={activeSlug}
+      pending={pending}
+      triggerClassName={SIDEBAR_SWITCH}
+      options={clients.map((c) => ({ value: c.slug, label: c.name }))}
+      onChoose={(slug) => {
+        const name = clients.find((c) => c.slug === slug)?.name ?? "the client";
+        const data = new FormData();
+        data.set("slug", slug);
+        start(() => selectClient(data), { label: `Switching to ${name}…` });
+      }}
+    />
   );
 }

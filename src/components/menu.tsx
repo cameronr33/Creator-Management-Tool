@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MoreHorizontal } from "lucide-react";
-import { cn, SrOnly } from "@/components/ui";
+import { ChevronDown, MoreHorizontal } from "lucide-react";
+import { cn, Spinner, SrOnly } from "@/components/ui";
 
 /**
  * A small pop-up menu — the ⋯ on Today rows and Pipeline cards, the owner
@@ -27,6 +27,7 @@ export function Menu({
   triggerClassName = DEFAULT_TRIGGER,
   align = "end",
   moreFor,
+  disabled,
 }: {
   /** The button's accessible name and tooltip ("More for Josh"). */
   label: string;
@@ -37,6 +38,7 @@ export function Menu({
   align?: "start" | "end";
   /** A row's id, so a panel it opened can hand focus back to this button. */
   moreFor?: string;
+  disabled?: boolean;
 }) {
   const [at, setAt] = useState<{ top?: number; bottom?: number; left?: number; right?: number; maxHeight?: number } | null>(null);
   const button = useRef<HTMLButtonElement | null>(null);
@@ -60,13 +62,14 @@ export function Menu({
     setAt({
       ...(below ? { top: r.bottom + 4 } : { bottom: window.innerHeight - r.top + 4 }),
       maxHeight: Math.max(120, below ? spaceBelow : spaceAbove),
-      ...(align === "end" ? { right: Math.max(8, window.innerWidth - r.right) } : { left: Math.max(8, r.left) }),
+      // Either way the panel stays inside the screen (review 2026-09-30, R6): 288px is its widest (max-w-72).
+      ...(align === "end" ? { right: Math.max(8, window.innerWidth - r.right) } : { left: Math.max(8, Math.min(r.left, window.innerWidth - 288 - 8)) }),
     });
   };
 
   useEffect(() => {
     if (!open) return;
-    panel.current?.querySelector<HTMLElement>("[role=menuitem]:not([disabled])")?.focus();
+    (panel.current?.querySelector<HTMLElement>("[role=menuitem][data-current]:not([disabled])") ?? panel.current?.querySelector<HTMLElement>("[role=menuitem]:not([disabled])"))?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
       // The panel sits at the end of the page: Tab closes it and hands focus back to its button.
@@ -112,6 +115,7 @@ export function Menu({
         data-more-for={moreFor}
         aria-label={label}
         title={label}
+        disabled={disabled}
         className={triggerClassName}
       >
         {trigger ?? <MoreHorizontal size={16} />}
@@ -157,12 +161,15 @@ export function MenuItem({
       type="button"
       role="menuitem"
       disabled={disabled}
+      data-current={active || undefined}
+      title={typeof children === "string" ? children : undefined}
       onClick={() => {
         close();
         onSelect();
       }}
       className={cn(
-        "flex w-full items-center gap-2 px-3 py-1.5 text-left transition focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
+        // The app's 2px focus ring, drawn inside so the scrolling panel doesn't clip it (R1).
+        "flex w-full items-center gap-2 px-3 py-1.5 text-left transition focus-visible:-outline-offset-2 disabled:pointer-events-none disabled:opacity-50",
         tone === "danger" ? "text-bad hover:bg-bad-soft focus:bg-bad-soft" : "text-text hover:bg-surface-2 focus:bg-surface-2",
         active && "font-semibold",
       )}
@@ -182,5 +189,86 @@ export function MenuLabel({ children }: { children?: ReactNode }) {
     <div className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-faint">{children}</div>
   ) : (
     <div className="my-1 border-t border-border" role="separator" />
+  );
+}
+
+export interface Choice<T extends string> {
+  value: T;
+  label: string;
+  /** Items with the same group sit under one caption, in the order given. */
+  group?: string;
+  disabled?: boolean;
+}
+
+/**
+ * A choice that acts the moment you pick it — a stage, an owner, a campaign,
+ * the agreement type — as a menu instead of a dropdown (review 2026-09-30,
+ * R10): on Windows, arrowing through a closed <select> fires a change at every
+ * step, so a keyboard user could move three creators through every stage. Here
+ * arrows only move; Enter or a click picks. The trigger looks like a field and
+ * is named "Stage: Agreed — change it".
+ */
+export function ChoiceMenu<T extends string>({
+  label,
+  value,
+  options,
+  onChoose,
+  placeholder,
+  pending = false,
+  disabled = false,
+  className = "w-44",
+  triggerClassName,
+}: {
+  /** What's being chosen ("Stage", "Owner") — part of the button's name. */
+  label: string;
+  value: T | null;
+  options: Choice<T>[];
+  onChoose: (value: T) => void;
+  /** Shown when nothing is chosen, or on a "Move to…" button. */
+  placeholder?: string;
+  pending?: boolean;
+  disabled?: boolean;
+  className?: string;
+  /** Replaces the field look (the navy sidebar's switchers). */
+  triggerClassName?: string;
+}) {
+  const current = options.find((o) => o.value === value) ?? null;
+  const shown = current?.label ?? placeholder ?? "Choose…";
+  const groups: { name: string | undefined; items: Choice<T>[] }[] = [];
+  for (const o of options) {
+    const g = groups.find((x) => x.name === o.group);
+    if (g) g.items.push(o);
+    else groups.push({ name: o.group, items: [o] });
+  }
+  return (
+    <Menu
+      label={`${label}: ${current ? current.label : placeholder ?? "none"} — change it`}
+      align="start"
+      disabled={disabled || pending}
+      triggerClassName={
+        triggerClassName ??
+        cn(
+          "inline-flex h-8 items-center justify-between gap-2 rounded-md border border-field bg-surface px-2.5 text-left text-xs text-text shadow-control transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60",
+          className,
+        )
+      }
+      trigger={
+        <>
+          <span className="min-w-0 truncate">{shown}</span>
+          {pending ? <Spinner size={12} className="shrink-0 text-accent" /> : <ChevronDown size={13} className="shrink-0 opacity-70" aria-hidden />}
+        </>
+      }
+    >
+      {groups.map((g, i) => (
+        <Fragment key={g.name ?? `g${i}`}>
+          {g.name && <MenuLabel>{g.name}</MenuLabel>}
+          {g.items.map((o) => (
+            <MenuItem key={o.value} active={o.value === value} disabled={o.disabled} onSelect={() => o.value !== value && onChoose(o.value)}>
+              {o.label}
+            </MenuItem>
+          ))}
+        </Fragment>
+      ))}
+    </Menu>
   );
 }

@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { Trash2, UserMinus } from "lucide-react";
-import { Field, Select } from "@/components/ui";
+import { FieldGroup } from "@/components/ui";
+import { ChoiceMenu } from "@/components/menu";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
 import { toast } from "@/components/toast";
@@ -20,26 +21,20 @@ export function CampaignPicker({
   const { pending, run } = useSave();
   if (campaigns.length < 2) return null;
   return (
-    <Field label="Campaign" inline>
-      <Select
-        compact
+    <FieldGroup label="Campaign" inline>
+      <ChoiceMenu<string>
+        label="Campaign"
         className="w-48"
         value={campaignId}
-        disabled={pending}
-        onChange={async (e) => {
-          const to = e.target.value;
-          const name = campaigns.find((c) => c.id === to)?.name ?? "that campaign";
+        pending={pending}
+        options={campaigns.map((cp) => ({ value: cp.id, label: cp.name }))}
+        onChoose={async (to) => {
+          const name = campaigns.find((cp) => cp.id === to)?.name ?? "that campaign";
           const r = await run(() => api<{ moved?: number; skipped?: number }>("/api/partnerships/bulk", { action: "set_campaign", ids: [partnershipId], campaignId: to }));
           if (r.ok) toast(r.data.moved ? `Moved to ${name}` : `Already in ${name} — open them there`, { tone: r.data.moved ? "good" : "bad" });
         }}
-      >
-        {campaigns.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </Select>
-    </Field>
+      />
+    </FieldGroup>
   );
 }
 
