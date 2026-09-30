@@ -34,7 +34,7 @@ export function InviteForm({ token, email }: { token: string; email: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-6 shadow-pop">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-xl bg-surface p-6 shadow-float">
       <Field label="Email">
         <Input value={email} readOnly autoComplete="username" />
       </Field>

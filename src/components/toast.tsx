@@ -39,7 +39,7 @@ export function toast(message: string, opts: ToastOptions = {}): number {
 
 const ICON = {
   info: <Info size={16} className="text-accent" />,
-  good: <CheckCircle2 size={16} className="text-good-strong" />,
+  good: <CheckCircle2 size={16} className="text-good" />,
   bad: <AlertCircle size={16} className="text-bad" />,
 };
 
@@ -74,7 +74,7 @@ export function Toaster() {
       {items.map((t) => (
         <div
           key={t.id}
-          className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm shadow-pop"
+          className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm shadow-float"
         >
           <span className="mt-0.5 shrink-0">{ICON[t.tone]}</span>
           <div className="min-w-0 flex-1">

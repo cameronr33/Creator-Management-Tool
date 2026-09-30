@@ -107,6 +107,43 @@ function main() {
   for (const token of ["--accent", "--accent-hover", "--good", "--warn", "--bad", "--info", "--sidebar-bg", "--brand-lime", "--text-faint"]) {
     check(`globals.css defines ${token}`, new RegExp(`${token}:`).test(css));
   }
+
+  // Design review 2026-09-30 (owner: all shadow, interaction and design picks).
+  console.log("\n── elevation, motion and contrast ──");
+  const shadowHits: string[] = [];
+  const vendorHits: string[] = [];
+  for (const file of files) {
+    const rel = relative(ROOT, file);
+    if (rel.endsWith(".css")) continue;
+    const src = readFileSync(file, "utf8");
+    for (const m of src.match(/\bshadow-(?:sm|md|lg|xl|2xl|inner|pop)\b|\bshadow-\[/g) ?? []) shadowHits.push(`${rel}: ${m}`);
+    // Words people read: string literals and JSX text. Identifiers and API paths don't count.
+    for (const line of src.split("\n")) {
+      if (/^\s*(\/\/|\*|\/\*|import\b)/.test(line)) continue;
+      for (const m of line.match(/"[^"]*\bGmail\b[^"]*"|`[^`]*\bGmail\b[^`]*`|>[^<>{}]*\bGmail\b[^<>{}]*</g) ?? []) vendorHits.push(`${rel}: ${m.slice(0, 60)}`);
+      if (rel.endsWith(".tsx") && /^\s*[^<>{}=;()"'`/*]*\bGmail\b[^<>{}=;()"'`]*$/.test(line)) vendorHits.push(`${rel}: ${line.trim().slice(0, 60)}`);
+    }
+  }
+  check("shadows come only from the three elevation tokens (shadow-control / shadow-card / shadow-float)", shadowHits.length === 0, shadowHits.slice(0, 6).join("; "));
+  for (const t of ["--shadow-control", "--shadow-card", "--shadow-float"]) check(`globals.css defines ${t}`, new RegExp(`${t}:`).test(css));
+  check("no vendor name in words people read (say mailbox or email; the connect button may say Google)", vendorHits.length === 0, vendorHits.slice(0, 5).join("; "));
+  for (const t of ["--duration-quick", "--duration-normal", "--duration-gentle", "--ease-out"]) check(`globals.css defines the motion setting ${t}`, new RegExp(`${t}:`).test(css));
+  check("motion switches off when the computer asks for reduced motion", /@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(css));
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const tokenHex = (name: string) => css.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`))?.[1] ?? null;
+  const field = tokenHex("--border-field"), surface = tokenHex("--surface");
+  check("field edges clear 3:1 against the card (WCAG 1.4.11)", !!field && !!surface && ratio(field, surface) >= 3, field && surface ? ratio(field, surface).toFixed(2) : "no --border-field token");
+  check("inputs, dropdowns and text areas are drawn with the field-edge colour", /const FIELD_BASE =[^;]*\bborder-field\b/.test(ui));
+  check("page titles are 20px (text-xl), a clear step above names", /<h1 className="text-xl font-semibold/.test(ui));
+  check("card titles read as headings: 15px in the main text colour, not small grey capitals", /export function SectionTitle[\s\S]{0,200}text-\[15px\][^"]*text-text\b/.test(ui) && !/export function SectionTitle[\s\S]{0,200}uppercase/.test(ui));
+  const toastSrc = readFileSync(join(ROOT, "components", "toast.tsx"), "utf8");
+  check("the success tick clears 3:1 (the dark green, not lime)", /good: <CheckCircle2[^>]*text-good"/.test(toastSrc));
+  const owner = readFileSync(join(ROOT, "components", "owner-controls.tsx"), "utf8");
+  check("the owner chip has a click area of at least 24px (WCAG 2.2 target size)", /triggerClassName="[^"]*before:-inset-1/.test(owner));
 }
 
 main();

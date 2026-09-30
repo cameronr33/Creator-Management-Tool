@@ -31,7 +31,7 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-6 shadow-pop">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-xl bg-surface p-6 shadow-float">
       <Field label="Email">
         <Input name="email" type="email" required autoComplete="email" autoFocus />
       </Field>

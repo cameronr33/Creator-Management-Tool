@@ -25,7 +25,7 @@ export async function PUT(req: NextRequest) {
   const { error } = await requireAgency();
   if (error) return error;
   const account = await getActiveGmailAccount();
-  if (!account) return badRequest("Connect Gmail first");
+  if (!account) return badRequest("Connect the mailbox first");
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);

@@ -97,7 +97,7 @@ export function CreatorsTable({
   return (
     <div className="space-y-3">
       {chosen.length > 0 && (
-        <div className="sticky top-0 z-10 flex flex-wrap items-end gap-3 rounded-xl border border-accent-ring bg-surface p-3 shadow-pop">
+        <div className="sticky top-0 z-10 flex flex-wrap items-end gap-3 rounded-xl border border-accent-ring bg-surface p-3 shadow-float">
           <div className="flex items-center gap-2 self-center text-sm font-medium text-text">
             {chosen.length} selected
             <Button size="sm" variant="ghost" icon={<X size={13} />} onClick={() => setSelected(new Set())}>
@@ -237,7 +237,7 @@ export function CreatorsTable({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-card">
+      <div className="overflow-x-auto rounded-xl bg-surface shadow-card">
         <table className="w-full min-w-[760px] text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs font-semibold text-text-muted">

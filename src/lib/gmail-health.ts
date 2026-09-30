@@ -33,7 +33,7 @@ export function summarizeGmailHealth(
 ): GmailHealthSummary {
   const base = { stale: false, fetchErrors: 0, lastCheckedAt: null };
   if (!account) {
-    return { ...base, state: "disconnected", tone: "warn", label: "Gmail not connected", detail: "Connect the shared mailbox to start tracking creator email." };
+    return { ...base, state: "disconnected", tone: "warn", label: "Mailbox not connected", detail: "Connect the shared mailbox in Settings to start tracking creator email." };
   }
   const status = account.lastSyncStatus?.toLowerCase() ?? "";
   const summary = asSummary(account.lastSyncSummary);
@@ -46,7 +46,7 @@ export function summarizeGmailHealth(
   const late = stale ? " The last check is also overdue." : "";
 
   if (status.startsWith("error")) {
-    return { ...facts, state: "error", tone: "bad", label: "Email check failed", detail: `The latest check failed. Review the Gmail connection and retry before relying on email status.${late}` };
+    return { ...facts, state: "error", tone: "bad", label: "Email check failed", detail: `The last email check failed. Check the mailbox connection in Settings, then try again.${late}` };
   }
   if (account.lastSyncAt == null) {
     return { ...facts, state: "never", tone: "warn", label: "Email not checked yet", detail: "The mailbox is connected, but no check has been recorded." };
@@ -55,7 +55,7 @@ export function summarizeGmailHealth(
     return { ...facts, state: "unknown", tone: "warn", label: "Email timing unknown", detail: "The last check has an invalid timestamp. Its freshness cannot be confirmed." };
   }
   if (fetchErrors > 0 || status.startsWith("partial")) {
-    return { ...facts, state: "partial", tone: "warn", label: "Email check incomplete", detail: `${fetchErrors > 0 ? `${fetchErrors} message or search fetch${fetchErrors === 1 ? " was" : "es were"} skipped.` : "Part of the latest check did not finish."} Some messages may be missing; retry the check.${late}` };
+    return { ...facts, state: "partial", tone: "warn", label: "Email check incomplete", detail: `${fetchErrors > 0 ? `${fetchErrors} message${fetchErrors === 1 ? "" : "s"} couldn't be read.` : "Part of the latest check did not finish."} Some replies may be missing, so check again.${late}` };
   }
   if (stale) {
     return { ...facts, state: "stale", tone: "warn", label: "Email check overdue", detail: "No check has been recorded in over 18 hours. Recent replies may be missing." };
@@ -64,7 +64,7 @@ export function summarizeGmailHealth(
     return { ...facts, state: "idle", tone: "warn", label: "No creator addresses to match", detail: "No creator has an email address yet, so there is nothing to track. Add their email on the creator page." };
   }
   if (status !== "ok") {
-    return { ...facts, state: "unknown", tone: "warn", label: "Email result unknown", detail: "The last check has no recognized completion status. Run another check before relying on it." };
+    return { ...facts, state: "unknown", tone: "warn", label: "Email result unknown", detail: "The last check didn't say whether it finished. Check again to be sure." };
   }
-  return { ...facts, state: "checked", tone: "info", label: "Email checked recently", detail: "The last recorded check reported no fetch errors. Only messages visible to the connected mailbox can be tracked." };
+  return { ...facts, state: "checked", tone: "info", label: "Email checked recently", detail: "Everything the mailbox holds for your creators is up to date." };
 }

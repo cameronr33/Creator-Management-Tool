@@ -38,7 +38,7 @@ export function VideoLinkPrompt({
 }) {
   const [url, setUrl] = useState("");
   return (
-    <div className="space-y-2 rounded-lg border border-accent-ring bg-surface p-2.5 text-xs shadow-pop">
+    <div className="space-y-2 rounded-lg border border-info-line bg-accent-soft p-2.5 text-xs">
       <Field label="Link to the posted video" hint="Posted needs the video itself. Paste its link.">
         <Input compact autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.instagram.com/reel/…" />
       </Field>
@@ -118,7 +118,7 @@ export function StageControl({
           onCancel={() => setAskVideo(false)}
         />
       ) : closingAs ? (
-        <div className="rounded-lg border border-accent-ring bg-surface p-2.5 text-xs shadow-pop">
+        <div className="rounded-lg border border-info-line bg-accent-soft p-2.5 text-xs">
           <div className="mb-1.5 font-medium text-text">
             Closing as {stageLabel(closingAs)} — why?
           </div>

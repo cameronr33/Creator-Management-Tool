@@ -24,7 +24,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         {person ? (
           <InviteForm token={token} email={person.email} />
         ) : (
-          <div className="rounded-xl border border-border bg-surface p-6 text-sm text-text-muted shadow-pop">
+          <div className="rounded-xl bg-surface p-6 text-sm text-text-muted shadow-float">
             This invite link has expired or was already used. Ask your contact at the agency for a new one, or{" "}
             <Link href="/login" className="font-medium text-accent underline">
               sign in

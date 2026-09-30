@@ -115,7 +115,7 @@ export default async function HelpPage() {
               icon={<Settings size={16} />}
               href="/settings"
               title="Settings — one-time setup"
-              body="Connect the Gmail mailbox, set follow-up timing, and manage campaigns."
+              body="Connect the team mailbox, set follow-up timing, and manage campaigns."
             />
           </ol>
         </Card>

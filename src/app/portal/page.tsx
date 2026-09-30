@@ -28,7 +28,7 @@ export default async function PortalOverview() {
   return (
     <>
       <div>
-        <h1 className="text-lg font-semibold tracking-tight text-text">{ctx.readOnly ? `${ctx.clientName}'s creator program` : ctx.viewerName ? `Hi ${ctx.viewerName.split(" ")[0]}` : "Your creator program"}</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-text">{ctx.readOnly ? `${ctx.clientName}'s creator program` : ctx.viewerName ? `Hi ${ctx.viewerName.split(" ")[0]}` : "Your creator program"}</h1>
         <p className="text-sm text-text-muted">
           {live.length} creator{live.length === 1 ? "" : "s"} in progress{campaigns.length ? ` across ${campaigns.join(", ")}` : ""}.
         </p>

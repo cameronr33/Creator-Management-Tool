@@ -17,7 +17,7 @@ export function AToZStrip({
   links?: boolean;
 }) {
   return (
-    <nav aria-label="How it works, A to Z" className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-border bg-surface px-3 py-2 shadow-card">
+    <nav aria-label="How it works, A to Z" className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-surface px-3 py-2 shadow-control">
       <span className="text-xs font-semibold text-text">A to Z</span>
       <ol className="flex min-w-0 flex-1 flex-wrap items-center gap-y-1">
         {ACTIVE_STAGES.map((s, i) => (

@@ -179,7 +179,7 @@ export class SyncBusyError extends Error {
  */
 export async function runGmailSync(opts: { trigger: SyncTrigger; windowDays?: number }): Promise<SyncRunResult> {
   const account = await getActiveGmailAccount();
-  if (!account) throw new Error("No Gmail account connected — connect one in Settings.");
+  if (!account) throw new Error("No mailbox connected — connect one in Settings.");
   const lease = await acquireLease(account.id);
   if (!lease) throw new SyncBusyError();
 
@@ -277,7 +277,7 @@ export async function runEmailCheck(
   let busy = false;
   await runJob("email_sync", async () => {
     const account = await getActiveGmailAccount();
-    if (!account) return { status: "idle", summary: { trigger, skipped: "no Gmail account connected" } };
+    if (!account) return { status: "idle", summary: { trigger, skipped: "no mailbox connected" } };
     let r: SyncRunResult;
     try {
       r = await runGmailSync({ trigger });
@@ -374,7 +374,7 @@ export async function downloadContracts(
 export async function recordStoredAttachments(opts: { apply: boolean; fetchers?: AttachmentFetchers }): Promise<{ messages: number; pdfs: { partnershipId: string; filename: string }[]; errors: number }> {
   const fetchers = opts.fetchers ?? { getMessage, getAttachment };
   const account = await getActiveGmailAccount();
-  if (!account) throw new Error("No Gmail account connected");
+  if (!account) throw new Error("No mailbox connected");
   const accessToken = await refreshAccessToken(decrypt(account.refreshTokenEnc));
   const stored = await db
     .select({ id: cmOutreachEvents.id, externalId: cmOutreachEvents.externalId, partnershipId: cmOutreachEvents.partnershipId, senderRole: cmOutreachEvents.senderRole, occurredAt: cmOutreachEvents.occurredAt })
@@ -461,7 +461,7 @@ export interface RefreshChange {
  */
 export async function refreshStoredEmails(opts: { apply: boolean }): Promise<{ checked: number; changes: RefreshChange[]; errors: number }> {
   const account = await getActiveGmailAccount();
-  if (!account) throw new Error("No Gmail account connected");
+  if (!account) throw new Error("No mailbox connected");
   const accessToken = await refreshAccessToken(decrypt(account.refreshTokenEnc));
   const [roster, team] = await Promise.all([getEmailRoster(), loadTeamIdentity(account.email, account.teamAddresses ?? [])]);
   const creatorsByAddress = new Map<string, string[]>();

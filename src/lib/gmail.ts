@@ -93,7 +93,7 @@ async function api<T>(accessToken: string, path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error(`Gmail API ${path} failed (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) throw new Error(`Mailbox request ${path} failed (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`);
   return (await res.json()) as T;
 }
 

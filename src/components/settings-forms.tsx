@@ -132,7 +132,7 @@ export function GmailConnectCard({
           only searches for the email addresses saved on creators — nothing else in the mailbox is read or stored. It never sends mail.
         </p>
         <Button variant="primary" href="/api/gmail/connect">
-          Connect Gmail
+          Connect a Google mailbox
         </Button>
       </div>
     );
@@ -150,7 +150,7 @@ export function GmailConnectCard({
         question="Stop tracking email?"
         confirmLabel="Disconnect"
         pending={pending}
-        onConfirm={() => run(() => api("/api/gmail/disconnect"), { success: "Gmail disconnected" })}
+        onConfirm={() => run(() => api("/api/gmail/disconnect"), { success: "Mailbox disconnected" })}
       />
     </div>
   );

@@ -65,7 +65,7 @@ export function PageHeader({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-semibold tracking-tight text-text">{title}</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-text">{title}</h1>
             {client && <Badge tone="accent">{client}</Badge>}
             {campaign !== undefined && (
               <Badge tone={campaign ? "info" : "muted"} title="Change it in the sidebar, under Campaign">
@@ -81,7 +81,7 @@ export function PageHeader({
                 >
                   <CircleHelp size={15} />
                 </summary>
-                <div className="absolute z-20 mt-1 max-w-md rounded-lg border border-border bg-surface p-3 text-xs leading-relaxed text-text-muted shadow-card">
+                <div className="absolute z-20 mt-1 max-w-md rounded-lg border border-border bg-surface p-3 text-[13px] leading-relaxed text-text-muted shadow-float">
                   {help}
                   {helpAnchor && (
                     <Link href={`/help#${helpAnchor}`} className="mt-1.5 block font-medium text-accent hover:underline">
@@ -114,7 +114,7 @@ export function PageHeader({
 
 export function Card({ children, className = "", id }: { children: ReactNode; className?: string; id?: string }) {
   return (
-    <section id={id} className={cn("rounded-xl border border-border bg-surface shadow-card", className)}>
+    <section id={id} className={cn("rounded-xl bg-surface shadow-card", className)}>
       {children}
     </section>
   );
@@ -141,7 +141,7 @@ export function CardHeader({
           {icon && <span className="text-text-faint">{icon}</span>}
           <SectionTitle>{title}</SectionTitle>
         </div>
-        {description && <p className="mt-1 max-w-prose text-xs leading-relaxed text-text-muted">{description}</p>}
+        {description && <p className="mt-1 max-w-prose text-[13px] leading-relaxed text-text-muted">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </div>
@@ -149,7 +149,7 @@ export function CardHeader({
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {
-  return <h2 className="text-xs font-semibold uppercase tracking-wider text-text-faint">{children}</h2>;
+  return <h2 className="text-[15px] font-semibold tracking-tight text-text">{children}</h2>;
 }
 
 /* ── Status ─────────────────────────────────────────────────────── */
@@ -381,14 +381,15 @@ export function StatTile({
   /** Tooltip explaining the number. */
   title?: string;
 }) {
-  const ring = tone === "warn" ? "ring-warn-line" : tone === "accent" ? "ring-info-line" : "ring-border";
+  // Same card as every other card; a tone adds a coloured edge (warn, accent) on top.
+  const ring = tone === "warn" ? "ring-1 ring-inset ring-warn-line" : tone === "accent" ? "ring-1 ring-inset ring-info-line" : "";
   const inner = (
     <div
       title={title}
       className={cn(
-        "rounded-xl bg-surface p-4 shadow-card ring-1 ring-inset transition",
+        "rounded-xl bg-surface p-4 shadow-card transition",
         ring,
-        href && "hover:ring-accent-ring",
+        href && "hover:ring-1 hover:ring-inset hover:ring-accent-ring",
       )}
     >
       <div className="text-xs font-medium text-text-muted">{label}</div>
@@ -414,8 +415,8 @@ const BUTTON_BASE =
   "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition select-none disabled:pointer-events-none disabled:opacity-50";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-white shadow-sm hover:bg-accent-hover active:bg-accent-active",
-  secondary: "border border-border bg-surface text-text hover:border-border-strong hover:bg-surface-2",
+  primary: "bg-accent text-white shadow-control hover:bg-accent-hover active:bg-accent-active",
+  secondary: "bg-surface text-text shadow-control hover:bg-surface-2",
   ghost: "text-text-muted hover:bg-surface-2 hover:text-text",
   danger: "border border-bad-line bg-surface text-bad hover:bg-bad-soft",
   link: "text-accent hover:underline",
@@ -521,7 +522,7 @@ export function IconButton({
     variant === "danger"
       ? "text-text-faint hover:bg-bad-soft hover:text-bad"
       : variant === "secondary"
-        ? "border border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
+        ? "bg-surface text-text-muted shadow-control hover:bg-surface-2 hover:text-text"
         : "text-text-faint hover:bg-surface-2 hover:text-text";
   return (
     <button
@@ -562,7 +563,7 @@ export function Segmented<T extends string>({
     <div
       role="group"
       aria-label={ariaLabel}
-      className="inline-flex overflow-hidden rounded-md border border-border bg-surface"
+      className="inline-flex overflow-hidden rounded-md bg-surface shadow-control"
     >
       {options.map((o, i) => {
         const active = o.value === value;
@@ -592,9 +593,9 @@ export function Segmented<T extends string>({
 /* ── Form controls ──────────────────────────────────────────────── */
 
 const FIELD_BASE =
-  "w-full rounded-md border border-border bg-surface text-text placeholder:text-text-faint transition focus:border-accent-ring focus:ring-2 focus:ring-accent-soft focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70";
+  "w-full rounded-md border border-field bg-surface text-text shadow-control placeholder:text-text-faint transition focus:border-accent-ring focus:ring-2 focus:ring-accent-soft focus-visible:outline-none disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70";
 
-const FIELD_INVALID = "border-bad-line focus:border-bad focus:ring-bad-soft";
+const FIELD_INVALID = "border-bad focus:border-bad focus:ring-bad-soft";
 
 // React 19: `ref` is an ordinary prop, so these accept one without forwardRef.
 type NativeInput = Omit<ComponentProps<"input">, "size">;

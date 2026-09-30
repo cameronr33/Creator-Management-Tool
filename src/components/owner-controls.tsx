@@ -99,7 +99,7 @@ export function OwnerMenu({
     <Menu
       label={owner ? `${mine ? "Yours" : `${owner.name}'s`} — change the owner` : `Nobody has ${name} — take it or assign it`}
       align="start"
-      triggerClassName="inline-flex shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
+      triggerClassName="relative inline-flex shrink-0 rounded-full before:absolute before:-inset-1 before:rounded-full before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
       trigger={owner ? <OwnerChip label={owner.label} name={owner.name} mine={mine} /> : <DashedChip icon={<UserPlus size={11} aria-hidden />}>Take it</DashedChip>}
     >
       {!mine && meId && (

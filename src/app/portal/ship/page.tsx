@@ -19,7 +19,7 @@ export default async function PortalShip() {
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-text">
+          <h1 className="text-xl font-semibold tracking-tight text-text">
             Ship product<span className="hidden print:inline"> · {ctx.clientName}</span>
           </h1>
           <p className="text-sm text-text-muted print:hidden">These creators have agreed and confirmed their address. Mark each one shipped with the tracking number — we&apos;ll take it from there.</p>

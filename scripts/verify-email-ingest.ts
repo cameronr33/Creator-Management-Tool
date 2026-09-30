@@ -318,7 +318,7 @@ async function main() {
     const [limited] = await db.insert(schema.cmContracts).values({ partnershipId, source: "email", filename: "later.pdf", gmailMessageId: "__verify_ei_pdf_q", gmailPartId: "2" }).returning();
     const quota = await downloadContracts("token", 10, {
       getMessage: async () => {
-        throw new Error("Gmail API /messages/x?format=full failed (HTTP 403): Quota exceeded for quota metric 'Total Query Cost'");
+        throw new Error("Mailbox request /messages/x?format=full failed (HTTP 403): Quota exceeded for quota metric 'Total Query Cost'");
       },
       getAttachment: async () => pdfBytes,
     }, [limited.id]);

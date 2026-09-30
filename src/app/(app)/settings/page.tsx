@@ -26,7 +26,7 @@ import { listTeamForSettings, memberForUser } from "@/lib/owners";
 export const metadata: Metadata = { title: "Settings" };
 
 const GMAIL_ERRORS: Record<string, string> = {
-  invalid_state: "The Google sign-in didn't complete (state mismatch). Try Connect Gmail again.",
+  invalid_state: "The Google sign-in didn't finish. Try Connect a Google mailbox again.",
   no_refresh_token:
     "Google didn't return a refresh token. Remove Creator Manager under myaccount.google.com/permissions, then connect again.",
   exchange_failed:
@@ -36,10 +36,10 @@ const GMAIL_ERRORS: Record<string, string> = {
 
 function describeGmailResult(param: string | null): { tone: "good" | "bad"; text: string } | null {
   if (!param) return null;
-  if (param === "connected") return { tone: "good", text: "Gmail connected. The first check searches each creator's last 6 months of email." };
+  if (param === "connected") return { tone: "good", text: "Mailbox connected. The first check looks through each creator's last 6 months of email." };
   if (param.startsWith("error:")) {
     const code = param.slice("error:".length);
-    return { tone: "bad", text: GMAIL_ERRORS[code] ?? `Gmail connection failed: ${code}` };
+    return { tone: "bad", text: GMAIL_ERRORS[code] ?? `The mailbox didn't connect (${code}). Try again.` };
   }
   return null;
 }
@@ -94,7 +94,7 @@ export default async function SettingsPage({
       <PageHeader
         title="Settings"
         client={client.name}
-        help="Follow-up timing and campaigns for this client. The Gmail connection and which clients show apply to every client."
+        help="Follow-up timing and campaigns for this client. The mailbox connection and which clients show apply to every client."
         helpAnchor="email"
       />
       <div className="mx-auto max-w-3xl space-y-6 p-6">
@@ -223,7 +223,7 @@ export default async function SettingsPage({
 
         <Card id="gmail" className="scroll-mt-4 p-5">
           <CardHeader
-            title="Gmail connection"
+            title="Mailbox"
             description="The shared mailbox the app reads (read-only) to track creator email. Keep it on cc for every creator email; replies on threads it isn't on are invisible."
           />
           <div className="mt-3">

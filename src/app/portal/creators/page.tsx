@@ -39,7 +39,7 @@ export default async function PortalCreators() {
   return (
     <>
       <div>
-        <h1 className="text-lg font-semibold tracking-tight text-text">All creators</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-text">All creators</h1>
         <p className="text-sm text-text-muted">Everyone in your program and where they are.</p>
       </div>
       {live.length === 0 ? <EmptyState title="No creators in progress yet" /> : <Card className="overflow-hidden">{list(live)}</Card>}

@@ -243,7 +243,7 @@ export default async function CreatorDetailPage({
             <Avatar name={creator.name} size="lg" src={photo} />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-semibold tracking-tight text-text">{creator.name}</h1>
+                <h1 className="text-xl font-semibold tracking-tight text-text">{creator.name}</h1>
                 {creator.contentPillar && <Badge tone="accent">{creator.contentPillar}</Badge>}
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
@@ -397,7 +397,7 @@ export default async function CreatorDetailPage({
                       </div>
                       {t.gmailUrl && (
                         <a href={t.gmailUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
-                          Open in Gmail <ExternalLink size={11} />
+                          Open the email <ExternalLink size={11} />
                         </a>
                       )}
                     </header>
@@ -607,7 +607,7 @@ export default async function CreatorDetailPage({
         </Card>
 
         {/* Removing them */}
-        <Card className="border-bad-line p-4">
+        <Card className="p-4 ring-1 ring-inset ring-bad-line">
           <CardHeader title="Remove" icon={<TriangleAlert size={14} />} description="Taking someone off a campaign deletes that campaign's conversation, shipping and videos for them." />
           <div className="mt-3">
             <DangerZone

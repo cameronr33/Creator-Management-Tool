@@ -82,7 +82,7 @@ export function QuickStage({
       </Select>
       {askVideo && <VideoLinkPrompt pending={pending} onSubmit={(url) => setStage("posted", undefined, url)} onCancel={() => setAskVideo(false)} />}
       {closingAs && (
-        <div className="rounded-lg border border-accent-ring bg-surface p-2.5 text-xs shadow-pop">
+        <div className="rounded-lg border border-info-line bg-accent-soft p-2.5 text-xs">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="font-medium text-text">{stageLabel(closingAs)} — why?</span>
             <IconButton label="Cancel" icon={<X size={13} />} onClick={() => setClosingAs(null)} />

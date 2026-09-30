@@ -134,7 +134,7 @@ export function PipelineBoard({
   const closePrompt = (c: Closing) => {
     const card = items.find((x) => x.partnershipId === c.id);
     return (
-      <div className="rounded-lg border border-accent-ring bg-surface p-2.5 text-xs shadow-pop">
+      <div className="rounded-lg border border-info-line bg-accent-soft p-2.5 text-xs">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <span className="font-medium text-text">Close {card?.name ?? "this creator"}</span>
           <IconButton label="Cancel" icon={<X size={13} />} onClick={() => setClosing(null)} />
@@ -333,7 +333,7 @@ function PipelineCard({
         onDragStart();
       }}
       onDragEnd={onDragEnd}
-      className={cn("cursor-grab rounded-lg border border-border bg-surface p-2.5 shadow-card transition active:cursor-grabbing", dragging && "opacity-50")}
+      className={cn("cursor-grab rounded-lg bg-surface p-2.5 shadow-control transition-shadow hover:shadow-card active:cursor-grabbing", dragging && "opacity-50")}
     >
       <div className="flex items-center gap-2">
         <Avatar name={c.name} size="sm" src={c.photoUrl} />

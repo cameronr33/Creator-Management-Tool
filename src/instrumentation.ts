@@ -19,7 +19,7 @@ export async function register() {
     throw new Error("Refusing to start: TOKEN_ENCRYPTION_KEY must be 64 hex characters (32 bytes)");
   }
   if ((process.env.APP_URL ?? process.env.NEXTAUTH_URL) == null) {
-    console.warn("[env] APP_URL/NEXTAUTH_URL not set — Gmail OAuth redirect URI cannot be built");
+    console.warn("[env] APP_URL/NEXTAUTH_URL not set — the mailbox sign-in redirect can't be built");
   }
   const optional = ["APIFY_TOKEN", "ANTHROPIC_API_KEY", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] as const;
   const off = optional.filter((k) => !process.env[k]);

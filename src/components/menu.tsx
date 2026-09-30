@@ -115,7 +115,7 @@ export function Menu({
             aria-label={label}
             onMouseDown={(e) => e.stopPropagation()}
             style={{ position: "fixed", ...at }}
-            className="z-50 min-w-44 max-w-72 overflow-y-auto rounded-lg border border-border bg-surface py-1 text-sm shadow-pop"
+            className="z-50 min-w-44 max-w-72 overflow-y-auto rounded-lg border border-border bg-surface py-1 text-sm shadow-float"
           >
             <CloseMenu.Provider value={() => close()}>{children}</CloseMenu.Provider>
           </div>,

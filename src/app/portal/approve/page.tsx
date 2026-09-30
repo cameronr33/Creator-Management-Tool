@@ -12,7 +12,7 @@ export default async function PortalApprove() {
   return (
     <>
       <div>
-        <h1 className="text-lg font-semibold tracking-tight text-text">Approve creators</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-text">Approve creators</h1>
         <p className="text-sm text-text-muted">We won&apos;t reach out to these creators until you approve. Pass on anyone who isn&apos;t right — a reason helps us find better ones.</p>
       </div>
       {waiting.length === 0 ? (
