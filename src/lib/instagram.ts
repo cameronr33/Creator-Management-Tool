@@ -75,7 +75,7 @@ export async function refreshFromInstagram(creatorIds: string[], opts: { fetch?:
     try {
       profiles = await get(batch.map((r) => r.username.toLowerCase()));
     } catch (e) {
-      result.errors.push((e as Error).message);
+      result.errors.push((e as Error).message); // log-only: the enrich route logs these and shows plain words
       continue;
     }
     const byHandle = new Map(profiles.map((p) => [p.username, p]));

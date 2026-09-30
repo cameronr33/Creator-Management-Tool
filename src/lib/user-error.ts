@@ -10,3 +10,10 @@ export class UserError extends Error {
     this.name = "UserError";
   }
 }
+
+/** The words a person sees for a caught error: a UserError's own, or the fallback — with the real error in the log. */
+export function userMessage(e: unknown, fallback: string, context = "[error]"): string {
+  if (e instanceof UserError) return e.message;
+  console.error(context, e);
+  return fallback;
+}

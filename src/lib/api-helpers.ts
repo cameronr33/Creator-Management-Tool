@@ -3,7 +3,7 @@
  */
 
 import { timingSafeEqual } from "crypto";
-import { UserError } from "@/lib/user-error";
+import { UserError, userMessage } from "@/lib/user-error";
 import { NextResponse } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { auth } from "@/lib/auth";
@@ -75,9 +75,8 @@ export function badRequest(message: string, details?: unknown) {
  * else — the fallback, with the real error in the server log.
  */
 export function errorResponse(e: unknown, fallback: string) {
-  if (e instanceof UserError) return badRequest(e.message);
-  console.error(e);
-  return NextResponse.json({ error: fallback }, { status: 500 });
+  const message = userMessage(e, fallback);
+  return e instanceof UserError ? badRequest(message) : NextResponse.json({ error: message }, { status: 500 });
 }
 
 export function notFound(message = "That isn't here any more. Reload the page.") {

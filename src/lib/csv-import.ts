@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { userMessage } from "@/lib/user-error";
 import { cmCreators, cmPartnerships } from "@/lib/db/schema";
 import { parseCsvMatrix, toFloat, toInt, viewsSourceOf } from "@/lib/csv";
 import { parseSocialUrl } from "@/lib/social-links";
@@ -294,7 +295,7 @@ export async function applyImport(clientId: string, parsed: ParsedFile, userId?:
       if (row.email) result.withEmail++;
       await writeNumbers(r.creatorId, row);
     } catch (e) {
-      result.failed.push({ line: row.line, message: (e as Error).message });
+      result.failed.push({ line: row.line, message: userMessage(e, "Couldn't save this row. Check its numbers are whole numbers and not too large, then import it again.", `[csv-import] line ${row.line}`) });
     }
   }
   return result;

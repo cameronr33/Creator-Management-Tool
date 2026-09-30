@@ -259,18 +259,19 @@ function main() {
   for (const name of readdirSync(join(ROOT, "lib"))) {
     const lib = `lib/${name}`;
     const importedByARoute = routeSrc.includes(`"@/lib/${name.replace(/\.ts$/, "")}"`);
-    if (name.endsWith(".ts") && importedByARoute && /ok: false, error:/.test(read(lib)) && !errorFiles.includes(lib)) errorFiles.push(lib);
+    if (name.endsWith(".ts") && importedByARoute && !errorFiles.includes(lib)) errorFiles.push(lib);
   }
-  for (const f of errorFiles.filter((x) => !x.includes("/cron/"))) {
+  // lib/user-error.ts is never scanned: userMessage there is the one place a UserError's own words are read.
+  for (const f of errorFiles.filter((x) => !x.includes("/cron/") && x !== "lib/user-error.ts")) {
     // Review 2026-09-30: any "Invalid …" or "… not found" is a raw word too, wherever it is.
     for (const m of read(f).match(/["'`](?:Invalid [a-zA-Z ]+|[A-Z][a-z]+ not found[^"'`]*|Missing [^"'`]*|Expected [^"'`]*)["'`]/g) ?? []) if (!/cron/.test(m)) rawErrors.push(`${f}: ${m}`);
     // Second review: a caught error's own words, however it's spelled (err.message, error.message, e.message).
     for (const line of read(f).split("\n")) {
-      if (line.trim() === "if (e instanceof UserError) return badRequest(e.message);") continue;
-      if (/\bconsole\.(?:error|warn|log)\(/.test(line)) continue; // the server log may say anything
+      if (/^console\.(?:error|warn|log)\(/.test(line.trim()) && !/\breturn\b|NextResponse|badRequest/.test(line)) continue; // a line that only logs may say anything
+      if (/\/\/ log-only: \S.{8,}$/.test(line)) continue; // raw words kept for the log or a stored status no one is shown — said so, with why
       if (/\b(?:e|err|error|ex|cause)\.message\b|\(\w+ as Error\)\.message\b|String\((?:e|err|error)\)|\$\{(?:e|err|error)\}|\.errors\[0\]/.test(line)) rawErrors.push(`${f}: ${line.trim().slice(0, 80)}`);
     }
-    for (const m of read(f).match(/"(?:Unauthorized|Invalid request|Invalid fields|Invalid bulk action|Invalid undo|Invalid archive|Not found|Partnership not found|Invalid partnership id|No client selected)"|belongs to a different client|Couldn't pass on this creator|HTTP \$\{r\.status\}|\(e as Error\)\.message/g) ?? []) rawErrors.push(`${f}: ${m}`);
+    for (const m of read(f).match(/"(?:Unauthorized|Invalid request|Invalid fields|Invalid bulk action|Invalid undo|Invalid archive|Not found|Partnership not found|Invalid partnership id|No client selected)"|belongs to a different client|Couldn't pass on this creator|HTTP \$\{r\.status\}/g) ?? []) rawErrors.push(`${f}: ${m}`);
   }
   check("every error a teammate can see says what to do next — no raw server words (R3)", rawErrors.length === 0, rawErrors.join("; "));
   const confirmSrc = read("components/confirm-button.tsx");

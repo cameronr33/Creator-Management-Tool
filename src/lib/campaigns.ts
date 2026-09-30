@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { UserError } from "@/lib/user-error";
 import { cmCampaigns, cmCreatorEmails, cmCreators, cmGmailAccounts, cmPartnerships } from "@/lib/db/schema";
 
 /**
@@ -33,7 +34,7 @@ export async function findCampaignByName(clientId: string, name: string): Promis
 /** Find (ignoring case) or create. Safe when two imports create the same name at once. */
 export async function ensureCampaign(clientId: string, name: string): Promise<{ id: string; name: string; created: boolean }> {
   const n = normalizeCampaignName(name);
-  if (!n) throw new Error("A campaign needs a name");
+  if (!n) throw new UserError("A campaign needs a name.");
   const found = await findCampaignByName(clientId, n);
   if (found) return { ...found, created: false };
   const [row] = await db.insert(cmCampaigns).values({ clientId, name: n }).onConflictDoNothing().returning({ id: cmCampaigns.id, name: cmCampaigns.name });

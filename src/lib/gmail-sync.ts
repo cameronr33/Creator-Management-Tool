@@ -254,7 +254,7 @@ export async function runGmailSync(opts: { trigger: SyncTrigger; windowDays?: nu
       .where(eq(cmGmailAccounts.id, account.id));
     return summary;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = err instanceof Error ? err.message : String(err); // log-only: stored in last_sync_status, which Settings no longer shows
     await db
       .update(cmGmailAccounts)
       .set({ lastSyncAt: new Date(), lastSyncStatus: `error: ${message}`, lastSyncSummary: null })
@@ -358,7 +358,7 @@ export async function downloadContracts(
       const r = await attachDownloaded(row.id, await fetchers.getAttachment(accessToken, row.gmailMessageId!, part.attachmentId));
       if (r === "stored") downloaded++;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = err instanceof Error ? err.message : String(err); // log-only: noteDownloadFailed logs it and stores plain words
       // Gmail's rate limit isn't this file's fault: stop for now, count nothing, try next check.
       if (isRateLimited(message)) break;
       failed++;

@@ -34,7 +34,7 @@ export function encrypt(plaintext: string): string {
 export function decrypt(stored: string): string {
   const key = getKey();
   const parts = stored.split(":");
-  if (parts.length !== 3) throw new Error("Invalid encrypted token format");
+  if (parts.length !== 3) throw new Error("The saved mailbox sign-in can't be read — reconnect the inbox in Settings.");
   const [ivHex, authTagHex, encryptedHex] = parts;
   const iv = Buffer.from(ivHex, "hex");
   const authTag = Buffer.from(authTagHex, "hex");
