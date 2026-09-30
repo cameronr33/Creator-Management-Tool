@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const form = await req.formData().catch(() => null);
-  if (!form) return badRequest("Expected a file upload");
+  if (!form) return badRequest("Choose a CSV file to import, then try again.");
   const file = form.get("file");
   if (!(file instanceof File)) return badRequest("Choose a CSV file first");
   if (file.size > MAX_BYTES) return badRequest("That file is over 2 MB — split it into smaller files");

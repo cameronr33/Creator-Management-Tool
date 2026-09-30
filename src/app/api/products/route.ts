@@ -53,7 +53,7 @@ export async function DELETE(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const parsed = deleteSchema.safeParse(body);
-  if (!parsed.success) return badRequest("Missing id");
+  if (!parsed.success) return badRequest("Couldn't remove that product. Reload the page and try again.");
 
   // Delete only within the selected client — a product id from another
   // client's deal must not be removable from here.

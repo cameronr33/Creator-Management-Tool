@@ -45,12 +45,12 @@ export async function PATCH(req: NextRequest) {
   const client = await selectedClient();
   if (!client) return badRequest("Pick a client in the sidebar first");
   const parsed = z.object({ id: z.string().uuid(), action: z.enum(["invite", "revoke"]) }).safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Couldn't save that. Check the name and email, then try again.");
+  if (!parsed.success) return badRequest("Couldn't change that. Reload the page and try again.");
   if (parsed.data.action === "revoke") {
-    return (await revokeLogin(client.id, parsed.data.id)) ? NextResponse.json({ ok: true }) : badRequest("Person not found for this client");
+    return (await revokeLogin(client.id, parsed.data.id)) ? NextResponse.json({ ok: true }) : badRequest("That person isn't on this client any more. Reload the page.");
   }
   const token = await createInvite(client.id, parsed.data.id);
-  if (!token) return badRequest("Person not found for this client");
+  if (!token) return badRequest("That person isn't on this client any more. Reload the page.");
   const base = (process.env.APP_URL ?? new URL(req.url).origin).replace(/\/$/, "");
   return NextResponse.json({ ok: true, url: `${base}/invite/${token}` });
 }
@@ -61,8 +61,8 @@ export async function DELETE(req: NextRequest) {
   const client = await selectedClient();
   if (!client) return badRequest("Pick a client in the sidebar first");
   const parsed = z.object({ id: z.string().uuid() }).safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Couldn't save that. Check the name and email, then try again.");
-  if (!(await removeClientUser(client.id, parsed.data.id))) return badRequest("Person not found for this client");
+  if (!parsed.success) return badRequest("Couldn't change that. Reload the page and try again.");
+  if (!(await removeClientUser(client.id, parsed.data.id))) return badRequest("That person isn't on this client any more. Reload the page.");
   reclassifyLater();
   return NextResponse.json({ ok: true });
 }

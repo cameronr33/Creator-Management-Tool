@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { and, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { UserError } from "@/lib/user-error";
 import { cmContracts, cmGmailAccounts, cmOutreachEvents, type CmGmailAccount } from "@/lib/db/schema";
 import { decrypt } from "@/lib/encryption";
 import { describeSyncOutcome, requireCompleteSync } from "@/lib/gmail-sync-outcome";
@@ -179,7 +180,7 @@ export class SyncBusyError extends Error {
  */
 export async function runGmailSync(opts: { trigger: SyncTrigger; windowDays?: number }): Promise<SyncRunResult> {
   const account = await getActiveGmailAccount();
-  if (!account) throw new Error("No mailbox connected — connect one in Settings.");
+  if (!account) throw new UserError("No mailbox connected — connect one in Settings.");
   const lease = await acquireLease(account.id);
   if (!lease) throw new SyncBusyError();
 

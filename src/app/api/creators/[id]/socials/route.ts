@@ -46,7 +46,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   if (scope) return scope;
   const body = await req.json().catch(() => null);
   const parsed = deleteSchema.safeParse(body);
-  if (!parsed.success) return badRequest("Missing socialId");
+  if (!parsed.success) return badRequest("Couldn't remove that link. Reload the page and try again.");
 
   await removeCreatorSocial(id, parsed.data.socialId);
   return NextResponse.json({ ok: true });

@@ -183,7 +183,10 @@ export function Contracts({ partnershipId, contracts, differences }: { partnersh
                   <div className="text-xs text-text-muted">{c.filled.length ? `Filled in: ${c.filled.join(", ")}` : "Nothing was blank to fill — any differences are shown above."}</div>
                 )}
                 {(c.readStatus === "failed" || c.givenUp || c.readStatus === "not_contract" || c.readStatus === "pending") && c.readError && (
-                  <div className={c.readStatus === "not_contract" ? "text-xs text-text-muted" : "text-xs text-bad"}>{c.readError}</div>
+                  <div className={c.readStatus === "not_contract" ? "text-xs text-text-muted" : "text-xs text-bad"}>
+                    {/* The stored line is written while it's still retrying; once it has given up, say what's left to do. */}
+                    {c.givenUp ? "Couldn't download it from the email. Press Try fetching it again, or upload the PDF yourself." : c.readError}
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-1">

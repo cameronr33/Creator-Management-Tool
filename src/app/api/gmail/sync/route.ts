@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAgency } from "@/lib/api-helpers";
+import { requireAgency, errorResponse } from "@/lib/api-helpers";
 import { runEmailCheck, SyncBusyError } from "@/lib/gmail-sync";
 
 /** POST /api/gmail/sync — "Check email now". Leaves the same heartbeat as the schedule. */
@@ -15,7 +15,6 @@ export async function POST() {
     if (err instanceof SyncBusyError) {
       return NextResponse.json({ ok: false, error: "An email check is already running — give it a minute." }, { status: 409 });
     }
-    const message = err instanceof Error ? err.message : "Sync failed";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return errorResponse(err, "Couldn't check email just now. Try again in a minute — if it keeps failing, reconnect the inbox in Settings.");
   }
 }

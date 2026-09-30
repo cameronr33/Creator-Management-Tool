@@ -207,7 +207,7 @@ function main() {
   check("the focus ring is never switched off without a 2px accent ring in its place (R1)", offRing.length === 0, offRing.slice(0, 5).join("; "));
   check("menu items show the focus ring inside the panel (R1)", /-outline-offset-2/.test(menu));
   check("a menu that opens rightwards stays inside the screen (R6)", /Math\.min\(r\.left, window\.innerWidth/.test(menu));
-  check("a saving button keeps its accessible name (opacity, not visibility) (R9)", /<span className="inline-flex items-center gap-1\.5 opacity-0">\{children\}<\/span>/.test(ui) && !/<span className="[^"]*\binvisible\b[^"]*">\{children\}/.test(ui));
+  check("a saving button keeps its accessible name (opacity, not visibility) (R9)", /<span className="inline-flex items-center gap-1\.5 opacity-0">\{children\}<\/span>/.test(ui) && !/className=["`][^"`]*\binvisible\b/.test(ui));
   const commitOnChange: string[] = [];
   for (const f of ["creators-table.tsx", "owner-controls.tsx", "creator-record-actions.tsx", "quick-stage.tsx", "client-switcher.tsx", "campaign-switcher.tsx", "creators-filter-bar.tsx"]) {
     if (/<Select\b|<select\b/.test(read(`components/${f}`))) commitOnChange.push(f);
@@ -245,6 +245,8 @@ function main() {
   const rawErrors: string[] = [];
   // The lib files whose error words a route passes straight to the toast are scanned too.
   const errorFiles = ["lib/api-helpers.ts", "components/use-save.ts", "lib/campaigns.ts", "lib/creator-emails.ts"];
+  // The email check's own messages reach the toast only as UserErrors.
+  check("the email check's messages for people are UserErrors", /throw new UserError\("No mailbox connected — connect one in Settings\."\)/.test(read("lib/gmail-sync.ts")) && !/throw new Error\("Email check incomplete/.test(read("lib/gmail-sync-outcome.ts")));
   const walkApi = (dir: string) => {
     for (const name of readdirSync(join(ROOT, dir))) {
       const p = `${dir}/${name}`;
@@ -255,7 +257,9 @@ function main() {
   walkApi("app/api");
   for (const f of errorFiles.filter((x) => !x.includes("/cron/"))) {
     // Review 2026-09-30: any "Invalid …" or "… not found" is a raw word too, wherever it is.
-    for (const m of read(f).match(/"(?:Invalid [a-zA-Z ]+|[A-Z][a-z]+ not found)"/g) ?? []) rawErrors.push(`${f}: ${m}`);
+    for (const m of read(f).match(/"(?:Invalid [a-zA-Z ]+|[A-Z][a-z]+ not found[^"]*|Missing [^"]*|Expected [^"]*)"/g) ?? []) if (!/cron/.test(m)) rawErrors.push(`${f}: ${m}`);
+    // Second review: a caught error's own words, however it's spelled (err.message, error.message, e.message).
+    for (const line of read(f).split("\n")) if (/\b(?:e|err|error)\.message\b/.test(line) && !/instanceof UserError/.test(line)) rawErrors.push(`${f}: ${line.trim().slice(0, 80)}`);
     for (const m of read(f).match(/"(?:Unauthorized|Invalid request|Invalid fields|Invalid bulk action|Invalid undo|Invalid archive|Not found|Partnership not found|Invalid partnership id|No client selected)"|belongs to a different client|Couldn't pass on this creator|HTTP \$\{r\.status\}|\(e as Error\)\.message/g) ?? []) rawErrors.push(`${f}: ${m}`);
   }
   check("every error a teammate can see says what to do next — no raw server words (R3)", rawErrors.length === 0, rawErrors.slice(0, 6).join("; "));
@@ -290,6 +294,10 @@ function main() {
     for (const m of readFileSync(file, "utf8").match(/<Field\b[^>]*>\s*<div\b/g) ?? []) fieldWrapsDiv.push(`${rel}: ${m.replace(/\s+/g, " ").slice(0, 60)}`);
   }
   check("a Field wraps its control itself (its hint and error are tied to what it wraps)", fieldWrapsDiv.length === 0, fieldWrapsDiv.slice(0, 5).join("; "));
+  // Second review: once the email check gives up, the line points at the button that's there.
+  const contractsUi = read("components/contracts.tsx");
+  check("a contract the email check gave up on says to press Try fetching it again", /c\.givenUp \?[\s\S]{0,200}Press Try fetching it again, or upload the PDF yourself/.test(contractsUi));
+  check("a bad id when changing a brand login doesn't ask to check a name and email", !/Check the name and email/.test(read("app/api/client-users/route.ts").split("export async function PATCH")[1] ?? ""));
   check("no Tailwind class that v4 doesn't have (blur-0 is blur-none)", !/\bblur-0\b/.test(ui));
   check("no leftover sidebar dropdown CSS now the switchers are menus", !/select-chevron-light/.test(cssAll));
   check("every button gives a press, and a pending button keeps its width", /secondary: [`"][^`"]*active:/.test(ui) && /ghost: [`"][^`"]*active:/.test(ui) && /<span className="inline-flex items-center gap-1\.5 opacity-0">\{children\}<\/span>\s*<span className="absolute inset-0 flex items-center justify-center">\{spinner\}/.test(ui));
