@@ -4,7 +4,8 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { useCallback, useEffect, useReducer } from "react";
 import { stagesByGroup } from "@/lib/stages";
-import { Field, Input, Select, Button, Spinner } from "@/components/ui";
+import { Field, FieldGroup, Input, Button, Spinner } from "@/components/ui";
+import { ChoiceMenu } from "@/components/menu";
 import { useMainPending } from "@/components/main-pending";
 import { searchDraft } from "@/lib/search-draft";
 
@@ -58,35 +59,28 @@ export function CreatorsFilterBar() {
 
   return (
     <div className="flex flex-wrap items-end gap-2">
-      <Field label="Find a creator">
-        <div className="relative">
-          <Search size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-faint" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search creators"
-            title="Search by name, handle or content type"
-            aria-label="Search creators"
-            className="w-64 pl-8 pr-8"
-          />
-          {(pending || q !== urlQ) && <Spinner size={14} className="absolute top-1/2 right-2.5 -translate-y-1/2 text-accent" />}
-        </div>
+      <Field
+        label="Find a creator"
+        decorate={
+          <>
+            <Search size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-text-faint" />
+            {(pending || q !== urlQ) && <Spinner size={14} className="absolute top-1/2 right-2.5 -translate-y-1/2 text-accent" />}
+          </>
+        }
+      >
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, handle or content type" title="Search by name, handle or content type" className="w-64 pl-8 pr-8" />
       </Field>
 
-      <Field label="Stage">
-        <Select value={stage} onChange={(e) => setParam("stage", e.target.value)} aria-label="Stage" className="w-44">
-          <option value="">All stages</option>
-          {stagesByGroup().map((g) => (
-            <optgroup key={g.group} label={g.label}>
-              {g.stages.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </Select>
-      </Field>
+      <FieldGroup label="Stage">
+        {/* A menu: arrowing through a closed dropdown reloaded the list at every step (review 2026-09-30). */}
+        <ChoiceMenu<string>
+          label="Stage"
+          triggerClassName="inline-flex h-9 w-44 items-center justify-between gap-2 rounded-md border border-field bg-surface px-3 text-left text-sm text-text shadow-control transition hover:bg-surface-2"
+          value={stage}
+          options={[{ value: "", label: "All stages" }, ...stagesByGroup().flatMap((g) => g.stages.map((st) => ({ value: st.value, label: st.label, group: g.label })))]}
+          onChoose={(v) => setParam("stage", v)}
+        />
+      </FieldGroup>
 
       {hasFilters && (
         <Button

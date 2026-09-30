@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return badRequest(parsed.error.issues[0]?.message ?? "Invalid list", parsed.error.flatten());
+  if (!parsed.success) return badRequest(parsed.error.issues[0]?.message ?? "Couldn't save the list. Check the addresses and try again.", parsed.error.flatten());
 
   const entries = [...new Set(parsed.data.entries)];
   await db.update(cmGmailAccounts).set({ teamAddresses: entries }).where(eq(cmGmailAccounts.id, account.id));

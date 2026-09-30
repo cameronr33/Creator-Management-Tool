@@ -15,11 +15,11 @@ import { contractOfClient, isStaleRead, markForReread, readContract } from "@/li
  *   DELETE remove the file (what it already filled in stays)
  */
 async function scoped(id: string) {
-  if (!isUuid(id)) return { error: badRequest("Invalid contract id") } as const;
+  if (!isUuid(id)) return { error: badRequest("That file isn't here any more. Reload the page.") } as const;
   const client = await resolveClient(await getSelectedClientSlug());
-  if (!client) return { error: notFound("No client selected") } as const;
+  if (!client) return { error: notFound("Pick a client in the sidebar first.") } as const;
   const contract = await contractOfClient(client.id, id);
-  if (!contract) return { error: notFound("Contract not found") } as const;
+  if (!contract) return { error: notFound("That file isn't here any more. Reload the page.") } as const;
   return { contract } as const;
 }
 

@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
-  if (!parsed.success) return badRequest("Invalid product", parsed.error.flatten());
+  if (!parsed.success) return badRequest("Couldn't save the product. Check the name and quantity, then try again.", parsed.error.flatten());
   const d = parsed.data;
 
   const scope = await assertPartnershipInSelectedClient(d.partnershipId);
@@ -58,7 +58,7 @@ export async function DELETE(req: NextRequest) {
   // Delete only within the selected client — a product id from another
   // client's deal must not be removable from here.
   const client = await resolveClient(await getSelectedClientSlug());
-  if (!client) return badRequest("No client selected");
+  if (!client) return badRequest("Pick a client in the sidebar first.");
   const [owner] = await db
     .select({ clientId: cmCreators.clientId, partnershipId: cmPartnerships.id })
     .from(cmProductsRequested)
@@ -66,7 +66,7 @@ export async function DELETE(req: NextRequest) {
     .innerJoin(cmCreators, eq(cmPartnerships.creatorId, cmCreators.id))
     .where(eq(cmProductsRequested.id, parsed.data.id))
     .limit(1);
-  if (!owner || owner.clientId !== client.id) return badRequest("Product not found");
+  if (!owner || owner.clientId !== client.id) return badRequest("That product isn't here any more. Reload the page.");
 
   await db
     .delete(cmProductsRequested)

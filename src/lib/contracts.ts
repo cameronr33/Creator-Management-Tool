@@ -145,7 +145,7 @@ export async function noteDownloadFailed(id: string, message: string) {
   await db
     .update(cmContracts)
     // What went wrong goes to the log; the file's line says what to do (interface review R3).
-    .set({ attempts: sql`${cmContracts.attempts} + 1`, readError: "Couldn't download it from the email. Press Read it again, or upload the PDF yourself." })
+    .set({ attempts: sql`${cmContracts.attempts} + 1`, readError: "Couldn't download it from the email yet — it's tried again on the next email check. If it keeps failing, upload the PDF yourself." })
     .where(eq(cmContracts.id, id));
 }
 

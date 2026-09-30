@@ -1,6 +1,7 @@
 import { and, eq, like, sql } from "drizzle-orm";
 import { addCreatorEmail } from "@/lib/creator-emails";
 import { db } from "@/lib/db";
+import { UserError } from "@/lib/user-error";
 import { ensureCampaign } from "@/lib/campaigns";
 import { approvalRequired } from "@/lib/approvals";
 import {
@@ -72,11 +73,11 @@ export async function createCreatorWithPartnership(
 
   const name = input.name.trim();
   if (!name && parsedLinks.length === 0) {
-    throw new Error("Provide a name or at least one profile link");
+    throw new UserError("Add a name or at least one profile link.");
   }
 
   const base = deriveUsername(parsedLinks, name) ?? slugify(name);
-  if (!base) throw new Error("Could not derive a username from the name or links");
+  if (!base) throw new UserError("Couldn't make a username from that name. Add a profile link, or use letters in the name.");
 
   // Match an existing creator by the primary handle so re-adding someone who is
   // already tracked attaches to them rather than duplicating.
@@ -221,7 +222,7 @@ export async function updateCreatorProfile(creatorId: string, input: UpdateCreat
  */
 export async function addCreatorSocial(creatorId: string, rawUrl: string) {
   const link = parseSocialUrl(rawUrl);
-  if (!link) throw new Error("Could not read that link");
+  if (!link) throw new UserError("That doesn't look like a profile link. Paste the full address, starting with https://.");
   const [creator] = await db.select({ profileUrl: cmCreators.profileUrl }).from(cmCreators).where(eq(cmCreators.id, creatorId)).limit(1);
   const first = !!creator && !creator.profileUrl;
   const [added] = await db
@@ -265,7 +266,7 @@ export async function setPrimarySocial(creatorId: string, socialId: string) {
     .from(cmCreatorSocials)
     .where(and(eq(cmCreatorSocials.id, socialId), eq(cmCreatorSocials.creatorId, creatorId)))
     .limit(1);
-  if (!social) throw new Error("Link not found for this creator");
+  if (!social) throw new UserError("That link isn't on this creator any more. Reload the page.");
 
   await db
     .update(cmCreatorSocials)

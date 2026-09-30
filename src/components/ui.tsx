@@ -407,7 +407,7 @@ const BUTTON_BASE =
 
 // The icon ⇄ spinner cross-fade (better-ui icon transitions).
 const SWAP = "transition-[opacity,scale,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)]";
-const SWAP_IN = "scale-100 opacity-100 blur-0";
+const SWAP_IN = "scale-100 opacity-100 blur-none";
 const SWAP_OUT = "scale-[0.25] opacity-0 blur-[2px]";
 
 // Every button answers a press: a darker fill and a slight squeeze (not links — they're text).
@@ -679,6 +679,7 @@ export function Field({
   className = "",
   required,
   inline,
+  decorate,
 }: {
   label: ReactNode;
   hint?: ReactNode;
@@ -688,6 +689,8 @@ export function Field({
   required?: boolean;
   /** Label and control side by side (for short controls in a settings row). */
   inline?: boolean;
+  /** Drawn over the control (a search icon, a spinner) — the control itself stays the Field's child, so its hint is tied to it. */
+  decorate?: ReactNode;
 }) {
   // The hint or error is tied to the control, and an error marks it invalid (review 2026-09-30, R12).
   const noteId = `${useId()}-note`;
@@ -702,7 +705,14 @@ export function Field({
         {label}
         {required && <span className="text-bad"> *</span>}
       </span>
-      {control}
+      {decorate ? (
+        <span className="relative block">
+          {control}
+          {decorate}
+        </span>
+      ) : (
+        control
+      )}
       {error ? (
         <span id={noteId} role="alert" className="text-xs text-bad">
           {error}

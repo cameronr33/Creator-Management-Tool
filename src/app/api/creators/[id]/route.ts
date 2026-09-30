@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return badRequest("Invalid profile fields", parsed.error.flatten());
+  if (!parsed.success) return badRequest("Couldn't save the profile. Check the fields and try again.", parsed.error.flatten());
 
   const d = parsed.data;
   await updateCreatorProfile(id, {

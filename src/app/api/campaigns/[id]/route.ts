@@ -30,5 +30,5 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   if (scope) return scope;
   const client = (await resolveClient(await getSelectedClientSlug()))!;
   const r = await deleteCampaign(client.id, id);
-  return r.ok ? NextResponse.json(r) : badRequest("Campaign not found");
+  return r.ok ? NextResponse.json(r) : badRequest("That campaign isn't here any more. Reload the page.");
 }

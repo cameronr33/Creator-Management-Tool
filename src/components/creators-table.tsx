@@ -286,31 +286,34 @@ export function CreatorsTable({
               onChoose={(v) => assignTo(v === "__nobody" ? null : v)}
             />
           </FieldGroup>
-          <div className="self-center">
-            {archivedView ? (
+          {archivedView && (
+            <div className="self-center">
               <Button size="sm" icon={<ArchiveRestore size={13} />} pending={pending} onClick={() => bulk({ action: "unarchive" }, (d) => `${d.restored ?? 0} back on the lists`)}>
                 Restore
               </Button>
-            ) : (
-              // The less-used bulk actions live in ⋯, so the bar stays one short row (R16).
-              <Menu label="More for the selected" align="start">
-                {rows.some((r) => chosen.includes(r.partnershipId) && r.clientApproval === "pending") && (
-                  <MenuItem icon={<Check size={14} />} disabled={pending} onSelect={() => bulk({ action: "approve" }, (d) => `${d.approved ?? 0} approved for outreach`, undoApprove)}>
-                    Approve for outreach
-                  </MenuItem>
-                )}
-                <MenuItem
-                  icon={<ImageDown size={14} />}
-                  disabled={pending}
-                  onSelect={() => bulk({ action: "refresh_instagram" }, (d) => `Getting photos and followers for ${d.queued ?? 0} — they'll appear in a minute or two`)}
-                >
-                  Get photos &amp; followers
+            </div>
+          )}
+          <div className="self-center">
+            {/* The less-used bulk actions live in ⋯, so the bar stays one short row (R16) — in the archived list too. */}
+            <Menu label="More for the selected" align="start">
+              {rows.some((r) => chosen.includes(r.partnershipId) && r.clientApproval === "pending") && (
+                <MenuItem icon={<Check size={14} />} disabled={pending} onSelect={() => bulk({ action: "approve" }, (d) => `${d.approved ?? 0} approved for outreach`, undoApprove)}>
+                  Approve for outreach
                 </MenuItem>
+              )}
+              <MenuItem
+                icon={<ImageDown size={14} />}
+                disabled={pending}
+                onSelect={() => bulk({ action: "refresh_instagram" }, (d) => `Getting photos and followers for ${d.queued ?? 0} — they'll appear in a minute or two`)}
+              >
+                Get photos &amp; followers
+              </MenuItem>
+              {!archivedView && (
                 <MenuItem icon={<Archive size={14} />} disabled={pending} onSelect={() => bulk({ action: "archive" }, (d) => `${d.archived ?? 0} archived — see them under Archived`)}>
                   Archive
                 </MenuItem>
-              </Menu>
-            )}
+              )}
+            </Menu>
           </div>
           <div className="ml-auto self-center">
             <ConfirmButton

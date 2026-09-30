@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       trackingNumber: z.string().trim().max(80).optional(),
     })
     .safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Invalid shipment");
+  if (!parsed.success) return badRequest("Couldn't save the shipment. Check the tracking details and try again.");
   const d = parsed.data;
   const p = await partnershipOfClient(person.clientId, d.partnershipId);
   if (!p) return badRequest("That creator isn't one of yours");

@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Invalid outreach event", parsed.error.flatten());
+  if (!parsed.success) return badRequest("Couldn't log that. Reload the page and try again.", parsed.error.flatten());
   const d = parsed.data;
 
   const scope = await assertPartnershipInSelectedClient(d.partnershipId);

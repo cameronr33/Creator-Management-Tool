@@ -386,8 +386,8 @@ export function AddressEditor({
 
   return (
     <div className="space-y-3 rounded-lg border border-border bg-surface-2/60 p-3">
-      <Field label="Paste the address as they sent it" hint="One line or several — it's read into the fields below.">
-        <div className="flex gap-2">
+      <div className="flex gap-2">
+        <Field label="Paste the address as they sent it" hint="One line or several — it's read into the fields below." className="flex-1">
           <Textarea
             compact
             value={paste}
@@ -395,11 +395,11 @@ export function AddressEditor({
             rows={3}
             placeholder={"Joe Hubbard\n3333 Simeon Bunker St\nSaint Charles, MO 63301"}
           />
-          <Button size="sm" onClick={() => (paste.trim() ? parsePasted() : setParseIssues(["Paste the address first — as they sent it."]))} className="self-start">
-            Read it
-          </Button>
-        </div>
-      </Field>
+        </Field>
+        <Button size="sm" onClick={() => (paste.trim() ? parsePasted() : setParseIssues(["Paste the address first — as they sent it."]))} className="mt-5 self-start">
+          Read it
+        </Button>
+      </div>
       {parseIssues.length > 0 && <Callout tone="warn">{parseIssues.join(" ")}</Callout>}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Field label="Recipient name">

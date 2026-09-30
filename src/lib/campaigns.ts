@@ -53,7 +53,7 @@ export async function renameCampaign(clientId: string, id: string, name: string)
     .limit(1);
   if (clash.length) return { ok: false, error: "Another campaign already has that name" };
   const r = await db.update(cmCampaigns).set({ name: n }).where(and(eq(cmCampaigns.id, id), eq(cmCampaigns.clientId, clientId))).returning({ id: cmCampaigns.id });
-  return r.length ? { ok: true } : { ok: false, error: "Campaign not found" };
+  return r.length ? { ok: true } : { ok: false, error: "That campaign isn't here any more. Reload the page." };
 }
 
 export interface RemovalResult {

@@ -3,6 +3,7 @@
  */
 
 import { timingSafeEqual } from "crypto";
+import { UserError } from "@/lib/user-error";
 import { NextResponse } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { auth } from "@/lib/auth";
@@ -69,6 +70,16 @@ export function badRequest(message: string, details?: unknown) {
   return NextResponse.json({ error: message, details }, { status: 400 });
 }
 
+/**
+ * A caught error as a response: a UserError's own words, or — for anything
+ * else — the fallback, with the real error in the server log.
+ */
+export function errorResponse(e: unknown, fallback: string) {
+  if (e instanceof UserError) return badRequest(e.message);
+  console.error(e);
+  return NextResponse.json({ error: fallback }, { status: 500 });
+}
+
 export function notFound(message = "That isn't here any more. Reload the page.") {
   return NextResponse.json({ error: message }, { status: 404 });
 }
@@ -104,7 +115,7 @@ export async function assertPartnershipInSelectedClient(partnershipId: string) {
 
 /** Same guard for creator-level mutations. */
 export async function assertCreatorInSelectedClient(creatorId: string) {
-  if (!isUuid(creatorId)) return badRequest("Invalid creator id");
+  if (!isUuid(creatorId)) return badRequest("This creator isn't in the client you have selected. Reload the page.");
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) return notFound("Pick a client in the sidebar first.");
   const [row] = await db
@@ -112,7 +123,7 @@ export async function assertCreatorInSelectedClient(creatorId: string) {
     .from(cmCreators)
     .where(eq(cmCreators.id, creatorId))
     .limit(1);
-  if (!row) return notFound("Creator not found");
+  if (!row) return notFound("This creator isn't here any more. Reload the page.");
   if (row.clientId !== client.id) return notFound("This creator isn't in the client you have selected. Reload the page.");
   return null;
 }
@@ -143,11 +154,11 @@ export async function assertPartnershipsInSelectedClient(ids: string[]) {
 
 /** A campaign id from the body must belong to the selected client. */
 export async function assertCampaignInSelectedClient(campaignId: string) {
-  if (!isUuid(campaignId)) return badRequest("Invalid campaign id");
+  if (!isUuid(campaignId)) return badRequest("That campaign isn't here any more. Reload the page.");
   const client = await resolveClient(await getSelectedClientSlug());
   if (!client) return notFound("Pick a client in the sidebar first.");
   const [row] = await db.select({ clientId: cmCampaigns.clientId }).from(cmCampaigns).where(eq(cmCampaigns.id, campaignId)).limit(1);
-  if (!row) return notFound("Campaign not found");
+  if (!row) return notFound("That campaign isn't here any more. Reload the page.");
   if (row.clientId !== client.id) return notFound("That campaign isn't in the client you have selected. Reload the page.");
   return null;
 }

@@ -273,21 +273,9 @@ body {
  * Dropdown lists are drawn by the browser. A select sets the list's colours
  * only through its options, and Chrome on Windows paints the open list with
  * the select's own background — so every option gets both colours explicitly:
- * light list for normal selects, the sidebar's dark list for the sidebar ones.
+ * a light list (the sidebar's switchers are menus now, so there's no dark one).
  */
 select option {
   background-color: var(--surface);
   color: var(--text);
-}
-.select-chevron-light {
-  color-scheme: dark;
-}
-.select-chevron-light option {
-  background-color: var(--sidebar-bg-2);
-  color: var(--sidebar-text);
-}
-.select-chevron-light {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23adb2c7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
 }

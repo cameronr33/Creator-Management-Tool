@@ -1,6 +1,6 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAgency, badRequest, assertClientIsSelected, assertCampaignInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, errorResponse, assertClientIsSelected, assertCampaignInSelectedClient } from "@/lib/api-helpers";
 import { createCreatorWithPartnership, ensureCampaignByName } from "@/lib/creators";
 import { refreshFromInstagram } from "@/lib/instagram";
 import { STARTING_STAGES } from "@/lib/stages";
@@ -24,7 +24,7 @@ const schema = z
     message: "Pick a campaign or provide a new campaign name",
   })
   .refine((d) => d.name.trim() !== "" || d.links.some((l) => l.trim() !== ""), {
-    message: "Provide a name or at least one profile link",
+    message: "Add a name or at least one profile link.",
   });
 
 export async function POST(req: NextRequest) {
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return badRequest("Invalid creator", parsed.error.flatten());
+  if (!parsed.success) return badRequest("Couldn't add the creator. Check the name and link, then try again.", parsed.error.flatten());
   const d = parsed.data;
   const scope = (await assertClientIsSelected(d.clientId)) ?? (d.campaignId ? await assertCampaignInSelectedClient(d.campaignId) : null);
   if (scope) return scope;
@@ -60,6 +60,6 @@ export async function POST(req: NextRequest) {
     after(() => refreshFromInstagram([result.creatorId]).then(() => undefined));
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
-    return badRequest((e as Error).message);
+    return errorResponse(e, "Couldn't add the creator. Try again in a moment.");
   }
 }

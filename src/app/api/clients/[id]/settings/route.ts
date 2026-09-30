@@ -27,11 +27,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const { id } = await ctx.params;
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return badRequest("Invalid settings", parsed.error.flatten());
+  if (!parsed.success) return badRequest("Couldn't save those settings. Check the values and try again.", parsed.error.flatten());
   const d = parsed.data;
 
   const [client] = await db.select({ id: clients.id }).from(clients).where(eq(clients.id, id)).limit(1);
-  if (!client) return badRequest("Client not found");
+  if (!client) return badRequest("That client isn't here any more. Reload the page.");
 
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (d.hidden !== undefined) set.hidden = d.hidden;

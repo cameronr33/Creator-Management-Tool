@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAgency, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, errorResponse, assertCreatorInSelectedClient } from "@/lib/api-helpers";
 import { addCreatorSocial, removeCreatorSocial, setPrimarySocial } from "@/lib/creators";
 
 const postSchema = z.object({
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (scope) return scope;
   const body = await req.json().catch(() => null);
   const parsed = postSchema.safeParse(body);
-  if (!parsed.success) return badRequest("Invalid link", parsed.error.flatten());
+  if (!parsed.success) return badRequest("That doesn't look like a profile link. Paste the full address, starting with https://.", parsed.error.flatten());
   const d = parsed.data;
 
   try {
@@ -29,11 +29,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       await setPrimarySocial(id, d.socialId);
       return NextResponse.json({ ok: true });
     }
-    if (!d.url) return badRequest("Provide a url");
+    if (!d.url) return badRequest("Paste the profile link first.");
     const link = await addCreatorSocial(id, d.url);
     return NextResponse.json({ ok: true, link });
   } catch (e) {
-    return badRequest((e as Error).message);
+    return errorResponse(e, "Couldn't save that link. Try again in a moment.");
   }
 }
 

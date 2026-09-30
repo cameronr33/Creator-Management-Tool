@@ -74,10 +74,8 @@ function main() {
   }
   check("no <option> sets its own colours (globals.css styles every dropdown list)", optionColour.length === 0, optionColour.slice(0, 5).join("; "));
   const cssAll = readFileSync(join(ROOT, "app", "globals.css"), "utf8");
-  check(
-    "dropdown lists have explicit colours, and the sidebar's are dark",
-    /select option\s*\{[^}]*background-color[^}]*color/.test(cssAll) && /\.select-chevron-light option\s*\{[^}]*background-color/.test(cssAll),
-  );
+  // (2026-09-30: the sidebar switchers became menus, so their dark option list is gone — see the check below.)
+  check("dropdown lists have explicit colours", /select option\s*\{[^}]*background-color[^}]*color/.test(cssAll));
 
   // Regression (review, 2026-09-28): Field renders a <label>, which hands its clicks to the first button inside —
   // clicking "When" pressed "Today". A row of buttons goes in FieldGroup, never in Field.
@@ -201,7 +199,7 @@ function main() {
   for (const file of files) {
     const rel = relative(ROOT, file);
     if (!rel.endsWith(".tsx")) continue;
-    for (const m of readFileSync(file, "utf8").match(/"[^"]*focus-visible:outline-none[^"]*"/g) ?? []) {
+    for (const m of readFileSync(file, "utf8").match(/["`][^"`]*focus-visible:outline-none[^"`]*["`]/g) ?? []) {
       // Switching the ring off is allowed only with a visible replacement: the same 2px accent ring.
       if (!/focus-visible:ring-2/.test(m) || !/focus-visible:ring-accent-ring/.test(m)) offRing.push(`${rel}: ${m.slice(0, 70)}`);
     }
@@ -209,9 +207,9 @@ function main() {
   check("the focus ring is never switched off without a 2px accent ring in its place (R1)", offRing.length === 0, offRing.slice(0, 5).join("; "));
   check("menu items show the focus ring inside the panel (R1)", /-outline-offset-2/.test(menu));
   check("a menu that opens rightwards stays inside the screen (R6)", /Math\.min\(r\.left, window\.innerWidth/.test(menu));
-  check("a saving button keeps its accessible name (opacity, not visibility) (R9)", !/className="invisible/.test(ui) && /opacity-0/.test(ui));
+  check("a saving button keeps its accessible name (opacity, not visibility) (R9)", /<span className="inline-flex items-center gap-1\.5 opacity-0">\{children\}<\/span>/.test(ui) && !/<span className="[^"]*\binvisible\b[^"]*">\{children\}/.test(ui));
   const commitOnChange: string[] = [];
-  for (const f of ["creators-table.tsx", "owner-controls.tsx", "creator-record-actions.tsx", "quick-stage.tsx", "client-switcher.tsx", "campaign-switcher.tsx"]) {
+  for (const f of ["creators-table.tsx", "owner-controls.tsx", "creator-record-actions.tsx", "quick-stage.tsx", "client-switcher.tsx", "campaign-switcher.tsx", "creators-filter-bar.tsx"]) {
     if (/<Select\b|<select\b/.test(read(`components/${f}`))) commitOnChange.push(f);
   }
   const actions = read("components/partnership-actions.tsx");
@@ -245,7 +243,8 @@ function main() {
   // Interface review 2026-09-30 (owner picks R3, R14, R21, R22): words.
   console.log("\n── the words people read ──");
   const rawErrors: string[] = [];
-  const errorFiles = ["lib/api-helpers.ts", "components/use-save.ts"];
+  // The lib files whose error words a route passes straight to the toast are scanned too.
+  const errorFiles = ["lib/api-helpers.ts", "components/use-save.ts", "lib/campaigns.ts", "lib/creator-emails.ts"];
   const walkApi = (dir: string) => {
     for (const name of readdirSync(join(ROOT, dir))) {
       const p = `${dir}/${name}`;
@@ -253,8 +252,10 @@ function main() {
       else if (name === "route.ts") errorFiles.push(p);
     }
   };
-  walkApi("app/api/partnerships");
-  for (const f of errorFiles) {
+  walkApi("app/api");
+  for (const f of errorFiles.filter((x) => !x.includes("/cron/"))) {
+    // Review 2026-09-30: any "Invalid …" or "… not found" is a raw word too, wherever it is.
+    for (const m of read(f).match(/"(?:Invalid [a-zA-Z ]+|[A-Z][a-z]+ not found)"/g) ?? []) rawErrors.push(`${f}: ${m}`);
     for (const m of read(f).match(/"(?:Unauthorized|Invalid request|Invalid fields|Invalid bulk action|Invalid undo|Invalid archive|Not found|Partnership not found|Invalid partnership id|No client selected)"|belongs to a different client|Couldn't pass on this creator|HTTP \$\{r\.status\}|\(e as Error\)\.message/g) ?? []) rawErrors.push(`${f}: ${m}`);
   }
   check("every error a teammate can see says what to do next — no raw server words (R3)", rawErrors.length === 0, rawErrors.slice(0, 6).join("; "));
@@ -280,7 +281,18 @@ function main() {
   check("one press size, 0.96, on buttons and icon buttons (R20)", /const PRESS = "active:scale-\[0\.96\]"/.test(ui) && !/active:scale-\[0\.98\]/.test(ui));
   check("menu and meta icons use a 1.5 stroke to match the text beside them (R25)", /\[&_svg\]:stroke-\[1\.5\]/.test(menu) && /strokeWidth=\{1\.5\}/.test(todayList));
   check("the saving spinner cross-fades in instead of jumping (R26)", /ease-\[cubic-bezier\(0\.2,0,0,1\)\]/.test(ui));
-  check("every button gives a press, and a pending button keeps its width", /secondary: [`"][^`"]*active:/.test(ui) && /ghost: [`"][^`"]*active:/.test(ui) && /invisible/.test(ui));
+  // Review of the interface fixes (2026-09-30).
+  check("the archived list keeps Approve and Get photos in its ⋯ menu; only Archive is left out there", /<Menu label="More for the selected"/.test(table) && /\{!archivedView && \(\s*<MenuItem icon=\{<Archive/.test(table));
+  const fieldWrapsDiv: string[] = [];
+  for (const file of files) {
+    const rel = relative(ROOT, file);
+    if (!rel.endsWith(".tsx")) continue;
+    for (const m of readFileSync(file, "utf8").match(/<Field\b[^>]*>\s*<div\b/g) ?? []) fieldWrapsDiv.push(`${rel}: ${m.replace(/\s+/g, " ").slice(0, 60)}`);
+  }
+  check("a Field wraps its control itself (its hint and error are tied to what it wraps)", fieldWrapsDiv.length === 0, fieldWrapsDiv.slice(0, 5).join("; "));
+  check("no Tailwind class that v4 doesn't have (blur-0 is blur-none)", !/\bblur-0\b/.test(ui));
+  check("no leftover sidebar dropdown CSS now the switchers are menus", !/select-chevron-light/.test(cssAll));
+  check("every button gives a press, and a pending button keeps its width", /secondary: [`"][^`"]*active:/.test(ui) && /ghost: [`"][^`"]*active:/.test(ui) && /<span className="inline-flex items-center gap-1\.5 opacity-0">\{children\}<\/span>\s*<span className="absolute inset-0 flex items-center justify-center">\{spinner\}/.test(ui));
 }
 
 main();

@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { UserError } from "@/lib/user-error";
 import { db } from "@/lib/db";
 import { cmCreatorEmails } from "@/lib/db/schema";
 
@@ -18,7 +19,7 @@ export function normalizeEmail(raw: string): string {
 /** Manual add on the creator page (source "manual"). */
 export async function addCreatorEmail(creatorId: string, rawEmail: string, source = "manual") {
   const email = normalizeEmail(rawEmail);
-  if (!EMAIL_RE.test(email)) throw new Error("Invalid email address");
+  if (!EMAIL_RE.test(email)) throw new UserError("That doesn't look like an email address. Check it and try again.");
   await db.insert(cmCreatorEmails).values({ creatorId, email, source }).onConflictDoNothing();
   return email;
 }

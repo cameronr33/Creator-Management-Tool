@@ -1,6 +1,6 @@
 import { NextResponse, after, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAgency, badRequest, assertCreatorInSelectedClient } from "@/lib/api-helpers";
+import { requireAgency, badRequest, errorResponse, assertCreatorInSelectedClient } from "@/lib/api-helpers";
 import { addCreatorEmail, removeCreatorEmail } from "@/lib/creator-emails";
 import { checkEmailForNewAddress } from "@/lib/gmail-sync";
 
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (scope) return scope;
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return badRequest("Invalid email", parsed.error.flatten());
+  if (!parsed.success) return badRequest("That doesn't look like an email address. Check it and try again.", parsed.error.flatten());
 
   try {
     const email = await addCreatorEmail(id, parsed.data.email);
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     after(() => checkEmailForNewAddress());
     return NextResponse.json({ ok: true, email });
   } catch (e) {
-    return badRequest((e as Error).message);
+    return errorResponse(e, "Couldn't add that email. Try again in a moment.");
   }
 }
 
@@ -38,7 +38,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   if (scope) return scope;
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return badRequest("Invalid email");
+  if (!parsed.success) return badRequest("That doesn't look like an email address. Check it and try again.");
 
   await removeCreatorEmail(id, parsed.data.email);
   return NextResponse.json({ ok: true });

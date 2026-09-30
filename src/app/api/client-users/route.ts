@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest) {
   const client = await selectedClient();
   if (!client) return badRequest("Pick a client in the sidebar first");
   const parsed = z.object({ id: z.string().uuid(), action: z.enum(["invite", "revoke"]) }).safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Invalid request");
+  if (!parsed.success) return badRequest("Couldn't save that. Check the name and email, then try again.");
   if (parsed.data.action === "revoke") {
     return (await revokeLogin(client.id, parsed.data.id)) ? NextResponse.json({ ok: true }) : badRequest("Person not found for this client");
   }
@@ -61,7 +61,7 @@ export async function DELETE(req: NextRequest) {
   const client = await selectedClient();
   if (!client) return badRequest("Pick a client in the sidebar first");
   const parsed = z.object({ id: z.string().uuid() }).safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return badRequest("Invalid request");
+  if (!parsed.success) return badRequest("Couldn't save that. Check the name and email, then try again.");
   if (!(await removeClientUser(client.id, parsed.data.id))) return badRequest("Person not found for this client");
   reclassifyLater();
   return NextResponse.json({ ok: true });

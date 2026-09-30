@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
       const [c] = await db.select({ followers: cmCreators.followers }).from(cmCreators).where(eq(cmCreators.id, d.creatorId)).limit(1);
       return NextResponse.json({ ok: true, followers: c?.followers ?? null, photo: r.photos > 0 });
     } catch (e) {
-      return NextResponse.json({ ok: false, error: (e as Error).message });
+      console.error(e);
+      return NextResponse.json({ ok: false, error: "Couldn't look them up right now. Try again in a minute." });
     }
   }
 
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
     if (!profile) return NextResponse.json({ ok: false, error: "No profile returned — it may be private." });
     return NextResponse.json({ ok: true, name: profile.fullName, followers: profile.followersCount, businessEmail: profile.businessEmail });
   } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as Error).message });
+    console.error(e);
+    return NextResponse.json({ ok: false, error: "Couldn't look that profile up right now. Try again in a minute, or fill it in by hand." });
   }
 }
