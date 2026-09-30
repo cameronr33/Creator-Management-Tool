@@ -174,7 +174,7 @@ export function MenuItem({
         active && "font-semibold",
       )}
     >
-      {icon && <span className="shrink-0 text-text-faint">{icon}</span>}
+      {icon && <span className="shrink-0 text-text-faint [&_svg]:stroke-[1.5]">{icon}</span>}
       <span className="min-w-0 flex-1 truncate">
         {children}
         {active && <SrOnly> (current)</SrOnly>}

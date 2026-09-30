@@ -281,9 +281,13 @@ export const AUTO_TRIGGER_PAST: Record<AutoStageTrigger, string> = {
 
 /** Tailwind classes per group — semantic tokens only, never raw palette colours. */
 export const STAGE_GROUP_STYLES: Record<StageGroup, string> = {
-  outreach: "bg-info-soft text-info ring-info-line",
-  deal: "bg-warn-soft text-warn ring-warn-line",
-  fulfilment: "bg-good-soft text-good ring-good-line",
+  // Neutral (interface review 2026-09-30, R4): Agreed and Finalizing wore the
+  // warning amber, and the outreach blue sat 3° from the action blue. The
+  // label already names the stage; colour is kept for warnings, good news and
+  // what you can press.
+  outreach: "bg-surface text-text ring-border-strong",
+  deal: "bg-surface text-text ring-border-strong",
+  fulfilment: "bg-surface text-text ring-border-strong",
   closed: "bg-surface-2 text-text-faint ring-border",
 };
 

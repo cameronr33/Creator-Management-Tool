@@ -267,6 +267,19 @@ function main() {
   const creatorsPage = read("app/(app)/creators/page.tsx");
   check("an empty search names the search and offers Clear filters; an empty conversation says how to start (R21)", /Clear filters/.test(creatorsPage) && /No creators match “/.test(creatorsPage) && !/Nothing yet\./.test(creatorPage));
   check("the log flow speaks as “I”, and one action has one name (R22)", !/We messaged them/.test(read("components/log-message.tsx")) && !/We sent them a DM/.test(actions) && /Log a message…/.test(todayList) && !/Log with a date or another way/.test(todayList) && !/"Open the conversation"/.test(creatorPage) && !/Shipment marked \$\{s\}/.test(actions));
+  // Interface review 2026-09-30 (owner picks R4, R13, R20, R23–R26): colour and motion.
+  console.log("\n── colour means something; motion stays light ──");
+  const stagesSrc = readFileSync(join(ROOT, "lib", "stages.ts"), "utf8");
+  const groupStyles = stagesSrc.split("STAGE_GROUP_STYLES")[1]?.split("};")[0] ?? "";
+  const groupClasses = (groupStyles.match(/"[^"]*"/g) ?? []).join(" "); // the class strings only, not the comment
+  check("stage pills don't wear the warning or action colours (R4)", groupClasses.length > 0 && !/warn|info|accent/.test(groupClasses), groupClasses.slice(0, 160));
+  check("static labels aren't in the action blue: client and pillar badges, avatar initials, the Next card's text, A to Z counts (R23)", !/<Badge tone="accent">\{client\}/.test(ui) && !/bg-accent-soft font-semibold text-accent/.test(ui) && !/tabular font-semibold text-accent/.test(read("components/a-to-z.tsx")) && !/Badge tone="accent">\{creator\.contentPillar/.test(creatorPage) && /data-next-card[\s\S]{0,300}text-text/.test(creatorPage));
+  check("banner text isn't dimmed (R24)", !/text-\[13px\] opacity-90/.test(ui));
+  check("a Today row folds in the gentle speed after a short hold, and the pulse draws one shadow (R13)", /animation: row-leave 320ms/.test(css) && /animation-delay: 450ms/.test(css) && !/ring-pulse[^}]*var\(--shadow-card\)/.test(css.replace(/\n/g, " ")));
+  check("a folded Pipeline column changes width at once, without animating it (R13)", !/transition-\[width/.test(board));
+  check("one press size, 0.96, on buttons and icon buttons (R20)", /const PRESS = "active:scale-\[0\.96\]"/.test(ui) && !/active:scale-\[0\.98\]/.test(ui));
+  check("menu and meta icons use a 1.5 stroke to match the text beside them (R25)", /\[&_svg\]:stroke-\[1\.5\]/.test(menu) && /strokeWidth=\{1\.5\}/.test(todayList));
+  check("the saving spinner cross-fades in instead of jumping (R26)", /ease-\[cubic-bezier\(0\.2,0,0,1\)\]/.test(ui));
   check("every button gives a press, and a pending button keeps its width", /secondary: [`"][^`"]*active:/.test(ui) && /ghost: [`"][^`"]*active:/.test(ui) && /invisible/.test(ui));
 }
 

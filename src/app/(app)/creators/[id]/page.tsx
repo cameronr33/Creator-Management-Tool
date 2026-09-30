@@ -250,7 +250,7 @@ export default async function CreatorDetailPage({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-semibold tracking-tight text-text">{creator.name}</h1>
-              {creator.contentPillar && <Badge tone="accent">{creator.contentPillar}</Badge>}
+              {creator.contentPillar && <Badge tone="neutral">{creator.contentPillar}</Badge>}
             </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
               {creator.profileUrl ? (
@@ -310,17 +310,17 @@ export default async function CreatorDetailPage({
           data-next-card
           className={cn(
             "mt-4 max-w-3xl rounded-lg px-3.5 py-3 text-sm",
-            flagged || partnership.clientApproval === "pending" ? "border border-warn-line bg-warn-soft text-warn" : "bg-accent-soft text-accent",
+            flagged || partnership.clientApproval === "pending" ? "border border-warn-line bg-warn-soft text-warn" : "bg-accent-soft text-text",
           )}
         >
           <div className="flex items-start gap-2">
-            <ArrowRight size={15} className="mt-0.5 shrink-0" />
+            <ArrowRight size={15} className="mt-0.5 shrink-0 text-accent" />
             <div className="min-w-0 flex-1">
               <span className="font-semibold">Next:</span> {step.text}
               {step.anchor && step.anchor !== "stage" && (
                 <>
                   {" "}
-                  <a href={anchor(step.anchor as Parameters<typeof creatorSectionHref>[1])} className="font-medium underline">
+                  <a href={anchor(step.anchor as Parameters<typeof creatorSectionHref>[1])} className="font-medium text-accent underline">
                     {NEXT_LINK_LABELS[step.anchor] ?? "Open it"}
                   </a>
                 </>

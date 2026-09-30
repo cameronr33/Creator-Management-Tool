@@ -59,7 +59,7 @@ export function PageHeader({
           href={back.href}
           className="mb-2 inline-flex items-center gap-1 text-sm text-text-muted transition hover:text-accent"
         >
-          <ArrowLeft size={14} /> {back.label}
+          <ArrowLeft size={14} strokeWidth={1.5} /> {back.label}
         </Link>
       )}
       {!back && backSlot}
@@ -67,9 +67,9 @@ export function PageHeader({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight text-text">{title}</h1>
-            {client && <Badge tone="accent">{client}</Badge>}
+            {client && <Badge tone="neutral">{client}</Badge>}
             {campaign !== undefined && (
-              <Badge tone={campaign ? "info" : "muted"} title="Change it in the sidebar, under Campaign">
+              <Badge tone={campaign ? "neutral" : "muted"} title="Change it in the sidebar, under Campaign">
                 {campaign ?? "All campaigns"}
               </Badge>
             )}
@@ -276,7 +276,7 @@ export function Avatar({ name, size = "md", src }: { name: string; size?: "sm" |
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-accent-soft font-semibold text-accent ring-1 ring-inset ring-info-line",
+        "flex shrink-0 items-center justify-center rounded-full bg-surface-2 font-semibold text-text-muted ring-1 ring-inset ring-border-strong",
         dims,
       )}
       aria-hidden="true"
@@ -328,7 +328,7 @@ export function Callout({
       {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
       <div className="min-w-[14rem] flex-1">
         {title && <div className="font-medium">{title}</div>}
-        {children && <div className={cn("leading-relaxed", title ? "mt-0.5 text-[13px] opacity-90" : "")}>{children}</div>}
+        {children && <div className={cn("leading-relaxed", title ? "mt-0.5 text-[13px]" : "")}>{children}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -405,8 +405,13 @@ export type ButtonSize = "sm" | "md";
 const BUTTON_BASE =
   "relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition select-none disabled:pointer-events-none disabled:opacity-50";
 
+// The icon ⇄ spinner cross-fade (better-ui icon transitions).
+const SWAP = "transition-[opacity,scale,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)]";
+const SWAP_IN = "scale-100 opacity-100 blur-0";
+const SWAP_OUT = "scale-[0.25] opacity-0 blur-[2px]";
+
 // Every button answers a press: a darker fill and a slight squeeze (not links — they're text).
-const PRESS = "active:scale-[0.98]";
+const PRESS = "active:scale-[0.96]";
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: `bg-accent text-white shadow-control hover:bg-accent-hover active:bg-accent-active ${PRESS}`,
   secondary: `bg-surface text-text shadow-control hover:bg-surface-2 active:bg-surface-3 ${PRESS}`,
@@ -475,7 +480,15 @@ export function Button({
       </>
     ) : (
       <>
-        {pending ? spinner : icon}
+        {icon ? (
+          // The icon and the spinner cross-fade in one slot (R26), so a save doesn't jump.
+          <span className="relative inline-grid shrink-0 place-items-center">
+            <span className={cn(SWAP, "col-start-1 row-start-1 inline-flex", pending ? SWAP_OUT : SWAP_IN)}>{icon}</span>
+            <span aria-hidden className={cn(SWAP, "col-start-1 row-start-1 inline-flex", pending ? SWAP_IN : SWAP_OUT)}>
+              {pending && spinner}
+            </span>
+          </span>
+        ) : null}
         {children}
       </>
     );
@@ -535,7 +548,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-md transition active:scale-[0.96] disabled:pointer-events-none disabled:opacity-50",
+        `inline-flex shrink-0 items-center justify-center rounded-md transition ${PRESS} disabled:pointer-events-none disabled:opacity-50`,
         size === "sm" ? "h-8 w-8" : "h-9 w-9",
         tone,
         className,

@@ -218,7 +218,7 @@ export function PipelineBoard({
               }}
               onDrop={dropHere}
               className={cn(
-                "flex shrink-0 flex-col items-center gap-2 rounded-xl border border-dashed py-3 text-xs transition-[width,background-color,border-color,color] duration-(--duration-normal)",
+                "flex shrink-0 flex-col items-center gap-2 rounded-xl border border-dashed py-3 text-xs transition-[background-color,border-color,color] duration-(--duration-quick)",
                 over ? "w-40 border-accent-ring bg-accent-soft text-accent" : "w-10 border-border bg-surface-2/40 text-text-faint",
               )}
             >
@@ -410,7 +410,7 @@ function PipelineCard({
           <span />
         )}
         {showCampaign && (
-          <Badge tone="info">{c.campaignName}</Badge>
+          <Badge tone="neutral">{c.campaignName}</Badge>
         )}
       </div>
       <p className="mt-1.5 line-clamp-2 text-xs leading-snug text-text-muted" title={c.latest}>

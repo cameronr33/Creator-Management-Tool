@@ -87,7 +87,7 @@ export function TodayList({
   }
   useEffect(() => {
     if (!ghosts.length) return;
-    const t = setTimeout(() => setGhosts([]), 1200);
+    const t = setTimeout(() => setGhosts([]), 850); // 450ms hold + 320ms fold, then gone
     return () => clearTimeout(t);
   }, [ghosts]);
 
@@ -230,14 +230,14 @@ function TodayItem({
             <QuickStage partnershipId={r.partnershipId} name={r.name} stage={r.stage} asPill />
             {r.badge === "due" && <Badge tone="warn" title="The first message is overdue">Due</Badge>}
             {r.badge === "late" && <Badge tone="bad" title="The video is later than the client's Video due setting">Late</Badge>}
-            {showCampaign && <Badge tone="info">{r.campaignName}</Badge>}
+            {showCampaign && <Badge tone="neutral">{r.campaignName}</Badge>}
             {turn && r.section !== "your_turn" && r.section !== "waiting" && r.whoseTurn === "us" && <Badge tone="warn">Your turn</Badge>}
           </div>
           <p className="mt-1 text-sm text-text-muted">
             {r.latestFromEmail ? (
-              <Mail size={12} className="mr-1 inline align-[-1px] text-text-faint" />
+              <Mail size={12} strokeWidth={1.5} className="mr-1 inline align-[-1px] text-text-faint" />
             ) : (
-              <MessageCircle size={12} className="mr-1 inline align-[-1px] text-text-faint" />
+              <MessageCircle size={12} strokeWidth={1.5} className="mr-1 inline align-[-1px] text-text-faint" />
             )}
             {r.latest}
             {r.latestAt && <span className="text-text-faint"> · {relativeDays(r.latestAt)}</span>}
@@ -252,7 +252,7 @@ function TodayItem({
           )}
           {(r.section === "get_address" || r.stageFlag?.beneath === "get_address") && r.suggestedAddress && (
             <p className="mt-1 text-xs text-text-muted">
-              <MapPin size={12} className="mr-1 inline align-[-1px] text-text-faint" />
+              <MapPin size={12} strokeWidth={1.5} className="mr-1 inline align-[-1px] text-text-faint" />
               Found in their email: <span className="font-medium text-text">{r.suggestedAddress}</span>
             </p>
           )}

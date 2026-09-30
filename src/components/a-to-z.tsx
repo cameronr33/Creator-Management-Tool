@@ -26,7 +26,7 @@ export function AToZStrip({
               const inner = (
                 <>
                   <span className={(counts[s.value] ?? 0) > 0 ? "font-medium text-text" : "text-text-faint"}>{s.label}</span>
-                  <span className={(counts[s.value] ?? 0) > 0 ? "tabular font-semibold text-accent" : "tabular text-text-faint"}>{counts[s.value] ?? 0}</span>
+                  <span className={(counts[s.value] ?? 0) > 0 ? "tabular font-semibold text-text" : "tabular text-text-faint"}>{counts[s.value] ?? 0}</span>
                 </>
               );
               const cls = "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-text-muted transition hover:bg-surface-2 hover:text-text";
