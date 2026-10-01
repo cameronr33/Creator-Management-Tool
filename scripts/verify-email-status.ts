@@ -33,6 +33,7 @@ import {
   type PromptMessage,
 } from "../src/lib/email-status";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
+import { markPromiseDone } from "../src/lib/promise-answer";
 import { changeStage } from "../src/lib/mutations";
 import { STAGE_VALUES, isTerminal, stageIndex } from "../src/lib/stages";
 import type { CmStage } from "../src/lib/db/schema";
@@ -213,12 +214,14 @@ async function main() {
   const invite: PromptMessage[] = [m(1, { senderRole: "client", kind: "note", subject: "Invitation: HELLA call @ Mon Aug 3", body: "We'll talk through the launch on the call." })];
   check("the brand's calendar invite isn't a promise", verifiedPromise({ open_promise: { what: "Talk through the launch", quote: "We'll talk through the launch on the call.", message: 1 }, confidence: "high" }, invite) === null);
   // When a reading may wipe a stored promise: only when it confidently says none, and could see the message.
-  const upd = (open: Assessment["open_promise"], confidence: Assessment["confidence"], stored: string | null) => promiseUpdate({ open_promise: open, confidence }, promiseConvo, stored);
+  const upd = (open: Assessment["open_promise"], confidence: Assessment["confidence"], stored: string | null, storedDone = false) => promiseUpdate({ open_promise: open, confidence }, promiseConvo, stored, storedDone);
   check("a verified promise is stored", (() => { const u = upd({ what: "Send the contract", quote: "We'll send the contract on Friday", message: 1 }, "high", null); return typeof u === "object" && u !== null && u.eventId === "e1"; })());
   check("none, confidently, with the promise's message in view: cleared", upd(null, "high", "e1") === "clear");
   check("a low-confidence reading never wipes it", upd(null, "low", "e1") === "keep");
   check("a promise named but not verified never wipes the stored one", upd({ what: "x", quote: "not in the message", message: 1 }, "high", "e1") === "keep");
   check("the promise's message fell out of the reader's window: kept", upd(null, "high", "e-gone") === "keep");
+  // Second review: clearing a promise marked done loses the note to the reader, and the next reading brings it back.
+  check("a promise a teammate marked done is never cleared — the reader keeps being told", upd(null, "high", "e1", true) === "keep");
   const donePrompt = buildPrompt({ creatorName: "T", campaignName: "C", clientName: "H", stage: "in_conversation", hasAddress: false, shipmentStatuses: [], deliverables: 0, agreementType: null, messages: promiseConvo, donePromise: { what: "Circle back with launch dates", at: day(2) } });
   check("the reader is told what a teammate marked done, so it isn't open again or our turn", /marked done[^\n]*Circle back with launch dates/i.test(donePrompt.user) && /not[^\n]*open_promise/i.test(donePrompt.user));
   check("the prompt asks for our side's open promise, quoted, and null once it's done", /open_promise:[^\n]*our side[^\n]*(promised|said we would)/i.test(prompt.system) && /open_promise:[^\n]*null[^\n]*(done|kept)/i.test(prompt.system));
@@ -445,6 +448,14 @@ async function main() {
     await assessPartnership(flag.partnershipId, { apply: true, model: promiseReading({ what: "Pay them", quote: "I'll be here when you're ready!" }) });
     const [p3] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, flag.partnershipId));
     check("the creator's own line is never kept as our promise", p3.promiseText === null);
+    // Mark done, then two readings in a row (second review): the reader is told both times, and it stays done.
+    await assessPartnership(flag.partnershipId, { apply: true, model: promiseReading({ what: "Get back to them on the build", quote: "We can't move forward on that specific build this round." }) });
+    const doneAt = await markPromiseDone(flag.partnershipId);
+    await assessPartnership(flag.partnershipId, { apply: true, model: promiseReading(null) });
+    const firstToldDone = /marked done[^\n]*Get back to them on the build/.test(promisePrompt);
+    await assessPartnership(flag.partnershipId, { apply: true, model: promiseReading(null) });
+    const [p4] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, flag.partnershipId));
+    check("after Mark done, every later reading is told it's done, and it stays done", !!doneAt && firstToldDone && /marked done[^\n]*Get back to them on the build/.test(promisePrompt) && p4.promiseText === "Get back to them on the build" && p4.promiseDoneEventId === p4.promiseEventId);
 
     // No API credit: every conversation stays unread, to be read once it's back (regression, 2026-09-24).
     const noCredit: AssessFn = async () => {

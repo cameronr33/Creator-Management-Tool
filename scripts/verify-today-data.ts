@@ -129,7 +129,8 @@ async function main() {
     check("Undo with the moment it was marked brings it back", !!done && (await undoPromiseDone(promiser, done)) && (await promiseRow())?.section === "promised");
 
     // Review 2026-09-30: the reader said it's our turn because of the promise — Mark done must not drop the row into Your turn.
-    const theirMail = new Date(Date.now() - 50 * 86_400_000);
+    // Their thank-you came before the promise (Rob's "we'll circle back" answered it): the turn is ours only because of the promise.
+    const theirMail = new Date(Date.now() - 55 * 86_400_000);
     await db.insert(schema.cmOutreachEvents).values({ partnershipId: promiser, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", body: "I'll be here when you're ready!", occurredAt: theirMail, externalId: "__verify_td_promise_mail" });
     await db.update(schema.cmPartnerships).set({ emailSummary: "Waiting on launch dates.", emailSummaryAt: theirMail, emailWhoseTurn: "us" }).where(eq(schema.cmPartnerships.id, promiser));
     check("…(with the reader saying it's our turn, the promise is what's listed)", (await promiseRow())?.section === "promised");
@@ -139,6 +140,14 @@ async function main() {
     check("…and Undo puts it back, whose turn and all", !!done2 && (await undoPromiseDone(promiser, done2)) && (await promiseRow())?.section === "promised");
     const [restored] = await db.select({ handled: schema.cmPartnerships.replyHandledAt }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, promiser));
     check("…restoring what No reply needed was before", restored?.handled === null);
+    // Second review: a question from them after the promise is never answered by Mark done.
+    const asked = new Date(Date.now() - 2 * 86_400_000);
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId: promiser, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", body: "What size kit do you need?", occurredAt: asked, externalId: "__verify_td_promise_q" });
+    await db.update(schema.cmPartnerships).set({ emailSummary: "They asked which kit size.", emailSummaryAt: asked, emailWhoseTurn: "us" }).where(eq(schema.cmPartnerships.id, promiser));
+    const done3 = await markPromiseDone(promiser);
+    const afterQuestion = await promiseRow();
+    check("Mark done never counts a newer question from them as answered", !!done3 && afterQuestion?.section === "your_turn", JSON.stringify(afterQuestion && { s: afterQuestion.section, t: afterQuestion.whoseTurn }));
+    if (done3) await undoPromiseDone(promiser, done3);
     // A new promise in a message sent just before Mark done is a new promise.
     const [ev1] = await db.insert(schema.cmOutreachEvents).values({ partnershipId: promiser, direction: "outbound", channel: "email", kind: "follow_up", senderRole: "team", body: "We'll circle back with dates.", occurredAt: new Date(Date.now() - 49 * 86_400_000) }).returning();
     await db.update(schema.cmPartnerships).set({ promiseEventId: ev1.id }).where(eq(schema.cmPartnerships.id, promiser));

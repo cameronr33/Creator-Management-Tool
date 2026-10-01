@@ -1,4 +1,5 @@
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, notInArray, sql } from "drizzle-orm";
+import { STAGES } from "@/lib/stages";
 import { db } from "@/lib/db";
 import { clients, cmClientDomains, cmClientUsers, cmCreatorSideSenders, cmCreators, cmGmailAccounts, cmOutreachEvents, cmPartnerships, users } from "@/lib/db/schema";
 import { FREE_MAIL_DOMAINS, normAddress } from "@/lib/email-ingest";
@@ -161,11 +162,20 @@ export async function unmarkCreatorSide(raw: string): Promise<void> {
 
 /** The conversations they wrote on are read again, so the reader sees the new label. */
 async function rereadThreadsFrom(email: string) {
-  // Matched the same way the list groups them (normAddress), not with a LIKE pattern.
+  // Narrowed in SQL by the domain, then matched exactly the way the list groups them (normAddress).
+  // Live deals only: a closed one has nothing for the reader to decide, and each read costs a model call.
+  const domainLike = `%@${emailDomain(email).replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
   const rows = await db
     .select({ partnershipId: cmOutreachEvents.partnershipId, from: cmOutreachEvents.fromAddress })
     .from(cmOutreachEvents)
-    .where(and(eq(cmOutreachEvents.senderRole, "other"), sql`${cmOutreachEvents.fromAddress} is not null`));
+    .innerJoin(cmPartnerships, eq(cmPartnerships.id, cmOutreachEvents.partnershipId))
+    .where(
+      and(
+        eq(cmOutreachEvents.senderRole, "other"),
+        sql`lower(${cmOutreachEvents.fromAddress}) like ${domainLike}`,
+        notInArray(cmPartnerships.stage, STAGES.filter((s) => s.terminal).map((s) => s.value)),
+      ),
+    );
   const ids = [...new Set(rows.filter((r) => normAddress(r.from!) === email).map((r) => r.partnershipId))];
   if (ids.length) await db.update(cmPartnerships).set({ emailAssessedAt: null }).where(inArray(cmPartnerships.id, ids));
 }

@@ -1,6 +1,6 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cmPartnerships } from "@/lib/db/schema";
+import { cmOutreachEvents, cmPartnerships } from "@/lib/db/schema";
 
 /**
  * "Mark done" on an open promise (promises.ts), and its Undo. Compare-and-set
@@ -9,8 +9,9 @@ import { cmPartnerships } from "@/lib/db/schema";
  *
  * Mark done also answers whose turn it is, like "No reply needed": the
  * reader said it was our turn because of the promise (review 2026-09-30), so
- * without this the row would drop straight into Your turn. What No reply
- * needed was before is kept for Undo.
+ * without this the row would drop straight into Your turn — unless they
+ * wrote after the promise, which Mark done never answers for anyone. What No
+ * reply needed was before is kept for Undo.
  */
 export async function markPromiseDone(partnershipId: string, now = new Date()): Promise<Date | null> {
   const r = await db
@@ -19,7 +20,13 @@ export async function markPromiseDone(partnershipId: string, now = new Date()): 
       promiseDoneAt: now,
       promiseDoneEventId: sql`${cmPartnerships.promiseEventId}`,
       promiseReplyHandledWas: sql`${cmPartnerships.replyHandledAt}`,
-      replyHandledAt: now,
+      // Only when nothing from them came in after the promise: a newer message of theirs (a question)
+      // is never answered by Mark done — it stays Your turn (second review, 2026-09-30).
+      replyHandledAt: sql`case when exists (
+          select 1 from ${cmOutreachEvents} e
+          where e.partnership_id = ${cmPartnerships.id} and e.direction = 'inbound' and e.kind <> 'note'
+            and coalesce(e.sender_role, 'creator') = 'creator' and e.occurred_at > ${cmPartnerships.promiseAt}
+        ) then ${cmPartnerships.replyHandledAt} else ${now.toISOString()}::timestamp end`,
     })
     .where(
       and(

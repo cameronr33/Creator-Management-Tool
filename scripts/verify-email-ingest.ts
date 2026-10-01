@@ -315,6 +315,14 @@ async function main() {
     check("\"With the creator\" takes them off the list", (await strangers()).length === 0);
     const [sideReread] = await db.select({ at: schema.cmPartnerships.emailAssessedAt }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
     check("…and their conversation is read again with the new label", sideReread?.at === null);
+    // A closed deal isn't re-read (each read costs a model call).
+    await unmarkCreatorSide("assistant@agency-x.com");
+    const [{ stage: liveStage }] = await db.select({ stage: schema.cmPartnerships.stage }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
+    await db.update(schema.cmPartnerships).set({ stage: "declined", emailAssessedAt: new Date() }).where(eq(schema.cmPartnerships.id, partnershipId));
+    await markCreatorSide("assistant@agency-x.com");
+    const [closedReread] = await db.select({ at: schema.cmPartnerships.emailAssessedAt }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
+    check("…but a closed deal isn't read again", closedReread?.at !== null);
+    await db.update(schema.cmPartnerships).set({ stage: liveStage }).where(eq(schema.cmPartnerships.id, partnershipId));
     await db.insert(schema.cmOutreachEvents).values({ partnershipId, direction: "inbound", channel: "email", kind: "note", senderRole: "other", fromAddress: "Calendar <calendar-robot@invites.example>", toAddress: CREATOR, subject: "Invitation: call", occurredAt: new Date(Date.now() + 40_000), externalId: "__verify_ei_robot" });
     check("an invite or robot on the thread isn't asked about", !(await unknownSenders(client.id)).some((s) => s.email === "calendar-robot@invites.example"));
     await unmarkCreatorSide("assistant@agency-x.com");

@@ -397,9 +397,12 @@ export function promiseUpdate(
   assessment: Pick<Assessment, "open_promise" | "confidence">,
   messages: PromptMessage[],
   storedEventId: string | null,
+  /** The stored promise was marked done: it's never cleared, so every later reading is still told so. */
+  storedDone = false,
 ): ReturnType<typeof verifiedPromise> | "clear" | "keep" {
   const verified = verifiedPromise(assessment, messages);
   if (verified) return verified;
+  if (storedDone) return "keep";
   if (assessment.confidence === "low" || assessment.open_promise !== null) return "keep";
   if (storedEventId && !messages.some((m) => m.eventId === storedEventId)) return "keep";
   return "clear";
@@ -599,7 +602,7 @@ export async function assessPartnership(
   const stageCited = assessment.stage_from_messages_message != null ? ctx.messages.find((m) => m.n === assessment.stage_from_messages_message) : undefined;
   const stageQuote = assessment.stage_from_messages_quote?.trim() ?? "";
   const stageQuoted = !!fromMessages && !!stageCited && fromMailbox(stageCited) && !!stageQuote && quoteFoundIn(stageQuote, stageCited);
-  const promise = promiseUpdate(assessment, ctx.messages, loaded.promiseEventId);
+  const promise = promiseUpdate(assessment, ctx.messages, loaded.promiseEventId, !!ctx.donePromise);
   await db
     .update(cmPartnerships)
     .set({
