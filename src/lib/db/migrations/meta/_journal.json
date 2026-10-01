@@ -211,6 +211,13 @@
       "when": 1790821291224,
       "tag": "0029_promises",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790822238435,
+      "tag": "0030_promise_done_by_message",
+      "breakpoints": true
     }
   ]
 }

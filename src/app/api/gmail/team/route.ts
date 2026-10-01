@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { cmGmailAccounts } from "@/lib/db/schema";
 import { getActiveGmailAccount } from "@/lib/gmail-sync";
 import { FREE_MAIL_DOMAINS, loadTeamIdentity, reclassifyStoredEmails } from "@/lib/email-ingest";
+import { clientDomainClash } from "@/lib/client-domains";
 
 const entry = z
   .string()
@@ -32,6 +33,8 @@ export async function PUT(req: NextRequest) {
   if (!parsed.success) return badRequest(parsed.error.issues[0]?.message ?? "Couldn't save the list. Check the addresses and try again.", parsed.error.flatten());
 
   const entries = [...new Set(parsed.data.entries)];
+  const clash = await clientDomainClash(entries);
+  if (clash) return badRequest(`@${clash.domain} is on ${clash.clientName}'s team. Take it off there first (Settings → ${clash.clientName}'s team).`);
   await db.update(cmGmailAccounts).set({ teamAddresses: entries }).where(eq(cmGmailAccounts.id, account.id));
   after(async () => {
     await reclassifyStoredEmails(await loadTeamIdentity(account.email, entries));

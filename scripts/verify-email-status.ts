@@ -26,6 +26,7 @@ import {
   verifiedDeal,
   verifiedPostUrl,
   verifiedPromise,
+  promiseUpdate,
   type Assessment,
   type DecisionInput,
   type AssessFn,
@@ -206,6 +207,20 @@ async function main() {
   check("a quote that isn't in the message is dropped", pr(1, "We'll pay you $5,000") === null);
   check("a low-confidence reading keeps nothing", pr(1, "We'll send the contract on Friday", "Send the contract", "low") === null);
   check("no promise, nothing kept", verifiedPromise({ open_promise: null, confidence: "high" }, promiseConvo) === null);
+  // Review 2026-09-30: only mail the mailbox holds, and never a brand's calendar invite.
+  const logged: PromptMessage[] = [m(1, { direction: "outbound", senderRole: "team", channel: "ig_dm", synced: false, body: "Told them we'd send the kit Monday." })];
+  check("a teammate's own summary of a DM isn't a quoted promise", verifiedPromise({ open_promise: { what: "Send the kit", quote: "Told them we'd send the kit Monday.", message: 1 }, confidence: "high" }, logged) === null);
+  const invite: PromptMessage[] = [m(1, { senderRole: "client", kind: "note", subject: "Invitation: HELLA call @ Mon Aug 3", body: "We'll talk through the launch on the call." })];
+  check("the brand's calendar invite isn't a promise", verifiedPromise({ open_promise: { what: "Talk through the launch", quote: "We'll talk through the launch on the call.", message: 1 }, confidence: "high" }, invite) === null);
+  // When a reading may wipe a stored promise: only when it confidently says none, and could see the message.
+  const upd = (open: Assessment["open_promise"], confidence: Assessment["confidence"], stored: string | null) => promiseUpdate({ open_promise: open, confidence }, promiseConvo, stored);
+  check("a verified promise is stored", (() => { const u = upd({ what: "Send the contract", quote: "We'll send the contract on Friday", message: 1 }, "high", null); return typeof u === "object" && u !== null && u.eventId === "e1"; })());
+  check("none, confidently, with the promise's message in view: cleared", upd(null, "high", "e1") === "clear");
+  check("a low-confidence reading never wipes it", upd(null, "low", "e1") === "keep");
+  check("a promise named but not verified never wipes the stored one", upd({ what: "x", quote: "not in the message", message: 1 }, "high", "e1") === "keep");
+  check("the promise's message fell out of the reader's window: kept", upd(null, "high", "e-gone") === "keep");
+  const donePrompt = buildPrompt({ creatorName: "T", campaignName: "C", clientName: "H", stage: "in_conversation", hasAddress: false, shipmentStatuses: [], deliverables: 0, agreementType: null, messages: promiseConvo, donePromise: { what: "Circle back with launch dates", at: day(2) } });
+  check("the reader is told what a teammate marked done, so it isn't open again or our turn", /marked done[^\n]*Circle back with launch dates/i.test(donePrompt.user) && /not[^\n]*open_promise/i.test(donePrompt.user));
   check("the prompt asks for our side's open promise, quoted, and null once it's done", /open_promise:[^\n]*our side[^\n]*(promised|said we would)/i.test(prompt.system) && /open_promise:[^\n]*null[^\n]*(done|kept)/i.test(prompt.system));
 
   console.log("\n── Whose turn: the brand is on our side ──");

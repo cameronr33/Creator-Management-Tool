@@ -128,6 +128,25 @@ async function main() {
     check("Undo with the wrong moment does nothing", !(await undoPromiseDone(promiser, new Date(0))) && (await promiseRow())?.section !== "promised");
     check("Undo with the moment it was marked brings it back", !!done && (await undoPromiseDone(promiser, done)) && (await promiseRow())?.section === "promised");
 
+    // Review 2026-09-30: the reader said it's our turn because of the promise — Mark done must not drop the row into Your turn.
+    const theirMail = new Date(Date.now() - 50 * 86_400_000);
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId: promiser, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", body: "I'll be here when you're ready!", occurredAt: theirMail, externalId: "__verify_td_promise_mail" });
+    await db.update(schema.cmPartnerships).set({ emailSummary: "Waiting on launch dates.", emailSummaryAt: theirMail, emailWhoseTurn: "us" }).where(eq(schema.cmPartnerships.id, promiser));
+    check("…(with the reader saying it's our turn, the promise is what's listed)", (await promiseRow())?.section === "promised");
+    const done2 = await markPromiseDone(promiser);
+    const afterDone = await promiseRow();
+    check("Mark done takes it off without dropping it into Your turn", !!done2 && afterDone?.section !== "promised" && afterDone?.section !== "your_turn" && afterDone?.whoseTurn !== "us", JSON.stringify(afterDone && { s: afterDone.section, t: afterDone.whoseTurn }));
+    check("…and Undo puts it back, whose turn and all", !!done2 && (await undoPromiseDone(promiser, done2)) && (await promiseRow())?.section === "promised");
+    const [restored] = await db.select({ handled: schema.cmPartnerships.replyHandledAt }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, promiser));
+    check("…restoring what No reply needed was before", restored?.handled === null);
+    // A new promise in a message sent just before Mark done is a new promise.
+    const [ev1] = await db.insert(schema.cmOutreachEvents).values({ partnershipId: promiser, direction: "outbound", channel: "email", kind: "follow_up", senderRole: "team", body: "We'll circle back with dates.", occurredAt: new Date(Date.now() - 49 * 86_400_000) }).returning();
+    await db.update(schema.cmPartnerships).set({ promiseEventId: ev1.id }).where(eq(schema.cmPartnerships.id, promiser));
+    await markPromiseDone(promiser);
+    const [ev2] = await db.insert(schema.cmOutreachEvents).values({ partnershipId: promiser, direction: "outbound", channel: "email", kind: "follow_up", senderRole: "team", body: "Here are the dates — we'll ship your kit next week.", occurredAt: new Date(Date.now() - 60_000) }).returning();
+    await db.update(schema.cmPartnerships).set({ promiseText: "Ship their kit next week", promiseEventId: ev2.id, promiseAt: ev2.occurredAt }).where(eq(schema.cmPartnerships.id, promiser));
+    check("a promise in a message sent just before Mark done still shows", (await promiseRow())?.section === "promised");
+
     // Review 2026-09-29: the flag must not undo automation that knew more than the emails.
     const flagged = async (h: string) => {
       const id = await add(h);

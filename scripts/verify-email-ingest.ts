@@ -26,7 +26,7 @@ import {
   type IncomingEmailMessage,
 } from "../src/lib/email-ingest";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
-import { addClientDomain, markCreatorSide, removeClientDomain, unknownSenders, unmarkCreatorSide } from "../src/lib/client-domains";
+import { addClientDomain, clientDomainClash, markCreatorSide, removeClientDomain, unknownSenders, unmarkCreatorSide } from "../src/lib/client-domains";
 import { changeStage } from "../src/lib/mutations";
 import { getLastMessages } from "../src/lib/queries";
 import { pdfAttachments } from "../src/lib/gmail";
@@ -310,8 +310,13 @@ async function main() {
     const strangers = async () => (await unknownSenders(client.id)).filter((s) => s.email === "assistant@agency-x.com");
     const listed = await strangers();
     check("someone nobody has placed is listed for the client, with the creator they wrote to", listed.length === 1 && listed[0].creatorNames.includes("Verify Email Ingest") && listed[0].domain === "agency-x.com", JSON.stringify(listed));
+    await db.update(schema.cmPartnerships).set({ emailAssessedAt: new Date() }).where(eq(schema.cmPartnerships.id, partnershipId));
     await markCreatorSide("Assistant <ASSISTANT@agency-x.com>");
     check("\"With the creator\" takes them off the list", (await strangers()).length === 0);
+    const [sideReread] = await db.select({ at: schema.cmPartnerships.emailAssessedAt }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
+    check("…and their conversation is read again with the new label", sideReread?.at === null);
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId, direction: "inbound", channel: "email", kind: "note", senderRole: "other", fromAddress: "Calendar <calendar-robot@invites.example>", toAddress: CREATOR, subject: "Invitation: call", occurredAt: new Date(Date.now() + 40_000), externalId: "__verify_ei_robot" });
+    check("an invite or robot on the thread isn't asked about", !(await unknownSenders(client.id)).some((s) => s.email === "calendar-robot@invites.example"));
     await unmarkCreatorSide("assistant@agency-x.com");
     check("…and Undo puts them back", (await strangers()).length === 1);
     check("a free-mail domain can't be a client's", !(await addClientDomain(client.id, "@gmail.com")).ok);
@@ -321,6 +326,10 @@ async function main() {
     check("nor something that isn't a domain", !(await addClientDomain(client.id, "not a domain")).ok);
     const added = await addClientDomain(client.id, " @Agency-X.com ");
     check("a domain is added, without the @ and lowercased", added.ok && added.domain === "agency-x.com", JSON.stringify(added));
+    check("…and they're off the unknown list at once, before any re-sort", (await strangers()).length === 0);
+    check("Our side can't take a domain that's a client's", (await clientDomainClash(["rob@sentic.io", "@Agency-X.com"]))?.domain === "agency-x.com" && (await clientDomainClash(["@elsewhere.example"])) === null);
+    // Review 2026-09-30: mail we sent from an alias at the brand's domain stays ours — only a listed person can turn ours into theirs.
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId, direction: "outbound", channel: "email", kind: "follow_up", senderRole: "team", fromAddress: "Sam <sam@agency-x.com>", toAddress: CREATOR, body: "Following up", occurredAt: new Date(Date.now() + 70_000), externalId: "__verify_ei_alias" });
     const [otherClient] = await db.insert(schema.clients).values({ name: "__verify_ei_other_client", slug: `__verify_ei_${Date.now()}` }).returning();
     try {
       check("the same domain can't be on two clients", !(await addClientDomain(otherClient.id, "agency-x.com")).ok);
@@ -332,6 +341,8 @@ async function main() {
     await reclassifyStoredEmails(await loadTeamIdentity("cameron@sentic.io"));
     const [byDomain] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_other"));
     check("adding the domain makes their earlier message the client's note", byDomain?.senderRole === "client" && byDomain.kind === "note", JSON.stringify(byDomain && { r: byDomain.senderRole, k: byDomain.kind }));
+    const [alias] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_alias"));
+    check("…but our own mail from an alias at that domain stays ours", alias?.senderRole === "team" && alias.direction === "outbound", JSON.stringify(alias && { r: alias.senderRole, d: alias.direction }));
     const [reread] = await db.select({ at: schema.cmPartnerships.emailAssessedAt }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
     check("…and the conversation is read again, since who wrote what changed", reread?.at === null);
     check("…and they're no longer listed as unknown", (await strangers()).length === 0);

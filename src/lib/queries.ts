@@ -160,7 +160,9 @@ export interface CreatorRow {
   promiseText: string | null;
   promiseQuote: string | null;
   promiseAt: Date | null;
+  promiseEventId: string | null;
   promiseDoneAt: Date | null;
+  promiseDoneEventId: string | null;
   /** Archived off the lists (see archive-rules.ts). */
   archivedUntil: Date | null;
   archivedAt: Date | null;
@@ -235,7 +237,9 @@ export async function getCreatorRows(
       promiseText: cmPartnerships.promiseText,
       promiseQuote: cmPartnerships.promiseQuote,
       promiseAt: cmPartnerships.promiseAt,
+      promiseEventId: cmPartnerships.promiseEventId,
       promiseDoneAt: cmPartnerships.promiseDoneAt,
+      promiseDoneEventId: cmPartnerships.promiseDoneEventId,
       archivedUntil: cmPartnerships.archivedUntil,
       archivedAt: cmPartnerships.archivedAt,
       archiveStage: cmPartnerships.archiveStage,

@@ -370,8 +370,11 @@ export const cmPartnerships = pgTable(
     promiseEventId: uuid("promise_event_id").references((): AnyPgColumn => cmOutreachEvents.id, { onDelete: "set null" }),
     /** When that message was sent. */
     promiseAt: timestamp("promise_at"),
-    /** "Mark done": closed until a newer promise. */
+    /** "Mark done": when, and for which message's promise — a promise from another message is a new one. */
     promiseDoneAt: timestamp("promise_done_at"),
+    promiseDoneEventId: uuid("promise_done_event_id"),
+    /** What "No reply needed" was before Mark done set it, so Undo puts it back. */
+    promiseReplyHandledWas: timestamp("promise_reply_handled_was"),
     /** A shipping address the creator wrote in an email, offered as "Use it". */
     suggestedAddress: text("suggested_address"),
     suggestedAddressEventId: uuid("suggested_address_event_id"),

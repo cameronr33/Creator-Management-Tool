@@ -246,7 +246,7 @@ function TodayItem({
           </p>
           {r.note && <p className="mt-0.5 text-xs text-text-faint">{r.note}</p>}
           {r.stageFlag?.quote && <p className="mt-0.5 text-xs text-text-muted">&ldquo;{r.stageFlag.quote}&rdquo;</p>}
-          {r.section === "promised" && r.promise?.quote && <p className="mt-0.5 text-xs text-text-muted">We wrote: &ldquo;{r.promise.quote}&rdquo;</p>}
+          {r.section === "promised" && r.promise?.quote && <p className="mt-0.5 text-xs text-text-muted">&ldquo;{r.promise.quote}&rdquo;</p>}
           {(r.statusNote || noteOpen) && (
             <div className="mt-1.5">
               <StatusNote partnershipId={r.partnershipId} note={r.statusNote} editing={noteOpen} onEditingChange={setNoteOpen} hideWhenEmpty />

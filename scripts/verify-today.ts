@@ -137,6 +137,11 @@ check("the section sits right after Your turn", TODAY_SECTIONS.findIndex((s) => 
 check("a promise marked done after it was made is closed", openPromise({ promiseText: "x", promiseAt: at(9), promiseDoneAt: at(10) }) === null);
 check("…a newer promise opens again", openPromise({ promiseText: "x", promiseAt: at(11), promiseDoneAt: at(10) })?.what === "x");
 check("no text or no date: nothing open", openPromise({ promiseText: null, promiseAt: at(9), promiseDoneAt: null }) === null && openPromise({ promiseText: "x", promiseAt: null, promiseDoneAt: null }) === null);
+// Review 2026-09-30: closed by the message it came from, not by the clock.
+check("done for that message stays done when it's read again", openPromise({ promiseText: "x", promiseAt: at(11), promiseEventId: "E1", promiseDoneAt: at(10), promiseDoneEventId: "E1" }) === null);
+check("a new promise sent just before Mark done still shows", openPromise({ promiseText: "y", promiseAt: at(9), promiseEventId: "E2", promiseDoneAt: at(10), promiseDoneEventId: "E1" })?.what === "y");
+check("their latest sounds like a no: Your turn, so the flag shows", promised({ soundsLikeNo: true })?.section === "your_turn");
+check("a name with an apostrophe keeps its capital", promised({ promise: { what: "HELLA's team sends dates", at: at(9) } })?.note === "Promised 54 days ago: HELLA's team sends dates.");
 
 // NEGATIVE (run-through, 2026-09-29): Michael Dey came in from the sheet as Agreed; his emails say talks are paused, and
 // the Next line asked for his address. The flag asks a person instead — automation never moves backward.

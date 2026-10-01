@@ -13,8 +13,11 @@ export interface PromiseFacts {
   promiseText: string | null;
   /** When the message with the promise was sent. */
   promiseAt: Date | null;
-  /** "Mark done" pressed: closed until a newer promise. */
+  /** That message. */
+  promiseEventId?: string | null;
+  /** "Mark done" pressed, and for which message's promise. */
   promiseDoneAt: Date | null;
+  promiseDoneEventId?: string | null;
 }
 
 export interface OpenPromise {
@@ -24,8 +27,13 @@ export interface OpenPromise {
 
 export function openPromise(f: PromiseFacts): OpenPromise | null {
   if (!f.promiseText || !f.promiseAt) return null;
+  const open = { what: f.promiseText, at: f.promiseAt };
+  // Closed by the message it came from (review 2026-09-30): read again, it stays done; a promise in
+  // another message — even one sent a minute before Mark done — is a new one.
+  if (f.promiseEventId) return f.promiseDoneEventId === f.promiseEventId ? null : open;
+  // The message is gone (deleted): fall back to the clock.
   if (f.promiseDoneAt && f.promiseDoneAt.getTime() >= f.promiseAt.getTime()) return null;
-  return { what: f.promiseText, at: f.promiseAt };
+  return open;
 }
 
 const DAY = 86_400_000;
@@ -34,7 +42,8 @@ const DAY = 86_400_000;
 export function promiseLine(p: OpenPromise, now = new Date()): string {
   const n = Math.max(0, Math.floor((now.getTime() - p.at.getTime()) / DAY));
   const when = n === 0 ? "today" : n === 1 ? "yesterday" : `${n} days ago`;
-  const first = p.what.split(/\s/)[0] ?? "";
-  const what = first.length > 1 && first === first.toUpperCase() ? p.what : p.what.charAt(0).toLowerCase() + p.what.slice(1);
+  // "HELLA's team…" keeps its capital: the first word's letters are all upper case.
+  const letters = (p.what.split(/\s/)[0] ?? "").replace(/'s$/i, "").replace(/[^A-Za-z]/g, "");
+  const what = letters.length > 1 && letters === letters.toUpperCase() ? p.what : p.what.charAt(0).toLowerCase() + p.what.slice(1);
   return `Promised ${when}: ${what}.`;
 }

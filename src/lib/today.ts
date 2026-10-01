@@ -87,6 +87,8 @@ export interface TodayFacts {
   staleStageAt?: Date | null;
   /** Our side's open promise (promises.ts openPromise). */
   promise?: OpenPromise | null;
+  /** Their latest message sounds like a no — Your turn shows that flag, so it wins over a promise. */
+  soundsLikeNo?: boolean;
 }
 
 export interface TodayPlacement {
@@ -173,7 +175,7 @@ export function placeOnToday(f: TodayFacts): TodayPlacement | null {
     }
   }
   // Before the deal stages and their turn: we owe them what we said (2026-09-30, Michael Dey).
-  if (f.promise) return place("promised", promiseLine(f.promise, now), f.promise.at);
+  if (f.promise && !(f.soundsLikeNo && f.whoseTurn === "us")) return place("promised", promiseLine(f.promise, now), f.promise.at);
   switch (stage) {
     case "awaiting_address":
       return nudge(f, stage, now) ?? place("get_address", null, f.stageSince);

@@ -16,7 +16,8 @@ import {
 } from "@/lib/db/schema";
 import { STAGES, canonicalStage, isTerminal, stageIndex, stageLabel } from "@/lib/stages";
 import { hasCompleteAddress } from "@/lib/address";
-import { lastManualChangeAt, normAddress } from "@/lib/email-ingest";
+import { CALENDAR_SUBJECT, lastManualChangeAt, normAddress } from "@/lib/email-ingest";
+import { openPromise } from "@/lib/promises";
 import { moveStage, describeVideo, type ExitReason } from "@/lib/stage-moves";
 import { displayNames } from "@/lib/email-body";
 import { READER_MODEL, anthropic, serviceUnavailable, withModelFallback } from "@/lib/claude";
@@ -129,6 +130,8 @@ export interface AssessmentContext {
   deliverables: number;
   agreementType: string | null;
   messages: PromptMessage[];
+  /** A promise a teammate marked done (promises.ts) — so the reader doesn't report it open again, or count it as our turn. */
+  donePromise?: { what: string; at: Date } | null;
 }
 
 /** Pure: the prompt. Stage definitions come from the same table the app runs on. */
@@ -169,6 +172,11 @@ Return:
     `Shipments: ${ctx.shipmentStatuses.length ? ctx.shipmentStatuses.join(", ") : "none"}`,
     `Posted videos recorded: ${ctx.deliverables}`,
     `Agreement: ${ctx.agreementType ?? "not recorded"}`,
+    ...(ctx.donePromise
+      ? [
+          `A teammate marked done our side's promise "${ctx.donePromise.what}" (from ${ctx.donePromise.at.toISOString().slice(0, 10)}) — it is done: do not report it as open_promise, and it doesn't make it our turn.`,
+        ]
+      : []),
   ].join("\n");
   const lines = ctx.messages.map((m) => {
     const who =
@@ -367,11 +375,34 @@ export function verifiedPromise(
   if (!p || assessment.confidence === "low") return null;
   const m = messages.find((x) => x.n === p.message);
   if (!m) return null;
-  const ours = (m.direction === "outbound" && m.senderRole === "team" && m.kind !== "note") || m.senderRole === "client";
+  // Mail the mailbox holds only — a teammate's summary of a DM isn't a line anyone wrote — and never a
+  // brand's calendar invite (the brand's mail is all stored as notes, so the subject tells; review 2026-09-30).
+  const ours =
+    fromMailbox(m) &&
+    ((m.direction === "outbound" && m.senderRole === "team" && m.kind !== "note") || (m.senderRole === "client" && !CALENDAR_SUBJECT.test((m.subject ?? "").trim())));
   const quote = p.quote.trim();
   const what = p.what.replace(/\s+/g, " ").trim().replace(/\.+$/, "");
   if (!ours || !quote || !what || !quoteFoundIn(quote, m)) return null;
   return { what: what.slice(0, 140), quote: quote.slice(0, 300), eventId: m.eventId, at: m.occurredAt };
+}
+
+/**
+ * What a reading does to the stored promise: store a verified one, clear it
+ * only when the reader confidently says there's none and could see the
+ * message it came from, and otherwise leave it alone — a low-confidence
+ * reading, an unverifiable quote or a promise that fell out of the last
+ * messages never wipes it (review 2026-09-30).
+ */
+export function promiseUpdate(
+  assessment: Pick<Assessment, "open_promise" | "confidence">,
+  messages: PromptMessage[],
+  storedEventId: string | null,
+): ReturnType<typeof verifiedPromise> | "clear" | "keep" {
+  const verified = verifiedPromise(assessment, messages);
+  if (verified) return verified;
+  if (assessment.confidence === "low" || assessment.open_promise !== null) return "keep";
+  if (storedEventId && !messages.some((m) => m.eventId === storedEventId)) return "keep";
+  return "clear";
 }
 
 export function verifiedPostUrl(assessment: Pick<Assessment, "post_url">, messages: PromptMessage[]): string | null {
@@ -451,7 +482,9 @@ export interface AssessmentOutcome {
   dealFilled?: string[];
 }
 
-async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentContext; hasEmail: boolean; latestAt: Date | null; dealEditedAt: Date | null } | null> {
+async function loadContext(
+  partnershipId: string,
+): Promise<{ ctx: AssessmentContext; hasEmail: boolean; latestAt: Date | null; dealEditedAt: Date | null; promiseEventId: string | null } | null> {
   const [row] = await db
     .select({ partnership: cmPartnerships, creatorName: cmCreators.name, campaignName: cmCampaigns.name, clientName: clients.name })
     .from(cmPartnerships)
@@ -501,11 +534,13 @@ async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentCont
       deliverables: videos.length,
       agreementType: p.agreementType,
       messages,
+      donePromise: p.promiseText && p.promiseAt && !openPromise(p) ? { what: p.promiseText, at: p.promiseAt } : null,
     },
     // Only mail the mailbox holds counts — an email logged by hand has nothing to read.
     hasEmail: messages.some(fromMailbox),
     latestAt: latest?.occurredAt ?? null,
     dealEditedAt: p.dealEditedAt,
+    promiseEventId: p.promiseEventId,
   };
 }
 
@@ -564,7 +599,7 @@ export async function assessPartnership(
   const stageCited = assessment.stage_from_messages_message != null ? ctx.messages.find((m) => m.n === assessment.stage_from_messages_message) : undefined;
   const stageQuote = assessment.stage_from_messages_quote?.trim() ?? "";
   const stageQuoted = !!fromMessages && !!stageCited && fromMailbox(stageCited) && !!stageQuote && quoteFoundIn(stageQuote, stageCited);
-  const promise = verifiedPromise(assessment, ctx.messages);
+  const promise = promiseUpdate(assessment, ctx.messages, loaded.promiseEventId);
   await db
     .update(cmPartnerships)
     .set({
@@ -577,11 +612,14 @@ export async function assessPartnership(
       emailStageEventId: stageQuoted ? stageCited!.eventId : null,
       emailStageAt: stageQuoted ? stageCited!.occurredAt : null,
       emailSoundsLikeNo: assessment.sounds_like_no && !isTerminal(ctx.stage),
-      // Our side's open promise; none (or not verified) clears it — the reader saw it done.
-      promiseText: promise?.what ?? null,
-      promiseQuote: promise?.quote ?? null,
-      promiseEventId: promise?.eventId ?? null,
-      promiseAt: promise?.at ?? null,
+      // Our side's open promise (promiseUpdate: store, clear, or leave it alone).
+      ...(promise === "keep"
+        ? {}
+        : promise === "clear"
+          ? { promiseText: null, promiseQuote: null, promiseEventId: null, promiseAt: null }
+          : promise
+            ? { promiseText: promise.what, promiseQuote: promise.quote, promiseEventId: promise.eventId, promiseAt: promise.at }
+            : {}),
       ...(address ? { suggestedAddress: address.text, suggestedAddressEventId: address.eventId } : {}),
     })
     .where(eq(cmPartnerships.id, partnershipId));

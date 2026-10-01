@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull, max, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, max, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   cmClientDomains,
@@ -15,7 +15,7 @@ import {
 import { MAX_CONTRACT_BYTES, looksLikeContract, safeFilename } from "@/lib/contracts";
 import { applyAutoStage } from "@/lib/auto-stage";
 import { cleanEmailBody } from "@/lib/email-body";
-import { isTerminal } from "@/lib/stages";
+import { STAGES, isTerminal } from "@/lib/stages";
 import { emailDomain, parseEmailAddress } from "@/lib/gmail";
 
 /**
@@ -187,7 +187,7 @@ export interface Classification {
   note: null | "calendar" | "auto_reply" | "automated" | "client";
 }
 
-const CALENDAR_SUBJECT = /^(invitation|updated invitation|accepted|declined|tentatively accepted|cancell?ed( event)?|invitation from google calendar)\b.*[:@]/i;
+export const CALENDAR_SUBJECT = /^(invitation|updated invitation|accepted|declined|tentatively accepted|cancell?ed( event)?|invitation from google calendar)\b.*[:@]/i;
 const AUTO_REPLY_SUBJECT = /^(automatic reply|auto(matic)?[- ]?(reply|response)|out of (the )?office|away from (the )?office)\b/i;
 const NO_REPLY_SENDER = /^(no-?reply|do-?not-?reply|notifications?|notify|calendar-notification|mailer-daemon|postmaster|bounces?)@/i;
 
@@ -597,9 +597,10 @@ export async function reclassifyStoredEmails(team: TeamIdentity): Promise<{ chan
     if (!c || (c.direction === r.direction && c.senderRole === r.senderRole)) continue;
     // Mail we sent was recognised by its SENT label, which isn't stored — the
     // headers alone can't overrule it, so ours stays ours. The one exception:
-    // a sender now listed on the creator's client team (explicit) was only
-    // "ours" by an Our-side domain rule, and becomes the client's.
-    if (r.senderRole === "team" && c.senderRole !== "team" && c.senderRole !== "client") continue;
+    // a person now listed on the creator's client team (explicit) was only
+    // "ours" by an Our-side domain rule, and becomes the client's. A whole
+    // client domain never does: our own alias there stays ours.
+    if (r.senderRole === "team" && c.senderRole !== "team" && !(c.senderRole === "client" && team.clientContacts?.has(normAddress(r.from ?? "")))) continue;
     // Becoming the client's makes it a note; no longer the client's, it's a message
     // again — unless it's an invite or auto-reply by its subject or sender.
     const kind =
@@ -610,6 +611,12 @@ export async function reclassifyStoredEmails(team: TeamIdentity): Promise<{ chan
   }
   await recomputeEmailKinds([...touched]);
   // Who wrote what changed, so whose turn it is may have too: read those conversations again.
-  if (touched.size) await db.update(cmPartnerships).set({ emailAssessedAt: null }).where(inArray(cmPartnerships.id, [...touched]));
+  // Live deals only: a closed one has nothing for the reader to decide, and each read costs a model call.
+  if (touched.size) {
+    await db
+      .update(cmPartnerships)
+      .set({ emailAssessedAt: null })
+      .where(and(inArray(cmPartnerships.id, [...touched]), notInArray(cmPartnerships.stage, STAGES.filter((s) => s.terminal).map((s) => s.value))));
+  }
   return { changed };
 }

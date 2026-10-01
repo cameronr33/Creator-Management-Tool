@@ -1,5 +1,6 @@
 import { statusNoteView } from "@/lib/status-note";
 import { openPromise, promiseLine } from "@/lib/promises";
+import { listedOnToday } from "@/lib/today";
 import { requireAgencyPage } from "@/lib/page-guards";
 import { resolveClient, getCreatorRows, getOutreachStates } from "@/lib/queries";
 import { scheduleEmailCheckForVisitor } from "@/lib/page-email-check";
@@ -54,7 +55,7 @@ export default async function PipelinePage() {
     owner: r.ownerId ? { id: r.ownerId, name: r.ownerName ?? "A teammate", label: labels.get(r.ownerId) ?? "?" } : null,
     hasOutbound: (outreach.get(r.partnershipId)?.totalOutbound ?? 0) > 0,
     promise: (() => {
-      const p = openPromise(r);
+      const p = listedOnToday(r.stage) ? openPromise(r) : null;
       return p ? promiseLine(p) : null;
     })(),
   }));

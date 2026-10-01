@@ -176,7 +176,7 @@ export default async function CreatorDetailPage({
     dismissedAt: partnership.stageFlagDismissedAt,
   });
   // What our side said we'd do and hasn't yet (2026-09-30, Michael Dey).
-  const promise = openPromise(partnership);
+  const promise = listedOnToday(partnership.stage) ? openPromise(partnership) : null;
   const step = nextStep({
     staleStage: flagged,
     stage: partnership.stage,
@@ -344,7 +344,7 @@ export default async function CreatorDetailPage({
                 <>
                   <p className="mt-1.5 text-[13px] text-text-muted">
                     {promiseLine(promise)}
-                    {partnership.promiseQuote ? <> We wrote: &ldquo;{partnership.promiseQuote}&rdquo;</> : null}
+                    {partnership.promiseQuote ? <> &ldquo;{partnership.promiseQuote}&rdquo;</> : null}
                   </p>
                   <div className="mt-2">
                     <PromiseDoneButton partnershipId={partnership.id} name={creator.name} />

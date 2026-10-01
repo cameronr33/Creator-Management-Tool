@@ -127,6 +127,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
     const promise = openPromise(c);
     const facts = {
       promise,
+      soundsLikeNo: c.emailSoundsLikeNo,
       staleStageAt: c.emailStageAt,
       stage: c.stage,
       whoseTurn: c.activity.whoseTurn,
