@@ -38,6 +38,8 @@ export interface BoardCard {
   owner: OwnerInfo | null;
   /** Anything sent yet — a logged message is then a follow-up, not the first. */
   hasOutbound: boolean;
+  /** Our side's open promise, as one line ("Promised 54 days ago: circle back with launch dates."). */
+  promise: string | null;
 }
 
 // Active stages get their own column; the three terminal stages collapse into
@@ -422,6 +424,7 @@ function PipelineCard({
         {c.latest}
         {c.latestAt && <span className="text-text-faint"> · {relativeDays(c.latestAt)}</span>}
       </p>
+      {c.promise && <p className="mt-1 text-xs leading-snug font-medium text-warn">{c.promise}</p>}
       {(c.statusNote || noteOpen) && (
         <div className="mt-1.5" {...noDrag}>
           <StatusNote partnershipId={c.partnershipId} note={c.statusNote} compact editing={noteOpen} onEditingChange={setNoteOpen} hideWhenEmpty />

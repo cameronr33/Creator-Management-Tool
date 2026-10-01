@@ -25,6 +25,7 @@ import {
   verifiedAddress,
   verifiedDeal,
   verifiedPostUrl,
+  verifiedPromise,
   type Assessment,
   type DecisionInput,
   type AssessFn,
@@ -86,6 +87,7 @@ const reading = (over: Partial<Assessment>): Assessment => ({
   stage_from_messages: null,
   stage_from_messages_quote: null,
   stage_from_messages_message: null,
+  open_promise: null,
   ...over,
 });
 const base: Omit<DecisionInput, "current" | "assessment"> = { messages: convo, lastManualChangeAt: null, hasAddress: false, shipmentStatuses: [], automove: true };
@@ -187,6 +189,25 @@ async function main() {
 
   // Michael Dey (2026-09-30, owner): the brand's partner wrote "We will circle back with you once we have
   // specific launch dates", Mike answered "I'll be here when you're ready!" — and the card said "Waiting on them".
+  console.log("\n── What our side promised (pure) ──");
+  const promiseConvo: PromptMessage[] = [
+    m(1, { direction: "outbound", senderRole: "team", body: "We'll send the contract on Friday." }),
+    m(2, { senderRole: "client", kind: "note", body: "We will circle back with you once we have specific launch dates." }),
+    m(3, { body: "I'll send my address tomorrow." }),
+    m(4, { senderRole: "other", body: "We will get back to you next week." }),
+    m(5, { direction: "outbound", senderRole: "team", kind: "note", body: "Invitation: call on Monday, we'll call you" }),
+  ];
+  const pr = (n: number, quote: string, what = "Do it", confidence: Assessment["confidence"] = "high") => verifiedPromise({ open_promise: { what, quote, message: n }, confidence }, promiseConvo);
+  check("our own promise, quoted word for word, is kept", pr(1, "We'll send the contract on Friday")?.eventId === "e1");
+  check("the brand's promise counts as ours, tidied", pr(2, "We will circle back with you once we have specific launch dates.", " Circle back  with launch dates. ")?.what === "Circle back with launch dates");
+  check("the creator's promise is never ours", pr(3, "I'll send my address tomorrow.") === null);
+  check("nor is someone else's on the thread", pr(4, "We will get back to you next week.") === null);
+  check("an invite or automatic message isn't a promise", pr(5, "we'll call you") === null);
+  check("a quote that isn't in the message is dropped", pr(1, "We'll pay you $5,000") === null);
+  check("a low-confidence reading keeps nothing", pr(1, "We'll send the contract on Friday", "Send the contract", "low") === null);
+  check("no promise, nothing kept", verifiedPromise({ open_promise: null, confidence: "high" }, promiseConvo) === null);
+  check("the prompt asks for our side's open promise, quoted, and null once it's done", /open_promise:[^\n]*our side[^\n]*(promised|said we would)/i.test(prompt.system) && /open_promise:[^\n]*null[^\n]*(done|kept)/i.test(prompt.system));
+
   console.log("\n── Whose turn: the brand is on our side ──");
   check("whose turn counts the brand, and anyone writing for it, as our side", /whose_turn:[^\n]*our side[^\n]*brand/i.test(prompt.system));
   check("a promise our side made that is still open makes it our turn", /whose_turn:[^\n]*(promised|circle back)/i.test(prompt.system));
@@ -391,6 +412,24 @@ async function main() {
     await assessPartnership(flag.partnershipId, { apply: true, model: flagReading("Talks are totally off forever"), automove: true });
     const [f2] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, flag.partnershipId));
     check("a line that isn't in the cited message is never kept — no line, no date, so no flag", f2.emailStage === "in_conversation" && f2.emailStageQuote === null && f2.emailStageEventId === null && f2.emailStageAt === null);
+
+    // What our side promised (2026-09-30): kept with the line from our message, cleared once the reader says it's done.
+    // The fake reader cites the message that holds the quote, by the number the prompt gave it (numberOf, above).
+    let promisePrompt = "";
+    const promiseReading = (open: { what: string; quote: string } | null): AssessFn => async (pr) => {
+      promisePrompt = pr.user;
+      return reading({ stage: "awaiting_address", evidence_quote: "Thanks!", evidence_message: 3, open_promise: open && { ...open, message: numberOf(pr.user, open.quote) } });
+    };
+    await assessPartnership(flag.partnershipId, { apply: true, model: promiseReading({ what: "Get back to them on the build", quote: "We can't move forward on that specific build this round." }) });
+    const [p1] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, flag.partnershipId));
+    check("our side's open promise is kept, with the line and when we said it", p1.promiseText === "Get back to them on the build" && p1.promiseQuote === "We can't move forward on that specific build this round." && !!p1.promiseEventId && !!p1.promiseAt, JSON.stringify({ t: p1.promiseText, q: p1.promiseQuote }) + promisePrompt.split("Messages, oldest first:")[1]?.slice(0, 600));
+    await db.update(schema.cmPartnerships).set({ emailAssessedAt: null }).where(eq(schema.cmPartnerships.id, flag.partnershipId));
+    await assessPartnership(flag.partnershipId, { apply: true, model: promiseReading(null) });
+    const [p2] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, flag.partnershipId));
+    check("…and cleared once the reader says it's been done", p2.promiseText === null && p2.promiseQuote === null && p2.promiseEventId === null && p2.promiseAt === null);
+    await assessPartnership(flag.partnershipId, { apply: true, model: promiseReading({ what: "Pay them", quote: "I'll be here when you're ready!" }) });
+    const [p3] = await db.select().from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, flag.partnershipId));
+    check("the creator's own line is never kept as our promise", p3.promiseText === null);
 
     // No API credit: every conversation stays unread, to be read once it's back (regression, 2026-09-24).
     const noCredit: AssessFn = async () => {

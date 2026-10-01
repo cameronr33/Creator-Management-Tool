@@ -16,6 +16,7 @@ import { CloseAsDeclinedButton, NoReplyNeededButton } from "@/components/email-s
 import { VideoLinkPrompt } from "@/components/partnership-actions";
 import { ApprovalButtons } from "@/components/approval-buttons";
 import { StageFlagButtons } from "@/components/stage-flag";
+import { PromiseDoneButton } from "@/components/promise-done";
 import { TODAY_SECTIONS, type TodaySection } from "@/lib/today";
 import type { TodayRow } from "@/lib/today-data";
 import { whoseTurnText } from "@/lib/activity";
@@ -245,6 +246,7 @@ function TodayItem({
           </p>
           {r.note && <p className="mt-0.5 text-xs text-text-faint">{r.note}</p>}
           {r.stageFlag?.quote && <p className="mt-0.5 text-xs text-text-muted">&ldquo;{r.stageFlag.quote}&rdquo;</p>}
+          {r.section === "promised" && r.promise?.quote && <p className="mt-0.5 text-xs text-text-muted">We wrote: &ldquo;{r.promise.quote}&rdquo;</p>}
           {(r.statusNote || noteOpen) && (
             <div className="mt-1.5">
               <StatusNote partnershipId={r.partnershipId} note={r.statusNote} editing={noteOpen} onEditingChange={setNoteOpen} hideWhenEmpty />
@@ -320,6 +322,15 @@ function NextAction({ row: r }: { row: TodayRow }) {
       );
     case "waiting_approval":
       return <ApprovalButtons partnershipId={r.partnershipId} name={r.name} who="agency" />;
+    case "promised":
+      return (
+        <>
+          <Button size="sm" variant="primary" href={href(r, "conversation")} icon={<ArrowRight size={13} />}>
+            Open conversation
+          </Button>
+          <PromiseDoneButton partnershipId={r.partnershipId} name={r.name} />
+        </>
+      );
     case "follow_up":
       return (
         <>

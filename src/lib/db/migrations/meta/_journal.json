@@ -204,6 +204,13 @@
       "when": 1790820691712,
       "tag": "0028_client_domains",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1790821291224,
+      "tag": "0029_promises",
+      "breakpoints": true
     }
   ]
 }

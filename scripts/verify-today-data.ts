@@ -18,6 +18,7 @@ import { DEFAULT_THRESHOLDS } from "../src/lib/thresholds";
 import { restoreArchived, setArchived, getLastInboundStoredAt } from "../src/lib/archive";
 import { splitArchived } from "../src/lib/archive-rules";
 import { answerStageFlag } from "../src/lib/stage-flag-answer";
+import { markPromiseDone, undoPromiseDone } from "../src/lib/promise-answer";
 import { moveStage } from "../src/lib/stage-moves";
 
 let failures = 0;
@@ -113,6 +114,19 @@ async function main() {
     const [flagMove] = (await db.select().from(schema.cmStageTransitions).where(eq(schema.cmStageTransitions.partnershipId, dey))).filter((t) => t.reason === "their emails read as Talking");
     check("Move: back to Talking, as a person's move with the reason and the line", moved2.ok && afterMove.stage === "in_conversation" && flagMove?.source === "manual" && (flagMove.meta as { quote?: string } | null)?.quote === "We can't move forward on that build");
     check("…and Today stops asking", (await flagRow())?.section !== "check_stage");
+
+    console.log("\n── We said we'd get back to them: Mark done, Undo ──");
+    const promiser = await add("__verify_td_promise");
+    await changeStage(promiser, "in_conversation");
+    await db.update(schema.cmPartnerships).set({ promiseText: "Circle back with launch dates", promiseQuote: "We will circle back with you once we have specific launch dates.", promiseAt: new Date(Date.now() - 54 * 86_400_000) }).where(eq(schema.cmPartnerships.id, promiser));
+    const promiseRow = async () => (await getTodayData({ clientId: client.id, campaignId })).rows.find((r) => r.partnershipId === promiser);
+    const pr1 = await promiseRow();
+    check("Today lists the open promise, with the line we wrote", pr1?.section === "promised" && pr1.promise?.quote === "We will circle back with you once we have specific launch dates." && pr1.note === "Promised 54 days ago: circle back with launch dates.", JSON.stringify(pr1 && { s: pr1.section, n: pr1.note, p: pr1.promise }));
+    const done = await markPromiseDone(promiser);
+    check("Mark done takes it off", !!done && (await promiseRow())?.section !== "promised");
+    check("…a second Mark done finds nothing open", (await markPromiseDone(promiser)) === null);
+    check("Undo with the wrong moment does nothing", !(await undoPromiseDone(promiser, new Date(0))) && (await promiseRow())?.section !== "promised");
+    check("Undo with the moment it was marked brings it back", !!done && (await undoPromiseDone(promiser, done)) && (await promiseRow())?.section === "promised");
 
     // Review 2026-09-29: the flag must not undo automation that knew more than the emails.
     const flagged = async (h: string) => {

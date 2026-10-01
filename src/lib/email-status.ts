@@ -96,6 +96,7 @@ export const AssessmentSchema = z.object({
   stage_from_messages: z.enum(STAGES.map((s) => s.value) as [CmStage, ...CmStage[]]).nullable(),
   stage_from_messages_quote: z.string().nullable(),
   stage_from_messages_message: z.number().int().nullable(),
+  open_promise: z.object({ what: z.string(), quote: z.string(), message: z.number().int() }).nullable(),
 });
 export type Assessment = z.infer<typeof AssessmentSchema>;
 
@@ -160,7 +161,8 @@ Return:
 - deal_message: the number of the message deal_quote comes from; null if none.
 - stage_from_messages: where the deal stands judged ONLY from what the messages say — ignore the current stage and the facts below. It may be earlier than the current stage (for example: nothing agreed yet, or talks paused). null if the messages don't show.
 - stage_from_messages_quote: a short quote (at most 25 words) copied exactly, character for character, from one message — the creator's, ours or the brand's — that best shows stage_from_messages; null if none.
-- stage_from_messages_message: the number of the message stage_from_messages_quote comes from; null if none.`;
+- stage_from_messages_message: the number of the message stage_from_messages_quote comes from; null if none.
+- open_promise: the latest thing our side (us, the brand, or anyone writing for the brand) promised or said we would do for the creator that no later message shows was done — for example "We will circle back with you once we have specific launch dates". what: at most 12 plain words saying what we'll do ("Circle back with launch dates"); quote: a short quote (at most 25 words) copied exactly, character for character, from that message; message: its number. null if our side promised nothing, or a later message shows it was done or kept.`;
 
   const facts = [
     `Shipping address on file: ${ctx.hasAddress ? "yes" : "no"}`,
@@ -352,6 +354,26 @@ export function verifiedDeal(
 }
 
 /** Pure: a post link the creator themselves sent, or null. */
+/**
+ * Our side's open promise (promises.ts), kept only from a message we or the
+ * brand wrote — never the creator's own promise, someone else's on the
+ * thread, or an invite — with the line found word for word in it.
+ */
+export function verifiedPromise(
+  assessment: Pick<Assessment, "open_promise" | "confidence">,
+  messages: PromptMessage[],
+): { what: string; quote: string; eventId: string; at: Date } | null {
+  const p = assessment.open_promise;
+  if (!p || assessment.confidence === "low") return null;
+  const m = messages.find((x) => x.n === p.message);
+  if (!m) return null;
+  const ours = (m.direction === "outbound" && m.senderRole === "team" && m.kind !== "note") || m.senderRole === "client";
+  const quote = p.quote.trim();
+  const what = p.what.replace(/\s+/g, " ").trim().replace(/\.+$/, "");
+  if (!ours || !quote || !what || !quoteFoundIn(quote, m)) return null;
+  return { what: what.slice(0, 140), quote: quote.slice(0, 300), eventId: m.eventId, at: m.occurredAt };
+}
+
 export function verifiedPostUrl(assessment: Pick<Assessment, "post_url">, messages: PromptMessage[]): string | null {
   const u = assessment.post_url?.trim();
   if (!u || !/^https?:\/\//i.test(u)) return null;
@@ -542,6 +564,7 @@ export async function assessPartnership(
   const stageCited = assessment.stage_from_messages_message != null ? ctx.messages.find((m) => m.n === assessment.stage_from_messages_message) : undefined;
   const stageQuote = assessment.stage_from_messages_quote?.trim() ?? "";
   const stageQuoted = !!fromMessages && !!stageCited && fromMailbox(stageCited) && !!stageQuote && quoteFoundIn(stageQuote, stageCited);
+  const promise = verifiedPromise(assessment, ctx.messages);
   await db
     .update(cmPartnerships)
     .set({
@@ -554,6 +577,11 @@ export async function assessPartnership(
       emailStageEventId: stageQuoted ? stageCited!.eventId : null,
       emailStageAt: stageQuoted ? stageCited!.occurredAt : null,
       emailSoundsLikeNo: assessment.sounds_like_no && !isTerminal(ctx.stage),
+      // Our side's open promise; none (or not verified) clears it — the reader saw it done.
+      promiseText: promise?.what ?? null,
+      promiseQuote: promise?.quote ?? null,
+      promiseEventId: promise?.eventId ?? null,
+      promiseAt: promise?.at ?? null,
       ...(address ? { suggestedAddress: address.text, suggestedAddressEventId: address.eventId } : {}),
     })
     .where(eq(cmPartnerships.id, partnershipId));

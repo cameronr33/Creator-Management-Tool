@@ -1,5 +1,6 @@
 import type { CmStage } from "@/lib/db/schema";
 import { staleStageLine } from "@/lib/stage-flag";
+import { promiseLine, type OpenPromise } from "@/lib/promises";
 import type { WhoseTurn } from "@/lib/activity";
 import type { FollowUpThresholds } from "@/lib/outreach";
 import { canonicalStage, isTerminal, stageAction } from "@/lib/stages";
@@ -21,6 +22,7 @@ import { canonicalStage, isTerminal, stageAction } from "@/lib/stages";
 export type TodaySection =
   | "check_stage"
   | "your_turn"
+  | "promised"
   | "follow_up"
   | "to_contact"
   | "waiting_approval"
@@ -38,6 +40,11 @@ export const TODAY_SECTIONS: { key: TodaySection; title: string; hint: string }[
     hint: "Their emails read as an earlier stage than the one set. Move them back, or keep the stage — nothing moves backward by itself.",
   },
   { key: "your_turn", title: "Your turn", hint: "They wrote last. Reply, or mark it as needing no reply." },
+  {
+    key: "promised",
+    title: "We said we'd get back to them",
+    hint: "Someone on our side — you or the brand — told them we'd do something, and no message since shows it done. Do it, then mark it done.",
+  },
   {
     key: "follow_up",
     title: "Follow up",
@@ -78,6 +85,8 @@ export interface TodayFacts {
   staleStage?: CmStage | null;
   /** When the message behind it was sent. */
   staleStageAt?: Date | null;
+  /** Our side's open promise (promises.ts openPromise). */
+  promise?: OpenPromise | null;
 }
 
 export interface TodayPlacement {
@@ -147,6 +156,7 @@ export function placeOnToday(f: TodayFacts): TodayPlacement | null {
   if (!listedOnToday(stage)) return null;
   if (f.staleStage) return place("check_stage", `${staleStageLine(stage, f.staleStage)}.`, f.staleStageAt ?? null);
   switch (stage) {
+    // Moving product keeps its own section; the row still shows their turn.
     case "fulfilling":
       return place("ready_to_ship", null, f.stageSince);
     case "shipped": {
@@ -161,6 +171,10 @@ export function placeOnToday(f: TodayFacts): TodayPlacement | null {
       const what = f.deliveredAt ? `Delivered ${ago(n)}` : `Waiting on the video for ${dayCount(n)} — no delivery date recorded`;
       return place("waiting_video", late ? `${what} — the video is late (due after ${f.thresholds.videoDueAfterDays} days).` : `${what}.`, since, late ? "late" : null);
     }
+  }
+  // Before the deal stages and their turn: we owe them what we said (2026-09-30, Michael Dey).
+  if (f.promise) return place("promised", promiseLine(f.promise, now), f.promise.at);
+  switch (stage) {
     case "awaiting_address":
       return nudge(f, stage, now) ?? place("get_address", null, f.stageSince);
     case "finalizing":

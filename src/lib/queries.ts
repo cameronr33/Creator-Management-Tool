@@ -156,6 +156,11 @@ export interface CreatorRow {
   emailStageQuote: string | null;
   emailStageAt: Date | null;
   stageFlagDismissedAt: Date | null;
+  /** Our side's open promise and the line behind it (promises.ts). */
+  promiseText: string | null;
+  promiseQuote: string | null;
+  promiseAt: Date | null;
+  promiseDoneAt: Date | null;
   /** Archived off the lists (see archive-rules.ts). */
   archivedUntil: Date | null;
   archivedAt: Date | null;
@@ -227,6 +232,10 @@ export async function getCreatorRows(
       emailStageQuote: cmPartnerships.emailStageQuote,
       emailStageAt: cmPartnerships.emailStageAt,
       stageFlagDismissedAt: cmPartnerships.stageFlagDismissedAt,
+      promiseText: cmPartnerships.promiseText,
+      promiseQuote: cmPartnerships.promiseQuote,
+      promiseAt: cmPartnerships.promiseAt,
+      promiseDoneAt: cmPartnerships.promiseDoneAt,
       archivedUntil: cmPartnerships.archivedUntil,
       archivedAt: cmPartnerships.archivedAt,
       archiveStage: cmPartnerships.archiveStage,

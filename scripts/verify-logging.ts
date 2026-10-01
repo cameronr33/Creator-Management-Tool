@@ -151,6 +151,7 @@ function pure() {
     stage_from_messages: null,
     stage_from_messages_quote: null,
     stage_from_messages_message: null,
+    open_promise: null,
   };
   const decide = (m: PromptMessage) =>
     decideEmailMove({ current: "awaiting_address", assessment: reading, messages: [m], lastManualChangeAt: null, hasAddress: false, shipmentStatuses: [], automove: true });

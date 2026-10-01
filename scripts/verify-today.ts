@@ -9,6 +9,7 @@ import { placeOnToday, sortToday, TODAY_SECTIONS, type TodayFacts, listedOnToday
 import { THRESHOLD_FIELDS, THRESHOLDS_SCHEMA } from "../src/lib/thresholds";
 import { ARCHIVE_REMIND_MAX_DAYS, archiveActive, archiveWoke, parseRemindOn, splitArchived } from "../src/lib/archive-rules";
 import { staleStage } from "../src/lib/stage-flag";
+import { openPromise } from "../src/lib/promises";
 import { DEFAULT_THRESHOLDS } from "../src/lib/outreach";
 import { ACTIVE_STAGES, STAGE_VALUES, isTerminal } from "../src/lib/stages";
 import type { CmStage } from "../src/lib/db/schema";
@@ -117,6 +118,25 @@ const sorted = sortToday([
   { name: "Ab", since: at(12).toISOString() },
 ]);
 check("whoever has waited longest comes first; unknown dates last; ties by name", sorted.map((r) => r.name).join(",") === "Bo,Ab,Cy,Al", sorted.map((r) => r.name).join(","));
+
+// NEGATIVE (owner, 2026-09-30): Michael Dey — HELLA's partner wrote "We will circle back with you once we have specific
+// launch dates", nobody did, and nothing on Today said so.
+console.log("\n── We said we'd get back to them (2026-09-30) ──");
+const promised = (over: Partial<TodayFacts> = {}) =>
+  place({ stage: "in_conversation", whoseTurn: "us", lastFrom: "them", lastMessageAt: at(10), promise: { what: "Circle back with launch dates", at: at(9) }, now: daysAfter(at(9), 54), ...over });
+check("an open promise from our side lists them under We said we'd get back to them", promised()?.section === "promised", promised()?.section);
+check("…saying how long ago, in plain words", promised()?.note === "Promised 54 days ago: circle back with launch dates.", promised()?.note ?? "");
+check("…the oldest promise first", promised()?.since?.getTime() === at(9).getTime());
+check("…a name keeps its capital", promised({ promise: { what: "HELLA sends the launch dates", at: at(9) } })?.note === "Promised 54 days ago: HELLA sends the launch dates.");
+check("…made today reads as today", promised({ now: at(9) })?.note === "Promised today: circle back with launch dates.");
+check("no promise: their turn, as before", promised({ promise: null })?.section === "your_turn");
+check("the stage flag still comes first", promised({ staleStage: "contacted", staleStageAt: at(9) })?.section === "check_stage");
+check("a shipment in progress keeps its own section", promised({ stage: "fulfilling" })?.section === "ready_to_ship");
+check("Agreed with an open promise: the promise first", promised({ stage: "awaiting_address" })?.section === "promised");
+check("the section sits right after Your turn", TODAY_SECTIONS.findIndex((s) => s.key === "promised") === TODAY_SECTIONS.findIndex((s) => s.key === "your_turn") + 1);
+check("a promise marked done after it was made is closed", openPromise({ promiseText: "x", promiseAt: at(9), promiseDoneAt: at(10) }) === null);
+check("…a newer promise opens again", openPromise({ promiseText: "x", promiseAt: at(11), promiseDoneAt: at(10) })?.what === "x");
+check("no text or no date: nothing open", openPromise({ promiseText: null, promiseAt: at(9), promiseDoneAt: null }) === null && openPromise({ promiseText: "x", promiseAt: null, promiseDoneAt: null }) === null);
 
 // NEGATIVE (run-through, 2026-09-29): Michael Dey came in from the sheet as Agreed; his emails say talks are paused, and
 // the Next line asked for his address. The flag asks a person instead — automation never moves backward.

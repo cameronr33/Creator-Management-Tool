@@ -10,6 +10,7 @@ import { statusNoteView, type StatusNoteView } from "@/lib/status-note";
 import { hiddenSummary, splitByView, type MemberId, type View } from "@/lib/owners";
 import { archiveWoke, splitArchived } from "@/lib/archive-rules";
 import { staleStage } from "@/lib/stage-flag";
+import { openPromise } from "@/lib/promises";
 import { lastStageDecisionAt } from "@/lib/email-ingest";
 import { getLastInboundStoredAt } from "@/lib/archive";
 
@@ -46,6 +47,8 @@ export interface TodayRow {
   /** Their emails read as an earlier stage (stage-flag.ts): what to suggest, and the line behind it. */
   /** Their emails read as an earlier stage; `beneath` is where the row would sit otherwise, so its own next step still shows. */
   stageFlag: { suggested: CmStage; quote: string | null; beneath: TodaySection | null } | null;
+  /** Our side's open promise: what, the line we wrote, and when (ISO). */
+  promise: { what: string; quote: string | null; at: string } | null;
   /** Back from the archive: because the reminder date came or they wrote, with who archived it and why. */
   backFromArchive: { why: "reminder" | "wrote"; by: string | null; reason: string | null } | null;
 }
@@ -121,7 +124,9 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       hasShipment: latestShipment.has(c.partnershipId),
       dismissedAt: c.stageFlagDismissedAt,
     });
+    const promise = openPromise(c);
     const facts = {
+      promise,
       staleStageAt: c.emailStageAt,
       stage: c.stage,
       whoseTurn: c.activity.whoseTurn,
@@ -168,6 +173,7 @@ export async function getTodayData({ clientId, campaignId, view = "all", me }: T
       badge: placed.badge,
       backFromArchive: woke ? { why: woke, by: c.archivedByName, reason: c.archiveReason } : null,
       stageFlag: suggested ? { suggested, quote: c.emailStageQuote, beneath } : null,
+      promise: promise ? { what: promise.what, quote: c.promiseQuote, at: promise.at.toISOString() } : null,
     });
   }
   return { rows: sortToday(rows), ...base };

@@ -67,6 +67,8 @@ import { archiveActive } from "@/lib/archive-rules";
 import { staleStage, staleStageLine } from "@/lib/stage-flag";
 import { lastStageDecisionAt } from "@/lib/email-ingest";
 import { StageFlagButtons } from "@/components/stage-flag";
+import { PromiseDoneButton } from "@/components/promise-done";
+import { openPromise, promiseLine } from "@/lib/promises";
 import { TrackingLink } from "@/components/tracking-link";
 import { OwnerPicker } from "@/components/owner-controls";
 import { chipLabels, listLoginNames, listTeammates, memberForUser } from "@/lib/owners";
@@ -173,6 +175,8 @@ export default async function CreatorDetailPage({
     hasShipment: shipments.length > 0,
     dismissedAt: partnership.stageFlagDismissedAt,
   });
+  // What our side said we'd do and hasn't yet (2026-09-30, Michael Dey).
+  const promise = openPromise(partnership);
   const step = nextStep({
     staleStage: flagged,
     stage: partnership.stage,
@@ -333,6 +337,17 @@ export default async function CreatorDetailPage({
                   </p>
                   <div className="mt-2">
                     <StageFlagButtons partnershipId={partnership.id} name={creator.name} stage={partnership.stage} suggested={flagged} />
+                  </div>
+                </>
+              )}
+              {promise && (
+                <>
+                  <p className="mt-1.5 text-[13px] text-text-muted">
+                    {promiseLine(promise)}
+                    {partnership.promiseQuote ? <> We wrote: &ldquo;{partnership.promiseQuote}&rdquo;</> : null}
+                  </p>
+                  <div className="mt-2">
+                    <PromiseDoneButton partnershipId={partnership.id} name={creator.name} />
                   </div>
                 </>
               )}

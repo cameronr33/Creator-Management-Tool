@@ -358,6 +358,20 @@ export const cmPartnerships = pgTable(
     emailStageAt: timestamp("email_stage_at"),
     /** "Keep Agreed": the flag stays away until a newer message reads differently. */
     stageFlagDismissedAt: timestamp("stage_flag_dismissed_at"),
+    /**
+     * What our side (us or the brand) told the creator we'd do and hasn't done
+     * yet (2026-09-30, owner: Michael Dey's "we'll circle back" went unkept) —
+     * written by the email reader only with the line found word for word in
+     * our message (promises.ts). Cleared when a later reading says it's done.
+     */
+    promiseText: text("promise_text"),
+    /** The line from our message. */
+    promiseQuote: text("promise_quote"),
+    promiseEventId: uuid("promise_event_id").references((): AnyPgColumn => cmOutreachEvents.id, { onDelete: "set null" }),
+    /** When that message was sent. */
+    promiseAt: timestamp("promise_at"),
+    /** "Mark done": closed until a newer promise. */
+    promiseDoneAt: timestamp("promise_done_at"),
     /** A shipping address the creator wrote in an email, offered as "Use it". */
     suggestedAddress: text("suggested_address"),
     suggestedAddressEventId: uuid("suggested_address_event_id"),
