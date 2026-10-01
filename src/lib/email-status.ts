@@ -3,6 +3,7 @@ import { z } from "zod";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  cmCreatorSideSenders,
   clients,
   cmCampaigns,
   cmCreators,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/db/schema";
 import { STAGES, canonicalStage, isTerminal, stageIndex, stageLabel } from "@/lib/stages";
 import { hasCompleteAddress } from "@/lib/address";
-import { lastManualChangeAt } from "@/lib/email-ingest";
+import { lastManualChangeAt, normAddress } from "@/lib/email-ingest";
 import { moveStage, describeVideo, type ExitReason } from "@/lib/stage-moves";
 import { displayNames } from "@/lib/email-body";
 import { READER_MODEL, anthropic, serviceUnavailable, withModelFallback } from "@/lib/claude";
@@ -111,6 +112,8 @@ export interface PromptMessage {
   from: string | null;
   /** Its To and Cc headers, together. Shown for "someone else" only, so the reader can see who they wrote to. */
   copied: string | null;
+  /** "Someone else" a person placed with the creator in Settings (a manager, a parent). */
+  creatorSide: boolean;
   subject: string | null;
   body: string | null;
 }
@@ -171,8 +174,10 @@ Return:
         ? "from us"
         : m.senderRole === "client"
           ? `from the brand, ${ctx.clientName} (${displayNames(m.from) || "unknown"})`
-          : m.senderRole === "other"
-            ? `from someone else on the creator's thread (${displayNames(m.from) || "unknown"}${m.copied ? `; copied: ${displayNames(m.copied)}` : ""})`
+          : m.senderRole === "other" && m.creatorSide
+            ? `from someone on the creator's side (${displayNames(m.from) || "unknown"}) — a manager or family member, not the brand`
+            : m.senderRole === "other"
+              ? `from someone else on the creator's thread (${displayNames(m.from) || "unknown"}${m.copied ? `; copied: ${displayNames(m.copied)}` : ""})`
             : "from the creator";
     const channel =
       m.channel === "email"
@@ -440,6 +445,12 @@ async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentCont
     db.select({ id: cmDeliverables.id }).from(cmDeliverables).where(eq(cmDeliverables.partnershipId, partnershipId)),
   ]);
   const ordered = [...events].reverse().filter((e) => !(e.isMigrated && !e.body));
+  const otherAddresses = [...new Set(ordered.filter((e) => e.senderRole === "other" && e.fromAddress).map((e) => normAddress(e.fromAddress!)))];
+  const creatorSide = new Set(
+    otherAddresses.length
+      ? (await db.select({ email: cmCreatorSideSenders.email }).from(cmCreatorSideSenders).where(inArray(cmCreatorSideSenders.email, otherAddresses))).map((r) => r.email)
+      : [],
+  );
   const messages: PromptMessage[] = ordered.map((e, i) => ({
     n: i + 1,
     eventId: e.id,
@@ -451,6 +462,7 @@ async function loadContext(partnershipId: string): Promise<{ ctx: AssessmentCont
     kind: e.kind,
     from: e.fromAddress,
     copied: [e.toAddress, e.ccAddress].filter(Boolean).join(", ") || null,
+    creatorSide: e.senderRole === "other" && !!e.fromAddress && creatorSide.has(normAddress(e.fromAddress)),
     subject: e.subject,
     body: e.body && e.body !== "migrated from sheet; original date unknown" ? e.body : null,
   }));

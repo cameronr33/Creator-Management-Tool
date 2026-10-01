@@ -101,6 +101,7 @@ function pure() {
     kind: "reply",
     from: null,
     copied: null,
+    creatorSide: false,
     subject: null,
     body: "hello",
     ...m,

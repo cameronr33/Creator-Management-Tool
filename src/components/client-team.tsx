@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Eye, KeyRound, Trash2, UserPlus, UserX } from "lucide-react";
+import { Copy, Eye, Globe, KeyRound, Trash2, UserPlus, UserRound, UserX } from "lucide-react";
 import { Badge, Button, Callout, Checkbox, Field, Input } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { api, useSave } from "@/components/use-save";
@@ -19,6 +19,18 @@ export interface ClientPerson {
   lastLoginAt: string | null;
 }
 
+/** Someone who wrote on this client's creators' threads that nobody has placed yet (src/lib/client-domains.ts). */
+export interface ThreadStranger {
+  email: string;
+  name: string | null;
+  domain: string;
+  domainAllowed: boolean;
+  messages: number;
+  /** ISO. */
+  lastAt: string;
+  creatorNames: string[];
+}
+
 /**
  * Settings → Client team. Everyone here is a client contact for email (their
  * messages on a creator's thread show as the brand's, never as the creator or
@@ -31,6 +43,8 @@ export function ClientTeam({
   people,
   requiresApproval,
   ourSideDomains = [],
+  domains = [],
+  strangers = [],
 }: {
   clientId: string;
   clientName: string;
@@ -38,10 +52,26 @@ export function ClientTeam({
   requiresApproval: boolean;
   /** Whole domains on "Our side" — anyone there who isn't listed here still counts as us. */
   ourSideDomains?: string[];
+  /** Whole domains at this client: everyone there counts as theirs. */
+  domains?: { id: string; domain: string }[];
+  strangers?: ThreadStranger[];
 }) {
-  const { pending, run } = useSave();
+  const { pending, run, undoVia } = useSave();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [domain, setDomain] = useState("");
+
+  const addDomain = async (d: string) => {
+    const r = await run(() => api<{ domain?: string }>("/api/client-domains", { domain: d }), {
+      success: `Everyone at @${d.trim().replace(/^@/, "").toLowerCase()} now counts as ${clientName}'s`,
+    });
+    if (r.ok) setDomain("");
+  };
+  const withCreator = (s: ThreadStranger) =>
+    run(() => api("/api/thread-senders", { email: s.email }), {
+      success: `${s.name ?? s.email} is with the creator`,
+      undoWith: () => () => void undoVia("/api/thread-senders", { email: s.email, undo: true }, `Undone — ${s.name ?? s.email} is back on the list`),
+    });
   const [link, setLink] = useState<{ id: string; url: string } | null>(null);
 
   const add = async () => {
@@ -168,6 +198,86 @@ export function ClientTeam({
           Add
         </Button>
       </div>
+
+      <div className="space-y-2 border-t border-border pt-4">
+        <div>
+          <div className="text-sm font-medium text-text">Whole domains</div>
+          <p className="text-xs text-text-muted">
+            Everyone writing from one of these counts as {clientName}&apos;s on {clientName}&apos;s creators — for an agency or partner that works for {clientName}.
+          </p>
+        </div>
+        {domains.length > 0 && (
+          <ul className="flex flex-wrap gap-2">
+            {domains.map((d) => (
+              <li key={d.id} className="inline-flex items-center gap-1 rounded-md border border-border bg-surface py-0.5 pr-0.5 pl-2 text-sm text-text">
+                @{d.domain}
+                <ConfirmButton
+                  label={`Remove @${d.domain}`}
+                  icon={<Trash2 size={13} />}
+                  iconOnly
+                  pending={pending}
+                  question={`Take @${d.domain} off ${clientName}'s team? Their emails show as someone else's again, unless the person is listed above.`}
+                  confirmLabel={`Remove @${d.domain}`}
+                  onConfirm={() => run(() => api("/api/client-domains", { id: d.id }, "DELETE"), { success: `@${d.domain} removed` })}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex flex-wrap items-end gap-2">
+          <Field label="Add a domain">
+            <Input compact value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="partner.com" className="w-56" />
+          </Field>
+          <Button size="sm" icon={<Globe size={13} />} pending={pending} disabled={!domain.trim()} onClick={() => addDomain(domain)}>
+            Add domain
+          </Button>
+        </div>
+      </div>
+
+      {strangers.length > 0 && (
+        <div className="space-y-2 border-t border-border pt-4">
+          <div>
+            <div className="text-sm font-medium text-text">Who are these?</div>
+            <p className="text-xs text-text-muted">
+              They wrote on {clientName}&apos;s creators&apos; threads and aren&apos;t on file. Saying whose side they&apos;re on keeps whose turn it is right.
+            </p>
+          </div>
+          <ul className="divide-y divide-border rounded-lg border border-border">
+            {strangers.map((s) => (
+              <li key={s.email} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-text">{s.name ?? s.email}</span>{" "}
+                  {s.name && <span className="break-all text-xs text-text-muted">{s.email}</span>}
+                  <div className="mt-0.5 text-xs text-text-muted">
+                    {`On ${s.creatorNames.join(", ")}'s thread${s.creatorNames.length === 1 ? "" : "s"} · ${s.messages === 1 ? "1 message" : `${s.messages} messages`} · last ${shortDate(s.lastAt)}`}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-1">
+                  <Button
+                    size="sm"
+                    icon={<UserPlus size={13} />}
+                    pending={pending}
+                    onClick={() =>
+                      run(() => api("/api/client-users", { name: s.name ?? s.email.split("@")[0], email: s.email }), { success: `${s.name ?? s.email} added to ${clientName}'s team` })
+                    }
+                  >
+                    {clientName}&apos;s team
+                  </Button>
+                  {s.domainAllowed && (
+                    <Button size="sm" variant="ghost" icon={<Globe size={13} />} pending={pending} onClick={() => addDomain(s.domain)}>
+                      All of @{s.domain}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" icon={<UserRound size={13} />} pending={pending} onClick={() => withCreator(s)}>
+                    With the creator
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <Button size="sm" variant="ghost" icon={<Eye size={13} />} href="/portal">
         See what {clientName} sees
       </Button>

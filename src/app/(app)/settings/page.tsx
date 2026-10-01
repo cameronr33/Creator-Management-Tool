@@ -19,6 +19,7 @@ import { getCampaignCounts } from "@/lib/queries";
 import { DEFAULT_THRESHOLDS } from "@/lib/outreach";
 import { summarizeGmailHealth } from "@/lib/gmail-health";
 import { listClientUsers } from "@/lib/client-users";
+import { listClientDomains, unknownSenders } from "@/lib/client-domains";
 import { ClientTeam } from "@/components/client-team";
 import { TeamSettings } from "@/components/team-settings";
 import { listTeamForSettings, memberForUser } from "@/lib/owners";
@@ -72,7 +73,13 @@ export default async function SettingsPage({
     getEmailCoverage(),
     emailMoveStats(monthStart),
   ]);
-  const [counts, clientPeople, myMember] = await Promise.all([getCampaignCounts(client.id), listClientUsers(client.id), memberForUser(session.user)]);
+  const [counts, clientPeople, myMember, clientDomains, strangers] = await Promise.all([
+    getCampaignCounts(client.id),
+    listClientUsers(client.id),
+    memberForUser(session.user),
+    listClientDomains(client.id),
+    unknownSenders(client.id),
+  ]);
   const teamMembers = await listTeamForSettings();
   const readingOn = !!process.env.ANTHROPIC_API_KEY;
   const automove = emailAutomoveOn();
@@ -200,6 +207,8 @@ export default async function SettingsPage({
               requiresApproval={!!currentSettings?.requiresApproval}
               ourSideDomains={(gmailAccount?.teamAddresses ?? []).filter((e) => e.startsWith("@")).map((e) => e.slice(1).toLowerCase())}
               clientName={client.name}
+              domains={clientDomains}
+              strangers={strangers.map((s) => ({ ...s, lastAt: s.lastAt.toISOString() }))}
               people={clientPeople.map((p) => ({
                 ...p,
                 inviteExpiresAt: p.inviteExpiresAt && p.inviteExpiresAt > new Date() ? p.inviteExpiresAt.toISOString() : null,

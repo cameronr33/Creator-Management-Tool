@@ -1,11 +1,10 @@
-import { NextResponse, after, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAgency, badRequest } from "@/lib/api-helpers";
 import { resolveClient } from "@/lib/queries";
 import { getSelectedClientSlug } from "@/lib/client-cookie";
 import { addClientUser, createInvite, removeClientUser, revokeLogin } from "@/lib/client-users";
-import { getActiveGmailAccount } from "@/lib/gmail-sync";
-import { loadTeamIdentity, reclassifyStoredEmails } from "@/lib/email-ingest";
+import { reclassifyLater } from "@/lib/reclassify-later";
 
 /**
  * Settings → Client team, for the client selected in the sidebar.
@@ -17,13 +16,6 @@ import { loadTeamIdentity, reclassifyStoredEmails } from "@/lib/email-ingest";
 
 async function selectedClient() {
   return resolveClient(await getSelectedClientSlug());
-}
-
-function reclassifyLater() {
-  after(async () => {
-    const account = await getActiveGmailAccount();
-    if (account) await reclassifyStoredEmails(await loadTeamIdentity(account.email, account.teamAddresses ?? []));
-  });
 }
 
 export async function POST(req: NextRequest) {

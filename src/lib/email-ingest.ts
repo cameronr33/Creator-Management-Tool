@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, isNull, max, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  cmClientDomains,
   cmClientUsers,
   cmContracts,
   cmCreators,
@@ -106,6 +107,8 @@ export interface TeamIdentity {
   domains: Set<string>;
   /** People at a client (Settings → client team): address → their client. */
   clientContacts?: Map<string, string>;
+  /** Whole domains at a client (Settings → client team): domain → their client. */
+  clientDomains?: Map<string, string>;
   /** Each creator's client, so a client contact counts only on their own brand's creators. */
   creatorClients?: Map<string, string>;
 }
@@ -133,14 +136,16 @@ export function teamIdentity(mailbox: string, userEmails: string[] = [], extra: 
 }
 
 export async function loadTeamIdentity(mailbox: string, extra: string[] = []): Promise<TeamIdentity> {
-  const [rows, contacts, creators] = await Promise.all([
+  const [rows, contacts, domains, creators] = await Promise.all([
     db.select({ email: users.email }).from(users),
     db.select({ email: cmClientUsers.email, clientId: cmClientUsers.clientId }).from(cmClientUsers),
+    db.select({ domain: cmClientDomains.domain, clientId: cmClientDomains.clientId }).from(cmClientDomains),
     db.select({ id: cmCreators.id, clientId: cmCreators.clientId }).from(cmCreators),
   ]);
   return {
     ...teamIdentity(mailbox, rows.map((r) => r.email), extra),
     clientContacts: new Map(contacts.map((c) => [c.email.trim().toLowerCase(), c.clientId])),
+    clientDomains: new Map(domains.map((d) => [d.domain, d.clientId])),
     creatorClients: new Map(creators.map((c) => [c.id, c.clientId])),
   };
 }
@@ -224,7 +229,8 @@ export function classifyMessage(
   // Someone listed on a client's team outranks an Our-side *domain* (the list
   // is explicit, the domain a blanket rule) — never our own mailbox's SENT
   // mail or an address listed on Our side by name.
-  const contactOf = team.clientContacts?.get(from);
+  // A listed person first, then a whole domain at the client (both explicit).
+  const contactOf = team.clientContacts?.get(from) ?? team.clientDomains?.get(emailDomain(from));
   const explicitlyOurs = !!msg.labelIds?.includes("SENT") || team.emails.has(from);
   const team_ = contactOf ? explicitlyOurs : isTeamSender(msg.from, msg.labelIds, team);
   const fromCreator = team_ ? undefined : creatorsByAddress.get(from)?.[0];
@@ -603,5 +609,7 @@ export async function reclassifyStoredEmails(team: TeamIdentity): Promise<{ chan
     changed++;
   }
   await recomputeEmailKinds([...touched]);
+  // Who wrote what changed, so whose turn it is may have too: read those conversations again.
+  if (touched.size) await db.update(cmPartnerships).set({ emailAssessedAt: null }).where(inArray(cmPartnerships.id, [...touched]));
   return { changed };
 }

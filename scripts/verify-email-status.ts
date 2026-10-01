@@ -53,7 +53,7 @@ const EXPECTED: Partial<Record<CmStage, CmStage[]>> = {
 
 const day = (n: number) => new Date(Date.UTC(2026, 8, n, 12));
 function m(n: number, over: Partial<PromptMessage>): PromptMessage {
-  return { n, eventId: `e${n}`, occurredAt: day(n), channel: "email", synced: true, direction: "inbound", senderRole: "creator", kind: "reply", from: null, copied: null, subject: null, body: null, ...over };
+  return { n, eventId: `e${n}`, occurredAt: day(n), channel: "email", synced: true, direction: "inbound", senderRole: "creator", kind: "reply", from: null, copied: null, creatorSide: false, subject: null, body: null, ...over };
 }
 const convo: PromptMessage[] = [
   m(1, { direction: "outbound", senderRole: "team", kind: "initial", body: "Would you like to work with HELLA on a lighting install video?" }),
@@ -200,6 +200,8 @@ async function main() {
   const partnerPrompt = buildPrompt({ creatorName: "T", campaignName: "C", clientName: "HELLA", stage: "in_conversation", hasAddress: false, shipmentStatuses: [], deliverables: 0, agreementType: null, messages: partnerConvo });
   check("someone else's message says who was copied, by name", /\[2\][^\n]*someone else[^\n]*Robert Tinson[^\n]*copied: mike@creator\.example, MILLIRON Raegan \(HELLA\), Cameron Rahmati/.test(partnerPrompt.user), partnerPrompt.user.split("\n").find((l) => l.startsWith("[2]")));
   check("a message from us or the creator doesn't list who was copied", !/\[(1|3)\][^\n]*copied:/.test(partnerPrompt.user));
+  const managerPrompt = buildPrompt({ creatorName: "T", campaignName: "C", clientName: "HELLA", stage: "in_conversation", hasAddress: false, shipmentStatuses: [], deliverables: 0, agreementType: null, messages: [m(1, { senderRole: "other", creatorSide: true, from: "Pat <pat@talent.example>", body: "Mike will get back to you Friday." })] });
+  check("someone a person placed with the creator is labelled as the creator's side, not the brand", /\[1\][^\n]*from someone on the creator's side \(Pat\)/.test(managerPrompt.user), managerPrompt.user.split("\n").find((l) => l.startsWith("[1]")));
 
   console.log("\n── The deal in the email (pure) ──");
   const dealConvo: PromptMessage[] = [

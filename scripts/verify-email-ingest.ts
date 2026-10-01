@@ -19,12 +19,14 @@ import {
   getEmailRoster,
   ingestEmails,
   lastManualChangeAt,
+  loadTeamIdentity,
   noteReason,
   reclassifyStoredEmails,
   teamIdentity,
   type IncomingEmailMessage,
 } from "../src/lib/email-ingest";
 import { createCreatorWithPartnership, ensureCampaignByName } from "../src/lib/creators";
+import { addClientDomain, markCreatorSide, removeClientDomain, unknownSenders, unmarkCreatorSide } from "../src/lib/client-domains";
 import { changeStage } from "../src/lib/mutations";
 import { getLastMessages } from "../src/lib/queries";
 import { pdfAttachments } from "../src/lib/gmail";
@@ -81,6 +83,24 @@ async function main() {
   check(
     "…so a parent on gmail.com cc'ing the creator is someone else, not us",
     classifyMessage(msg({ from: "parent@gmail.com", to: [CREATOR] }), creators, freeMailbox)?.senderRole === "other",
+  );
+
+  console.log("\n── A whole domain at the client (pure) ──");
+  // Michael Dey (2026-09-30): HELLA's partner aftermarketREADY wrote on his thread and read as a stranger.
+  const withDomain = {
+    ...teamIdentity("cameron@sentic.io", [], ["@partner.example"]),
+    clientDomains: new Map([["partner.example", "CLIENT_A"]]),
+    creatorClients: new Map([["C1", "CLIENT_A"], ["C2", "CLIENT_B"]]),
+  };
+  const twoCreators = new Map([[CREATOR, ["C1"]], [ALT, ["C2"]]]);
+  const partnerMsg = classifyMessage(msg({ from: "Robert Tinson <rt@partner.example>", to: [CREATOR] }), twoCreators, withDomain);
+  check("anyone at a client's domain is the client's, kept as a note", partnerMsg?.senderRole === "client" && partnerMsg.note === "client", JSON.stringify(partnerMsg));
+  check("…even when the same domain is on Our side (the client's list is explicit)", partnerMsg?.senderRole === "client");
+  // Like a listed person: on another brand's creator they're just someone else (the client's list outranks an Our-side domain).
+  check("…but only on that client's own creators — on another brand's, someone else", classifyMessage(msg({ from: "rt@partner.example", to: [ALT] }), twoCreators, withDomain)?.senderRole === "other");
+  check(
+    "a creator writing from that domain is still the creator",
+    classifyMessage(msg({ from: "rt@partner.example", to: [] }), new Map([["rt@partner.example", ["C1"]]]), withDomain)?.senderRole === "creator",
   );
 
   console.log("\n── People at the client (pure) ──");
@@ -285,6 +305,40 @@ async function main() {
     await reclassifyStoredEmails(clientTeam);
     const [backToOther] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_other"));
     check("…and removing them makes it someone else's message again", backToOther?.senderRole === "other" && backToOther.kind === "reply", JSON.stringify(backToOther && { r: backToOther.senderRole, k: backToOther.kind }));
+
+    // A whole domain at the client, and people nobody has placed yet (2026-09-30).
+    const strangers = async () => (await unknownSenders(client.id)).filter((s) => s.email === "assistant@agency-x.com");
+    const listed = await strangers();
+    check("someone nobody has placed is listed for the client, with the creator they wrote to", listed.length === 1 && listed[0].creatorNames.includes("Verify Email Ingest") && listed[0].domain === "agency-x.com", JSON.stringify(listed));
+    await markCreatorSide("Assistant <ASSISTANT@agency-x.com>");
+    check("\"With the creator\" takes them off the list", (await strangers()).length === 0);
+    await unmarkCreatorSide("assistant@agency-x.com");
+    check("…and Undo puts them back", (await strangers()).length === 1);
+    check("a free-mail domain can't be a client's", !(await addClientDomain(client.id, "@gmail.com")).ok);
+    const [agencyLogin] = await db.select({ email: schema.users.email }).from(schema.users).limit(1);
+    const agencyDomain = agencyLogin?.email.split("@")[1]?.toLowerCase() ?? "";
+    check("nor the agency's own domain (a login's)", !!agencyDomain && !(await addClientDomain(client.id, agencyDomain)).ok, agencyDomain);
+    check("nor something that isn't a domain", !(await addClientDomain(client.id, "not a domain")).ok);
+    const added = await addClientDomain(client.id, " @Agency-X.com ");
+    check("a domain is added, without the @ and lowercased", added.ok && added.domain === "agency-x.com", JSON.stringify(added));
+    const [otherClient] = await db.insert(schema.clients).values({ name: "__verify_ei_other_client", slug: `__verify_ei_${Date.now()}` }).returning();
+    try {
+      check("the same domain can't be on two clients", !(await addClientDomain(otherClient.id, "agency-x.com")).ok);
+      check("another client can't remove it", added.ok && !(await removeClientDomain(otherClient.id, added.id)));
+    } finally {
+      await db.delete(schema.clients).where(eq(schema.clients.id, otherClient.id));
+    }
+    await db.update(schema.cmPartnerships).set({ emailAssessedAt: new Date() }).where(eq(schema.cmPartnerships.id, partnershipId));
+    await reclassifyStoredEmails(await loadTeamIdentity("cameron@sentic.io"));
+    const [byDomain] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_other"));
+    check("adding the domain makes their earlier message the client's note", byDomain?.senderRole === "client" && byDomain.kind === "note", JSON.stringify(byDomain && { r: byDomain.senderRole, k: byDomain.kind }));
+    const [reread] = await db.select({ at: schema.cmPartnerships.emailAssessedAt }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, partnershipId));
+    check("…and the conversation is read again, since who wrote what changed", reread?.at === null);
+    check("…and they're no longer listed as unknown", (await strangers()).length === 0);
+    check("its own client removes it", added.ok && (await removeClientDomain(client.id, added.id)));
+    await reclassifyStoredEmails(await loadTeamIdentity("cameron@sentic.io"));
+    const [undone] = await db.select().from(schema.cmOutreachEvents).where(eq(schema.cmOutreachEvents.externalId, "__verify_ei_other"));
+    check("…and their message is someone else's again", undone?.senderRole === "other" && undone.kind === "reply");
 
     // Contract PDFs attached on the thread (2026-09-24).
     const contractsNow = () => db.select().from(schema.cmContracts).where(eq(schema.cmContracts.partnershipId, partnershipId));

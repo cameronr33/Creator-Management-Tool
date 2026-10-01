@@ -788,6 +788,36 @@ export const cmClientUsers = pgTable(
   (t) => [unique("cm_client_users_email_uq").on(t.email), index("cm_client_users_client_idx").on(t.clientId)],
 );
 
+/**
+ * Whole domains at a client (2026-09-30, owner: HELLA's partner agency wrote
+ * on Michael Dey's thread and read as a stranger). Anyone writing from one
+ * counts as the client's on that client's creators, like a listed person.
+ */
+export const cmClientDomains = pgTable(
+  "cm_client_domains",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    /** Lowercased, without the "@". */
+    domain: text("domain").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique("cm_client_domains_domain_uq").on(t.domain), index("cm_client_domains_client_idx").on(t.clientId)],
+);
+
+/**
+ * Senders on creators' threads a person placed with the creator (a manager, a
+ * parent) — "With the creator" in Settings. They stay "someone else" for
+ * whose message it is; the email reader is told which side they're on.
+ */
+export const cmCreatorSideSenders = pgTable("cm_creator_side_senders", {
+  /** Lowercased address. */
+  email: text("email").primaryKey(),
+  decidedAt: timestamp("decided_at").defaultNow().notNull(),
+});
+
 export type CmClientUser = typeof cmClientUsers.$inferSelect;
 
 // ─────────────────────────────────────────────────────────────────
