@@ -399,8 +399,11 @@ export function promiseUpdate(
   storedEventId: string | null,
   /** The stored promise was marked done: it's never cleared, so every later reading is still told so. */
   storedDone = false,
+  /** When the promise marked done was made: an older promise surfacing again doesn't reopen (third review). */
+  donePromiseAt: Date | null = null,
 ): ReturnType<typeof verifiedPromise> | "clear" | "keep" {
   const verified = verifiedPromise(assessment, messages);
+  if (verified && storedDone && donePromiseAt && verified.eventId !== storedEventId && verified.at.getTime() <= donePromiseAt.getTime()) return "keep";
   if (verified) return verified;
   if (storedDone) return "keep";
   if (assessment.confidence === "low" || assessment.open_promise !== null) return "keep";
@@ -602,7 +605,7 @@ export async function assessPartnership(
   const stageCited = assessment.stage_from_messages_message != null ? ctx.messages.find((m) => m.n === assessment.stage_from_messages_message) : undefined;
   const stageQuote = assessment.stage_from_messages_quote?.trim() ?? "";
   const stageQuoted = !!fromMessages && !!stageCited && fromMailbox(stageCited) && !!stageQuote && quoteFoundIn(stageQuote, stageCited);
-  const promise = promiseUpdate(assessment, ctx.messages, loaded.promiseEventId, !!ctx.donePromise);
+  const promise = promiseUpdate(assessment, ctx.messages, loaded.promiseEventId, !!ctx.donePromise, ctx.donePromise?.at ?? null);
   await db
     .update(cmPartnerships)
     .set({

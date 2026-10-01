@@ -140,6 +140,16 @@ async function main() {
     check("…and Undo puts it back, whose turn and all", !!done2 && (await undoPromiseDone(promiser, done2)) && (await promiseRow())?.section === "promised");
     const [restored] = await db.select({ handled: schema.cmPartnerships.replyHandledAt }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, promiser));
     check("…restoring what No reply needed was before", restored?.handled === null);
+    // Third review — the real Michael Dey order: the promise, then their "I'll be here when you're ready!". Mark done can't tell
+    // a thank-you from a question, so it asks for one fresh read (told the promise is done) to settle whose turn it is.
+    const thanks = new Date(Date.now() - 50 * 86_400_000);
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId: promiser, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", body: "I'll be here when you're ready!", occurredAt: thanks, externalId: "__verify_td_promise_thanks" });
+    await db.update(schema.cmPartnerships).set({ emailSummary: "Waiting on launch dates.", emailSummaryAt: thanks, emailWhoseTurn: "us", emailAssessedAt: new Date() }).where(eq(schema.cmPartnerships.id, promiser));
+    const doneThanks = await markPromiseDone(promiser);
+    const [reread] = await db.select({ at: schema.cmPartnerships.emailAssessedAt }).from(schema.cmPartnerships).where(eq(schema.cmPartnerships.id, promiser));
+    check("Mark done on a promise they answered asks for one fresh read to settle whose turn it is", !!doneThanks && reread?.at === null);
+    check("…and doesn't answer their message for them in the meantime", (await promiseRow())?.section === "your_turn");
+    if (doneThanks) await undoPromiseDone(promiser, doneThanks);
     // Second review: a question from them after the promise is never answered by Mark done.
     const asked = new Date(Date.now() - 2 * 86_400_000);
     await db.insert(schema.cmOutreachEvents).values({ partnershipId: promiser, direction: "inbound", channel: "email", kind: "reply", senderRole: "creator", body: "What size kit do you need?", occurredAt: asked, externalId: "__verify_td_promise_q" });
@@ -148,6 +158,16 @@ async function main() {
     const afterQuestion = await promiseRow();
     check("Mark done never counts a newer question from them as answered", !!done3 && afterQuestion?.section === "your_turn", JSON.stringify(afterQuestion && { s: afterQuestion.section, t: afterQuestion.whoseTurn }));
     if (done3) await undoPromiseDone(promiser, done3);
+    // Third review: nor a question from their manager (someone else on the thread) — on its own creator, so
+    // the manager's is the only message after the promise.
+    const managed = await add("__verify_td_promise_mgr");
+    await changeStage(managed, "in_conversation");
+    const managerAsked = new Date(Date.now() - 86_400_000);
+    await db.insert(schema.cmOutreachEvents).values({ partnershipId: managed, direction: "inbound", channel: "email", kind: "reply", senderRole: "other", fromAddress: "pat@talent.example", body: "What's the fee?", occurredAt: managerAsked, externalId: "__verify_td_promise_mgr" });
+    await db.update(schema.cmPartnerships).set({ promiseText: "Send the brief", promiseAt: new Date(Date.now() - 10 * 86_400_000), emailSummary: "Their manager asked about the fee.", emailSummaryAt: managerAsked, emailWhoseTurn: "us" }).where(eq(schema.cmPartnerships.id, managed));
+    const done4 = await markPromiseDone(managed);
+    const managedRow = (await getTodayData({ clientId: client.id, campaignId })).rows.find((r) => r.partnershipId === managed);
+    check("…nor a newer question from their manager", !!done4 && managedRow?.section === "your_turn", JSON.stringify(managedRow && { s: managedRow.section, t: managedRow.whoseTurn }));
     // A new promise in a message sent just before Mark done is a new promise.
     const [ev1] = await db.insert(schema.cmOutreachEvents).values({ partnershipId: promiser, direction: "outbound", channel: "email", kind: "follow_up", senderRole: "team", body: "We'll circle back with dates.", occurredAt: new Date(Date.now() - 49 * 86_400_000) }).returning();
     await db.update(schema.cmPartnerships).set({ promiseEventId: ev1.id }).where(eq(schema.cmPartnerships.id, promiser));

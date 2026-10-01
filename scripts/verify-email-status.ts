@@ -222,6 +222,11 @@ async function main() {
   check("the promise's message fell out of the reader's window: kept", upd(null, "high", "e-gone") === "keep");
   // Second review: clearing a promise marked done loses the note to the reader, and the next reading brings it back.
   check("a promise a teammate marked done is never cleared — the reader keeps being told", upd(null, "high", "e1", true) === "keep");
+  // Third review: once a later promise is marked done, an older one surfacing again doesn't reopen.
+  const older = promiseUpdate({ open_promise: { what: "Send the contract", quote: "We'll send the contract on Friday", message: 1 }, confidence: "high" }, promiseConvo, "e2", true, day(2));
+  check("an older promise than the one marked done never reopens", older === "keep", JSON.stringify(older));
+  const newer = promiseUpdate({ open_promise: { what: "Circle back with dates", quote: "We will circle back with you once we have specific launch dates.", message: 2 }, confidence: "high" }, promiseConvo, "e1", true, day(1));
+  check("…but a newer one does", typeof newer === "object" && newer !== null && newer.eventId === "e2");
   const donePrompt = buildPrompt({ creatorName: "T", campaignName: "C", clientName: "H", stage: "in_conversation", hasAddress: false, shipmentStatuses: [], deliverables: 0, agreementType: null, messages: promiseConvo, donePromise: { what: "Circle back with launch dates", at: day(2) } });
   check("the reader is told what a teammate marked done, so it isn't open again or our turn", /marked done[^\n]*Circle back with launch dates/i.test(donePrompt.user) && /not[^\n]*open_promise/i.test(donePrompt.user));
   check("the prompt asks for our side's open promise, quoted, and null once it's done", /open_promise:[^\n]*our side[^\n]*(promised|said we would)/i.test(prompt.system) && /open_promise:[^\n]*null[^\n]*(done|kept)/i.test(prompt.system));
