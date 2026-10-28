@@ -1,0 +1,275 @@
+{
+  "app": "Stoic",
+  "file": "08-stoic",
+  "category": "journal and mental health",
+  "recording": {
+    "length": "2:35",
+    "starts": "fresh install, splash (the first second shows the iOS Notification Center; the app fades in at 0:01)",
+    "onboarding_span": "0:00-0:37",
+    "paywall_at": "0:37",
+    "after_paywall": "X opens a one-time 'special offer for students' 50% win-back that hands off to an App Store offer code (1 year for $14.99, then $39.99/year, with a 1-week free trial); the tester cancels, closes a newsletter email capture, uses the free tier, and later hits a second, contextual paywall ('Unlock daily journal prompts.') from locked content."
+  },
+  "counts": {"questions": 3, "intermissions": 3, "permissions": 1, "loaders": 1, "reveals": 1, "other": 4},
+  "strategy": "Stoic runs a very short, quiet onboarding (three questions in about 37 seconds) carried by one idea: journaling is proven to help with exactly what you just named, and this is your private, safe space to do it. The arc goes from calm (a sparse splash with an X already visible) to being seen (an evidence line grows inside the goal you tap) to safety (a privacy line after the age question) to commitment (picking your own reminder times, then the notification prompt) to a plan whose title repeats your goals back. The paywall lands on the 'Begin the Journey!' tap with a goal-matched headline, a '52% off' figure computed against monthly price times twelve, and risk-removal copy, and a refusal is met at once with an unverified 'student' 50% discount. Persuasion rests on evidence claims, mirroring and low stakes rather than on length or effort.",
+  "phases": [
+    {
+      "name": "Calm arrival",
+      "span": "0:00-0:02",
+      "screens": [1],
+      "goal": "Set a quiet, companion-like, non-clinical tone so a stressed person relaxes, and show from the first screen that nothing is forced.",
+      "feelings": ["calm", "safety", "curiosity"],
+      "mechanisms": ["Mood / brand setting", "Reassurance / risk removal"]
+    },
+    {
+      "name": "Name the need, get proof",
+      "span": "0:02-0:18",
+      "screens": [2, 3],
+      "goal": "Get the person to state what they want help with, then immediately convince them that journaling is proven to deliver it and that tapping a goal already counts as progress.",
+      "feelings": ["seen", "hope", "trust", "pride"],
+      "mechanisms": ["Authority / education", "Validation", "Low-effort framing", "Progress / momentum", "Future pacing"]
+    },
+    {
+      "name": "Safety and habit setup",
+      "span": "0:18-0:30",
+      "screens": [4, 5, 6, 7],
+      "goal": "Make the app feel private and personal at the point personal data is asked, then turn intent into a daily habit commitment by having the person pick reminder times and grant notifications.",
+      "feelings": ["safety", "trust", "calm", "commitment"],
+      "mechanisms": ["Reassurance / risk removal", "Identity / belonging", "Commitment & consistency", "Permission priming"]
+    },
+    {
+      "name": "Plan build and reveal",
+      "span": "0:30-0:37",
+      "screens": [8, 9],
+      "goal": "Create the sense that a plan has been assembled from their answers, and promise immediate entry into it.",
+      "feelings": ["anticipation", "seen", "momentum"],
+      "mechanisms": ["Labor illusion", "Mirroring", "Personalization signal", "Anticipation / reveal"]
+    },
+    {
+      "name": "Soft paywall",
+      "span": "0:37-1:20",
+      "screens": [10],
+      "goal": "Convert at peak momentum by tying premium to the stated goal, framing the yearly price as a big discount and removing payment risk, while upselling an AI tier.",
+      "feelings": ["desire", "trust", "safety", "mild urgency"],
+      "mechanisms": ["Personalization signal", "Anchoring", "Social proof", "Reassurance / risk removal", "Loss aversion"]
+    },
+    {
+      "name": "Win-back",
+      "span": "1:20-1:36",
+      "screens": [11, 12, 13],
+      "goal": "Recapture someone who declined by recasting the refusal as a price problem, offering a 'student' discount without verification, and closing through Apple's trusted purchase sheets.",
+      "feelings": ["surprise", "relief", "being cared for", "temptation"],
+      "mechanisms": ["Absolution / reframe", "Reciprocity", "Identity / belonging", "Anchoring"]
+    },
+    {
+      "name": "Free tier and second paywall",
+      "span": "1:36-2:35",
+      "screens": [14, 15, 16],
+      "goal": "Keep a non-payer engaged (email capture, a usable free check-in) while locked items and a contextual paywall keep premium in view.",
+      "feelings": ["calm", "curiosity", "mild frustration"],
+      "mechanisms": ["Reciprocity", "Social proof", "Personalization signal", "Loss aversion"]
+    }
+  ],
+  "screens": [
+    {
+      "n": 1,
+      "t": "0:01.0",
+      "kind": "intermission",
+      "subtype": "splash",
+      "title": "stoic.",
+      "body": "your mental health companion",
+      "controls": "Button: Begin. Small X at top right.",
+      "visual": "Light grey canvas, black lowercase wordmark, a black line drawing of a woman's profile with eyes closed and a small bird at her chin, black pill button. Fades in over the iOS Notification Center shown from 0:00 to 0:01. No progress bar.",
+      "intent": "Sets a quiet, editorial, companion tone rather than a clinical or gamified one, so a person arriving stressed feels they have entered a calm room. The X on the very first screen signals that nothing is forced, which lowers guard before any question is asked.",
+      "mechanisms": ["Mood / brand setting", "Reassurance / risk removal"]
+    },
+    {
+      "n": 2,
+      "t": "0:02.7",
+      "kind": "question",
+      "subtype": "goals (multi-select) with evidence on selection",
+      "title": "What feels most important to take care of now?",
+      "body": "This helps Stoic understand your pace and context. / Your selections won’t limit access to any features.",
+      "controls": "Options: Improve mood; Reduce stress & anxiety; Improve sleep; Feel more productive; Something else (multi-select). Button: Continue. Top bar: back arrow, Skip.",
+      "reaction": "A picked pill turns black, and the topmost selected pill grows to show one line of evidence. Improve mood: 'Over 300 studies prove that journaling lifts your mood and brings more positive emotions.' (bold: 'lifts your mood', 'brings more positive emotions.'). Reduce stress & anxiety (shown at 0:10.0 once Improve mood was deselected): 'With more than 200 studies behind it, journaling is a powerful way to get rid of anxious feelings and process emotions.' (bold: 'get rid of anxious feelings', 'process emotions.'). Improve sleep, Feel more productive and Something else turned black but never became the topmost selection, so any evidence lines they carry are not shown.",
+      "visual": "White pills on grey, black when selected; the expanding pill animates taller to fit two or three lines of small white text with bold key phrases. The tester picks Improve mood (0:04.3), Reduce stress & anxiety (0:05.0), Improve sleep (0:06.7), Feel more productive (0:09.0), Something else (0:09.3), then deselects Improve mood (0:10.0) and continues at about 0:14.5. No progress bar.",
+      "intent": "Asking what matters 'now' frames the app around the person's current state, and the evidence line rewards the choice instantly with a study-count claim that journaling works for exactly that need, so the person's own tap becomes the persuasion (the studies are not cited). The footer removes the fear of choosing wrong or being locked into a narrow plan, which keeps the tap cheap.",
+      "mechanisms": ["Authority / education", "Validation", "Personalization signal", "Low-effort framing", "Reassurance / risk removal"]
+    },
+    {
+      "n": 3,
+      "t": "0:14.7",
+      "kind": "intermission",
+      "subtype": "validation / practices preview",
+      "title": "That was the first step in the right direction.",
+      "body": "Here, you will find tools that support your calmer state of mind and everyday joy.",
+      "controls": "Button: Continue. Top bar: back arrow, Skip.",
+      "visual": "Two short centred lines, 'the first step' in bold. The lower half holds a tilted grid (a fan) of white practice cards with round black or lavender icons, running off both edges: Evening Unwind with Maya, Mood Check-In, End of the Day Reflection, Thought Dump Journal, Anxiety Relief: Guided Journal, Anxiety Relief: [unreadable], Relax Breathing, and a faded Sleep Breathing. On screen about 3 s.",
+      "intent": "Credits a single tap as real progress, so the person feels they have already begun caring for themselves and is more inclined to continue. The card fan converts the abstract goal into named, concrete tools, previewing the content that will later be sold, right after the person said what they need.",
+      "mechanisms": ["Validation", "Progress / momentum", "Future pacing", "Commitment & consistency"]
+    },
+    {
+      "n": 4,
+      "t": "0:18.0",
+      "kind": "question",
+      "subtype": "age",
+      "title": "How old are you?",
+      "body": "This helps Stoic understand your pace and context. / Your selections won’t limit access to any features.",
+      "controls": "Options: 16-24; 25-34; 35-44; 45-54; 55+ (single select). Button: Continue. Top bar: back arrow, Skip.",
+      "visual": "Same pill layout as the goals question; the tester picks 16-24 (pill turns black) at 0:19.7 to 0:20.0. No reaction line on this question.",
+      "intent": "A demographic question softened by the same 'pace and context' rationale and the no-lock-in footer, so it reads as tailoring rather than data collection.",
+      "mechanisms": ["Low-effort framing", "Reassurance / risk removal"]
+    },
+    {
+      "n": 5,
+      "t": "0:21.0",
+      "kind": "intermission",
+      "subtype": "reassurance / privacy",
+      "title": "You’re setting up a private, safe space that grows with you.",
+      "body": "",
+      "controls": "Button: Continue. Top bar: back arrow, Skip.",
+      "visual": "Light first line, bold remainder ('a private, safe space that grows with you.'). A large black and white illustration bleeds off the bottom: an open checklist journal, a coffee cup seen from above, a phone with the bird logo, pencils. On screen about 2 s.",
+      "intent": "Sits right after the first personal-data question to answer the unspoken worry of a mental health journal (who sees this?), and reframes setup as building something of their own that will grow with them, which supports long-term commitment.",
+      "mechanisms": ["Reassurance / risk removal", "Identity / belonging", "Future pacing"]
+    },
+    {
+      "n": 6,
+      "t": "0:22.7",
+      "kind": "question",
+      "subtype": "reminder times / notification primer",
+      "title": "When do you want to carve a few minutes for daily self-care?",
+      "body": "",
+      "controls": "Rows with toggles, all on by default: Morning 8:00 AM ›; During the Day 2:30 PM ›; Evening 9:00 PM ›. Button: Continue. Back arrow only (no Skip).",
+      "visual": "Above the question, an illustration of a notification banner with the 'S.' app icon; 'daily self-care?' in bold; white rows with periwinkle toggles. The tester switches Morning off, back on and off again and turns During the Day off, leaving only Evening on.",
+      "intent": "Asks 'when', not 'whether', and pre-selects three daily reminders, so the default is maximum engagement and the habit is assumed. The banner illustration primes the system notification request that follows, so the OS prompt reads as carrying out the schedule the person just chose.",
+      "mechanisms": ["Permission priming", "Commitment & consistency", "Low-effort framing", "Future pacing"]
+    },
+    {
+      "n": 7,
+      "t": "0:29.7",
+      "kind": "permission",
+      "subtype": "iOS notification prompt",
+      "title": "“stoic.” Would Like to Send You Notifications",
+      "body": "Notifications may include banners, sounds and icon badges. These can be configured in Settings.",
+      "controls": "Don’t Allow; Allow",
+      "visual": "System alert over the dimmed reminder screen, which stays visible behind it. It closes at about 0:30.5 and the plan loader slides in; which button the tester pressed is not clearly visible.",
+      "intent": "Fires straight after the person picked their own reminder times, so allowing feels like honouring a decision they just made rather than granting the app a favour.",
+      "mechanisms": ["Permission priming", "Commitment & consistency"]
+    },
+    {
+      "n": 8,
+      "t": "0:30.7",
+      "kind": "loader",
+      "subtype": "plan building checklist",
+      "title": "Preparing your plan...",
+      "body": "Start with a quick Daily Check-In / Track your mood over time / Give Your Practices a go / Curated activities to support your sleep quality, stress relief, well-being, and productivity / Go Deeper / Personal guidance for deeper journaling and reflection / Explore our library / journals; breathing exercises; meditation; quotes; & more",
+      "controls": "None (advances automatically).",
+      "visual": "Four rows with square black icons (bird, practice circles, lavender sparkle cloud, quote mark and feather); each row appears grey and fills to black in turn, roughly one per second, over about 5 s. Bold words: Daily Check-In, Your Practices, Go Deeper, Explore. No percentage or progress bar.",
+      "intent": "A short labor illusion: rows appearing one at a time suggest the app is assembling something for this person, while the list is the app's four standard sections. The practices line names sleep, stress, well-being and productivity, which appears to echo the goal pills, so a generic tour feels tailored and builds anticipation for the reveal.",
+      "mechanisms": ["Labor illusion", "Personalization signal", "Anticipation / reveal", "Future pacing"]
+    },
+    {
+      "n": 9,
+      "t": "0:36.0",
+      "kind": "reveal",
+      "subtype": "plan preview / mirror",
+      "title": "Support for your sleep, stress resilience, daily balance, and productivity starts here.",
+      "body": "(the four plan rows from the loader stay in place)",
+      "controls": "Button: Begin the Journey!",
+      "visual": "The 'Preparing your plan...' title cross-fades into the new headline and the black pill fades in at the bottom; the tester taps it about 1 s later.",
+      "intent": "Mirrors the person's final goal picks back as a promise (sleep, stress and productivity, with 'daily balance' apparently standing in for Something else; the deselected mood is absent), so the plan feels built from their answers. 'Begin the Journey!' promises immediate entry, and that is exactly the tap the paywall is attached to.",
+      "mechanisms": ["Mirroring", "Personalization signal", "Anticipation / reveal", "Future pacing"]
+    },
+    {
+      "n": 10,
+      "t": "0:37.3",
+      "kind": "paywall",
+      "subtype": "soft paywall, long scroll, two tiers",
+      "title": "Be more productive with stoic.",
+      "body": "with 52% off on stoic’s premium features. / Morning & Evening Reflections: Prepare for your day in the morning and stay on top of things / Daily Prompts & Guided Journals: On productivity, mental health, and more created by experts / Unlock All Exercises: All the tools you need to improve your productivity and make you more zen / Track Habits & Metrics: Personalize your reflections to include habits you’re working towards / Automatic iCloud Sync: Seamlessly use stoic across your iPhone, Mac, iPad, and Apple Watch / Protect Your Journal Entries: Lock stoic with a passcode, TouchID, or FaceID / (greyed) Prompts by Seneca & Other Stoics: Written by AI based on your day [AI] / See features in other plans: 20+ features / 89k+ 5-star reviews / 'I have tried so many apps and ways to journal. But most of them focus on a rigid structure than being inspirational. The way stoic has helped me interact and engage to write more was phenomenal.' (noodleMind) / 'I don’t think I’ve ever come across a journaling app like stoic that has so many features, exercises, interactive aspects, and impactful quotes.' (Daphne) / 'stoic redirected my focus from external chaos to internal clarity during a rough phase. It didn’t just light up my path, but taught me how to keep the light on, reminding me I control my life’s narrative.' (KVSupernova) / App of the Day / Restore Purchase / Terms & Conditions / Sticky sheet: $39.99 annually ($3.33/month) / + share with up to 5 family members / No payment now. / Cancel anytime / Premium + AI tab: with 36% off on stoic’s premium features. / Personalized Reflections: Get custom prompts based on your focuses by Seneca, Marcus Aurelius, and more [AI] / Reflective Analysis: Use AI to analyze your entries, uncover patterns and get follow-up prompts [AI] / Smart Notifications: Get personalized notifications based on your day powered by AI [AI] / (then Morning & Evening Reflections, Daily Prompts & Guided Journals) / See features included in your plan: 20+ features / $99.99 annually ($8.33/month)",
+      "controls": "Segmented toggle: Premium (selected) / Premium + AI. X at top right, visible at once. Button: Show Other Premium Plans, which expands a grid headed Premium / Premium [AI]: Yearly, BEST VALUE, $83.88 struck through, $39.99/year (pre-selected, checkmark); Yearly + AI, BEST VALUE, $155.88 struck through, $99.99/year, '3 day trial'; Monthly $6.99/month ($83.88/year); Monthly + AI $12.99/month ($155.88/year); Lifetime $299.00 one time; Lifetime + AI $699.00 one time. Sticky CTA: Start Your Free Trial.",
+      "visual": "The home screen ('good morning.') flashes at 0:37.0 and the paywall sheet slides up over it. Light grey page, bold left-aligned headline, white feature card with black icons, a swipeable carousel of Memoji testimonial cards, five stars, a laurel badge, and a sticky white bottom sheet with a periwinkle pill. The tester scrolls, expands the plan grid (0:44 to 0:46), returns to the top (1:10), switches to Premium + AI (1:13: lavender '36% off', lavender AI pills, gradient Yearly + AI card, blue to pink CTA) and taps X at about 1:20. Trial length appears only as a near-invisible white caption on whichever yearly card is not selected ('3 day trial' under Yearly + AI; '7 day trial' under Yearly once AI is selected); the selected card shows a checkmark instead.",
+      "intent": "Interrupts 'Begin the Journey!' at peak momentum and keeps the personal thread: the headline picks one stated goal (productivity) and several feature descriptions repeat it. '52% off' is the yearly price measured against monthly times twelve, an anchor that makes the standard plan look like a sale, while 'No payment now. Cancel anytime' and family sharing remove risk and the greyed AI row plus the AI tab plant an upsell. The default plan's trial length is effectively hidden, so the person commits to 'free' without seeing when it converts; the immediate X keeps it soft and sets up the exit offer.",
+      "mechanisms": ["Personalization signal", "Anchoring", "Social proof", "Reassurance / risk removal", "Loss aversion", "Authority / education"]
+    },
+    {
+      "n": 11,
+      "t": "1:21.3",
+      "kind": "exit",
+      "subtype": "win-back discount ('student')",
+      "title": "Stoic has a special offer for students. How does a 50% discount on premium sound to you?",
+      "body": "Daily journaling has proven benefits, and we don't want cost to get in the way of using stoic.",
+      "controls": "Button: Continue. Small X at top right.",
+      "visual": "After X the paywall slides down to reveal home (1:20.7), then a full-screen black sheet slides up with a periwinkle ribbon crossing it vertically and horizontally and a bow near the top, like a wrapped gift. No student verification is asked for.",
+      "intent": "Catches the person at the moment of refusal, recasts the refusal as a price problem and then absolves it ('we don't want cost to get in the way'). The 'student' label supplies a flattering, plausible reason for a discount without checking anything (the tester had chosen the 16-24 age band, which may be what triggers it; this cannot be confirmed). It also teaches that closing the paywall produces a better price, which undercuts the main offer.",
+      "mechanisms": ["Absolution / reframe", "Reciprocity", "Identity / belonging", "Anchoring", "Delight / reward"]
+    },
+    {
+      "n": 12,
+      "t": "1:24.7",
+      "kind": "exit",
+      "subtype": "App Store offer code redemption",
+      "title": "Redeem Special Offer",
+      "body": "stoic. journal & mental health / stoic. journal & diary premium / 1 year for $14.99, then $39.99 per year. / Apple Media Services Terms and Conditions ›",
+      "controls": "Button: Redeem Offer. X at top right.",
+      "visual": "Continue switches out of the app into the App Store (app-switch animation at 1:24.7, blank App Store at 1:25 to 1:26), which raises Apple's white offer sheet at 1:27.7 with the S. app icon and a laurel product icon. The tester taps Redeem Offer at about 1:31.",
+      "intent": "Moving redemption into Apple's own interface borrows the platform's trust and makes the deal feel official. $14.99 against $39.99 is about 62% off the first year, more than the '50%' promised, so the sheet over-delivers on the hook; the cost is friction, since the person is taken out of the app.",
+      "mechanisms": ["Reassurance / risk removal", "Anchoring", "Delight / reward"]
+    },
+    {
+      "n": 13,
+      "t": "1:32.0",
+      "kind": "exit",
+      "subtype": "system purchase sheet",
+      "title": "In-App Purchase",
+      "body": "stoic. journal & diary premium / stoic. journal & mental health 9+ / Family Subscription / 1-week free trial / Starting today / $14.99 for 1 year / Starting Oct 6, 2026 / $39.99 per year / Starting Oct 6, 2027 / Cancel anytime in Settings > Apple Account at least a day before each renewal date. Plan automatically renews until canceled. / Account: [tester's email, omitted]",
+      "controls": "Confirm with Side Button (side hint: 'Double Click to Redeem'). X at top right.",
+      "visual": "Apple's grey purchase sheet, Apple logo before the title, over the dimmed offer sheet. The tester closes it at about 1:33.5; the offer sheet shows a spinner, then Redeem Offer again, and at 1:35.3 it is dismissed to the App Store Today tab.",
+      "intent": "Apple's sheet is the first place the trial length and renewal dates are stated in full: a 1-week free trial is stacked on top of the discounted year, so the final decision point carries the platform's plain terms rather than the app's.",
+      "mechanisms": ["Reassurance / risk removal"]
+    },
+    {
+      "n": 14,
+      "t": "1:36.3",
+      "kind": "app",
+      "subtype": "newsletter email capture",
+      "title": "Keep growing even outside the app.",
+      "body": "Get inspirational Stoic Letters delivered directly to your inbox. Once a week. / a short reflection; weekly theme; thoughtful quote / You become what you give your attention to. / – Epictetus",
+      "controls": "Field: Enter Your Email. Button: Get the Newsletter. X at top right.",
+      "visual": "Back in stoic after the App Store, a sheet with a black illustration (lightbulb, open book with the bird, pencil, cup), 'Keep growing' in bold; the keyboard opens with an email autofill bar. The tester dismisses the keyboard and closes the sheet at about 1:39.7.",
+      "intent": "A free fallback ask after both money offers were declined: if not a purchase, an email address, so the relationship continues outside the app.",
+      "mechanisms": ["Reciprocity", "Low-effort framing"]
+    },
+    {
+      "n": 15,
+      "t": "1:40.0",
+      "kind": "app",
+      "subtype": "free tier: first check-in and tabs",
+      "title": "good morning.",
+      "body": "Daily Check-In / Good morning! I'm here to help you start your day with a positive mindset. What are you looking forward to today? / 33,917 people checked-in today! / Your Practices / Set of exercises always at hand, chosen to help you rest better. Adjust or add your own anytime! / Weekly Theme / on fine print. (padlock) Day 2 of 7 / Daily Affirmation / I am grateful for every opportunity that comes my way.",
+      "controls": "Begin; Reflect; Journal About It; + button; tab bar: Home, Quotes, Explore, History, Trends.",
+      "visual": "The tester runs the first Daily Check-In (1:40.7 'Welcome to your first Daily Check-In.'; 'This is a quick reflection to pause and settle in your feelings. Over time, it helps you notice patterns in your moods, habits, and everyday life.'; 'How are you feeling?' with five faces from Terrible to Great; 'Which areas do you want to focus on today?' with 12 tiles; then the writing prompt 'Can you send a message to someone you love, telling them why you are grateful for them?') and closes it at 1:48. Home shows padlocks on Calm Down with Seneca, Fight Stress Breathing and the weekly theme. Quotes, Explore, History and Trends are visited from 1:55 to 2:00.",
+      "intent": "The free tier is genuinely usable, while padlocks on featured items and a live check-in counter keep premium and social proof in constant view.",
+      "mechanisms": ["Social proof", "Loss aversion"]
+    },
+    {
+      "n": 16,
+      "t": "2:04.7",
+      "kind": "app",
+      "subtype": "contextual second paywall, then browsing",
+      "title": "Unlock daily journal prompts.",
+      "body": "with 52% off on stoic’s premium features. / Daily Prompts & Guided Journals: New and original content from experts every day / Unlock All Exercises: Meditations, breathing, sleep exercises, guided journals, lessons, and more / Automatic iCloud Sync / Personalize Your Daily Reflections: Customize your Morning & Evening Reflections the way you like them / Protect Your Journal Entries / (greyed) Prompts by Seneca & Other Stoics / Detail page: Better features, better self-care. (sections CONTENT BY EXPERTS, AI with 'Not included' tags, SECURITY & PRIVACY)",
+      "controls": "Same toggle (Premium / Premium + AI), X, sticky Start Your Free Trial sheet; 'See features in other plans' opens the detail page.",
+      "visual": "Opens from home, apparently from the locked Weekly Theme, with the feature list reordered so journal prompts come first. The tester opens the detail page (2:08 to 2:14), switches to Premium + AI (2:16.3) and closes at about 2:24; the student offer does not reappear. Then Quotes, Explore (a 'This Week’s Theme: on fine print.' card with an 'Unlock With Stoic Premium' button), the library grid and History; the recording ends in Control Center at 2:34.",
+      "intent": "Each locked item reopens the same paywall with a headline and feature order matched to what was tapped, so later asks feel relevant rather than repetitive; the win-back discount is reserved for the first refusal.",
+      "mechanisms": ["Personalization signal", "Loss aversion"]
+    }
+  ],
+  "intermission_pattern": "Stoic has only three stand-alone intermissions (splash, 'first step' validation, 'private, safe space' reassurance) against three questions, so the cadence is roughly one after each question, and the plan loader and plan reveal take that role after the last one. Its most distinctive intermission lives inside a question: the evidence line that grows in the selected goal pill acts as a micro fact screen delivered at the exact moment of choice, backed by a standing footer ('Your selections won’t limit access to any features.') that lowers the stakes of every answer. Placement follows the emotional need of the moment: validation and a preview of named practices right after the person states a need, privacy reassurance right after the first personal-data question, a reminder schedule right before the notification prompt. The tone is calm, second person and brief (one or two lines, two to three seconds each), set in monochrome with black and white illustration and one lavender accent, with no mascot, no numbers about the person and no fake progress percentages. Together they build toward a feeling that the space is safe, already personal and already working, which the reveal cashes in by repeating the goals back just before the paywall.",
+  "standouts": [
+    "Screen 2 turns the answer itself into the intermission: the tapped goal pill grows to show a study-count claim ('Over 300 studies prove that journaling lifts your mood...'), but only the topmost selected pill expands, so a person who picks several goals sees just one claim and the rest of their choices get no response.",
+    "Screen 3 credits a single tap as 'the first step in the right direction' and shows a fan of named practices, converting an abstract goal into concrete tools before the age question is even asked.",
+    "Screen 5 places the privacy line ('a private, safe space that grows with you.') immediately after the age question, answering the core fear of a mental health journal at the point personal data starts being collected.",
+    "Screen 9 mirrors the final goal picks in the plan title (the deselected mood is dropped), and the paywall on screen 10 narrows that to one goal ('Be more productive with stoic.') with productivity repeated in the feature copy, while screen 11's unverified 'student' 50% offer, delivered as a gift-wrapped screen, rewards closing the paywall with a deal that is actually about 62% off the first year."
+  ],
+  "gaps": "The recording opens on the iOS Notification Center for about one second before the app appears (folded into screen 1, not given its own entry). Evidence lines were only visible for Improve mood and Reduce stress & anxiety, because only the topmost selected pill expands and Improve sleep, Feel more productive and Something else never became the topmost selection. One card in the screen 3 fan is cut off ('Anxiety Relief: [unreadable]'). The tester's answer to the iOS notification prompt (screen 7) is not clearly visible. The Skip links and the splash X were not exercised, so where they lead is unknown. Whether the 'student' offer is triggered by the 16-24 age answer cannot be confirmed from one recording. The tester's Apple account email on screen 13 is deliberately omitted. 'other' in counts covers the paywall and the three exit screens (11 to 13); the three post-paywall app summaries (14 to 16) are not counted. No new mechanism names were added."
+}

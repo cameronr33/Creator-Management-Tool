@@ -1,0 +1,215 @@
+{
+  "app": "Foodnoms",
+  "file": "04-foodnoms",
+  "category": "nutrition tracker (freemium)",
+  "recording": {
+    "length": "1:24",
+    "starts": "partway through onboarding: the first frame is the optional \"Anything else to focus on?\" goals question; any welcome screens and the main goal question before it are not captured",
+    "onboarding_span": "0:00-0:36",
+    "paywall_at": "0:36",
+    "after_paywall": "X closes it with no exit offer; a reminders choice and \"Welcome to Foodnoms\" lead to a usable free Food Log, where locked items open a feature-comparison paywall at the same price."
+  },
+  "counts": {"questions": 5, "intermissions": 1, "permissions": 2, "loaders": 0, "reveals": 1, "other": 5},
+  "strategy": "Foodnoms runs onboarding as a calm, iOS-native settings form in which every question carries a one-line subtitle saying why it is asked, what it controls, and that the data stays private, so trust is built inside the questions rather than in separate story screens. The arc is competent and unemotional: answer a few practical inputs, get concrete numbers back (\"You're all set!\"), read a medical disclaimer, then meet a paywall that explains the trial day by day and tells you exactly how to cancel. The only pull toward paying is quiet: one of the person's own targets is marked as needing Foodnoms+ just before the paywall, and the paywall ends with the founder's story. The idea that carries it is respect: a tool that explains itself and never pressures, so paying feels like a fair, informed choice and a way to support an independent developer.",
+  "phases": [
+    {
+      "name": "Inputs with reasons",
+      "span": "0:00-0:24",
+      "screens": [1, 2, 3, 4, 5, 6],
+      "goal": "Collect what the calorie maths needs while making each ask feel justified, optional where possible, and private, so the person feels in control and keeps going without suspicion.",
+      "feelings": ["control", "trust", "competence"],
+      "mechanisms": ["Authority / education", "Reassurance / risk removal", "Low-effort framing", "Personalization signal"]
+    },
+    {
+      "name": "Targets and safeguards",
+      "span": "0:24-0:36",
+      "screens": [7, 8, 9],
+      "goal": "Hand back concrete personal targets that feel finished and owned, plant a quiet note that some of them need Foodnoms+, then cover medical limits and offer Health sync before the offer.",
+      "feelings": ["accomplishment", "readiness", "trust"],
+      "mechanisms": ["Anticipation / reveal", "Personalization signal", "Loss aversion", "Reassurance / risk removal", "Permission priming"]
+    },
+    {
+      "name": "Transparent trial offer",
+      "span": "0:36-1:03",
+      "screens": [10, 11],
+      "goal": "Convert to the annual trial by removing every fear about trials (what happens each day, a reminder, how to cancel) and adding warmth through reviews and an independent founder the person can feel good about supporting.",
+      "feelings": ["safety", "trust", "goodwill"],
+      "mechanisms": ["Reassurance / risk removal", "Social proof", "Reciprocity", "Anchoring"]
+    }
+  ],
+  "screens": [
+    {
+      "n": 1,
+      "t": "0:00",
+      "kind": "question",
+      "subtype": "optional extra goals",
+      "title": "Anything else to focus on?",
+      "body": "Add any goals you'd like to track. This is optional.",
+      "controls": "Options: Eat Less Sugar; Eat Less Salt; Eat More Fiber; Support Heart Health; Practice Intermittent Fasting (multi-select, optional). Button: Continue. Back button top left.",
+      "visual": "White iOS screen, small orange checklist icon, bold title, grey subtitle, native grey grouped list with grey line icons, full-width orange Continue pill. No progress bar. No row shows a check in the frames.",
+      "intent": "Says outright that the question is optional, which lowers effort and signals the app will not force anything; the extra goals also seed premium-only targets (added sugar) that appear later.",
+      "mechanisms": ["Low-effort framing", "Personalization signal"]
+    },
+    {
+      "n": 2,
+      "t": "0:04",
+      "kind": "question",
+      "subtype": "diet style",
+      "title": "How do you want to eat?",
+      "body": "This sets your starting macros. Balanced works for most, and you can change it anytime.",
+      "controls": "Options: Balanced, A flexible mix for most people; High Protein, Protein-forward, great for muscle; Low Carb, Lighter on carbs; Keto, Very low carb, high fat (single tap, each row has a chevron and advances).",
+      "visual": "Pushes in from the right as a card over the previous screen. Orange fork and knife icon, grouped list with one-line descriptions. The later reveal shows High Protein was picked.",
+      "intent": "The subtitle explains what the answer controls, recommends a safe default and promises it is reversible, so the choice carries no anxiety.",
+      "mechanisms": ["Authority / education", "Reassurance / risk removal", "Low-effort framing"]
+    },
+    {
+      "n": 3,
+      "t": "0:07",
+      "kind": "question",
+      "subtype": "body stats form",
+      "title": "About You",
+      "body": "These details estimate your daily calorie needs and stay private to your account, never sold or shared. / Your resting metabolic rate (RMR) is calculated using the Mifflin-St Jeor equation. Nutrition requirements vary from person to person and are dependent on many factors. Always seek the advice of a physician or other qualified healthcare provider before changing your dietary habits.",
+      "controls": "Fields: Sex (Required); Birthdate (Required); Weight (lb) (Required); Height (Required). Links: Import from Apple Health; Change Units; Mifflin-St Jeor equation. Button: Continue.",
+      "visual": "Orange standing-person icon, grey grouped form with orange \"Required\" placeholders, two orange text links below, small grey footnote with the equation name in orange. The person taps Import from Apple Health; after the Health sheet (screen 4) the form returns filled (Male, September 29, 2002, 163, 6' 0\") at 0:14.",
+      "intent": "The subtitle pairs the reason (calorie estimate) with a privacy promise in one sentence, and the footnote names the formula and adds a medical caveat, so a sensitive ask feels scientific and safe. Offering a Health import makes it nearly effortless.",
+      "mechanisms": ["Authority / education", "Reassurance / risk removal", "Low-effort framing"]
+    },
+    {
+      "n": 4,
+      "t": "0:11",
+      "kind": "permission",
+      "subtype": "Apple Health OS sheet",
+      "title": "Health Access",
+      "body": "Health / “Foodnoms” would like to access and update your Health data. / Allow “Foodnoms” to write: Alcohol Consumption; Biotin; Caffeine; Calcium; Carbohydrates; Copper ...",
+      "controls": "Turn On All (becomes Turn Off All); per-type toggles; Allow; Don't Allow.",
+      "visual": "Standard iOS Health permission sheet sliding up over the form. The person taps Turn On All (all toggles turn green) and Allow at 0:12-0:13.",
+      "intent": "Triggered by the person's own tap on Import from Apple Health, so the OS ask arrives at the moment it obviously helps (filling the form) rather than as a cold request.",
+      "mechanisms": ["Permission priming", "Low-effort framing"]
+    },
+    {
+      "n": 5,
+      "t": "0:15",
+      "kind": "question",
+      "subtype": "activity level",
+      "title": "Activity Level",
+      "body": "Choose the option that best matches a typical week.",
+      "controls": "Options: Sedentary, Little or no exercise; Lightly Active, Exercise 1-2 times a week; Active, Exercise 3-5 times a week; Very Active, Exercise 6-7 times a week; Extra Active, Very intense exercise daily or physically-demanding job (single tap). Advanced: Use Apple Health, Use Active Energy data from Apple Health to calculate your dietary energy requirements.",
+      "visual": "Orange walking-figure icon, grouped list with chevrons, a separate \"Advanced\" group with a red heart icon. Stays on screen about six seconds.",
+      "intent": "Plain, concrete frequency anchors make self-rating easy and honest; the Advanced Health option signals precision for people who want it without forcing it on anyone.",
+      "mechanisms": ["Low-effort framing", "Personalization signal"]
+    },
+    {
+      "n": 6,
+      "t": "0:21",
+      "kind": "question",
+      "subtype": "goal pace",
+      "title": "Pick your pace",
+      "body": "Slower changes are easier to stick with. You can adjust anytime.",
+      "controls": "Options: Lose 2 lbs per week; Lose 1.5 lbs per week; Lose 1 lb per week; Lose 0.5 lbs per week; Maintain current weight; Gain 0.5 lbs per week; Gain 1 lb per week (single tap).",
+      "visual": "Orange kettlebell icon, grouped list with chevrons. The reveal shows Gain 1 lb per week was picked.",
+      "intent": "The subtitle gently steers toward a sustainable pace and again promises reversibility, positioning the app as sensible rather than extreme.",
+      "mechanisms": ["Authority / education", "Reassurance / risk removal"]
+    },
+    {
+      "n": 7,
+      "t": "0:24",
+      "kind": "reveal",
+      "subtype": "plan preview",
+      "title": "You're all set!",
+      "body": "Here are your daily targets, built around your goals. Tap any goal to adjust. / Calories: 3,241 Cal • Gain 1 lb per week / Macros: High Protein / Added Sugars: 10% / Some goals require Foodnoms+ / How are goals calculated?",
+      "controls": "Rows tappable to adjust (chevrons). Link: How are goals calculated?. Button: Continue.",
+      "visual": "Orange clipboard icon, grouped list with a flame, a pie chart and a sugar-cube icon. Added Sugars carries a small grey \"+\" badge that matches the footnote \"Some goals require Foodnoms+\". No animation or loader before it.",
+      "intent": "Gives an immediate, concrete result in the person's own numbers so effort feels rewarded and the plan feels owned and editable. The \"+\" badge on one of their own goals quietly tells them part of what they just built sits behind the paywall that follows.",
+      "mechanisms": ["Anticipation / reveal", "Personalization signal", "Progress / momentum", "Loss aversion"]
+    },
+    {
+      "n": 8,
+      "t": "0:30",
+      "kind": "intermission",
+      "subtype": "medical disclaimer",
+      "title": "Disclaimer",
+      "body": "Nutrition requirements vary from person to person and are dependent on many factors. These goals are not intended to substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a physician or other qualified healthcare provider before changing your dietary habits.",
+      "controls": "Buttons: Learn More; Continue.",
+      "visual": "Small rounded alert card over the dimmed reveal, grey Learn More and orange Continue side by side. Appears after tapping Continue on the reveal, fades out at 0:32.",
+      "intent": "Covers liability and signals responsibility right after big numbers (3,241 Cal) are shown. It costs a beat of momentum but adds credibility, and it stops the targets from reading as a prescription.",
+      "mechanisms": ["Reassurance / risk removal", "Authority / education"]
+    },
+    {
+      "n": 9,
+      "t": "0:33",
+      "kind": "permission",
+      "subtype": "Apple Health sync settings",
+      "title": "Apple Health",
+      "body": "Keep your nutrition, activity, and weight in sync with Apple Health. / Nutrition: Save your logged food and import nutrition from other apps. / Activity: Import the active and resting energy you burn. / Weight & Height: Keep your weight and height up to date.",
+      "controls": "Three toggles (Nutrition; Activity; Weight & Height), all off by default. Button: Continue.",
+      "visual": "Red heart icon, grouped list of three toggles with one-line explanations. The person leaves all off and taps Continue.",
+      "intent": "Offers sync as plain, opt-in settings with each benefit stated, keeping the respectful tone; it sits last before the paywall so the setup feels complete (\"You Are Ready\" is the paywall's first line).",
+      "mechanisms": ["Permission priming", "Reassurance / risk removal"]
+    },
+    {
+      "n": 10,
+      "t": "0:36",
+      "kind": "paywall",
+      "subtype": "trial timeline paywall",
+      "title": "How your 7-day free trial works",
+      "body": "No commitment. Cancel anytime. / You Are Ready: Everything is set up for you to track your food and reach your goals. / Today: Start your free trial and unlock full access to Foodnoms. / Day 5: Choose whether to receive a notification before your trial ends.* / Day 7: You'll be charged on the 7th day. Cancel anytime at least 24 hours before your subscription expires. / * Requires notification permission. Foodnoms must remain installed. / Apple Best Nutrition Tracker Apps / 4.8 / Based on over 8,000 ratings worldwide / How can I cancel? / It's easy! Open the Settings app on your phone, tap your name, then tap Subscriptions and choose Foodnoms. Tap Cancel Subscription. Done! / Join thousands of happy Foodnoms+ users / Marvelous: The best calorie tracker I've ever used — and I've used them all over the many years I've been tracking my caloric intake! Great interface, responsive and kind developer, and plenty of features in both the free and Plus plan. Leaves all the competitors in the dust! / My favourite food tracking app: It has such a clean user interface, it almost feels like it's part of iOS. It supports scanning barcodes and nutrition labels which is a huge plus and makes logging less of a chore. Highly recommend. / Perfect, fast: Perfect, reliable, with all the features you really need and none of the garage gimmick ones. Love the privacy protecting elements of the app. Worth doing the premium subscription to support the app's continued development. Thanks! / No nonsense food tracking: Foodnoms is the only food tracking app I've used that has a clean, functional interface that doesn't hate the user. Add in some great features like nutrition label scanning and the ease of seeing specific goals, with regular updates, and you have the best tracking app I've used. / Top Features: Foodnoms AI, Magically log meals using your camera and natural language; Go Beyond Calories, Track fiber, sodium, cholesterol, vitamins, minerals, etc.; Water, Caffeine, & Alcohol, Track hydration and beverage consumption; Custom Meal Types & Timestamps, Organize your food log; Weekly & Monthly Charts, Review your progress / About Foodnoms: Foodnoms was created in 2019 by Ryan, an independent developer who wanted a nutrition tracking app that was simpler, easier to use, more respectful of user privacy, and encouraging rather than judgmental. Thanks to the awesome support from Foodnoms+ subscribers, Ryan has been able to keep improving and maintaining the app. / Restore Purchases / Redeem Code / Privacy Policy / Terms of Use / Sticky footer: No payment now / 7 days free, then $49.99/year",
+      "controls": "Buttons: Continue (sticky, orange); View All Plans (sticky, white). X top right, visible from the first frame. List links: Restore Purchases; Redeem Code; Privacy Policy; Terms of Use.",
+      "visual": "Pushes in from the right. Orange app icon, bold headline, vertical timeline with orange done/today steps and grey future steps (check, unlock, bell, card icons), laurel badge with five orange stars and a big 4.8, a grey \"How can I cancel?\" card, review cards with titles and stars, feature list with icons, founder card, grey link list. Sticky footer with an orange check badge. Scrolled to the bottom and back (0:37-0:42). At 0:46 Continue opens the Apple In-App Purchase sheet (Foodnoms+ Annual, 1-week free trial Starting today, $49.99 per year Starting Oct 6, 2026, \"No commitment. Cancel anytime in Settings > Apple Account at least a day before each renewal date. Plan automatically renews until canceled.\"), which is dismissed, followed by an alert \"Purchase Cancelled / Purchase cancelled and you were not charged.\" with OK (0:49).",
+      "intent": "Removes the main fear of trials by narrating exactly what happens and when, promising an optional reminder and printing the cancel steps, then layers on credible proof (Apple badge, 4.8 from 8,000 ratings, long specific reviews). The founder story closes by framing the subscription as support for one independent developer, an appeal to goodwill rather than urgency. The only steer is that the annual plan is the only one named until View All Plans is opened.",
+      "mechanisms": ["Reassurance / risk removal", "Social proof", "Authority / education", "Reciprocity", "Future pacing"]
+    },
+    {
+      "n": 11,
+      "t": "0:51",
+      "kind": "paywall",
+      "subtype": "plan picker sheet",
+      "title": "Choose a Plan",
+      "body": "Individual Plans: Monthly $9.99; Annual $49.99 • Save 58% / Family Plans: Monthly $14.99; Annual $89.99 ($7.49/mo) • Save 49% / Family plans allow sharing your Foodnoms+ subscription with up to five other family members at no extra cost through Family Sharing.",
+      "controls": "Single-select rows with an orange check (Annual pre-selected). Buttons: Continue; Restore Purchases. X top left.",
+      "visual": "Grey bottom sheet with two grouped lists. At 0:56 the person picks Monthly and taps Continue; the Apple sheet shows Foodnoms+ Monthly, $9.99 per month, no trial (1:02), and is dismissed. At 1:03 the paywall's X is tapped.",
+      "intent": "Keeps the full choice honest and one tap away, with Annual pre-checked and \"Save 58%\" against the monthly price as the only nudge. Choosing Monthly silently drops the free trial, which is visible only on the Apple sheet.",
+      "mechanisms": ["Anchoring", "Reassurance / risk removal"]
+    },
+    {
+      "n": 12,
+      "t": "1:04",
+      "kind": "app",
+      "subtype": "reminders choice and welcome",
+      "title": "Notifications",
+      "body": "Consistency is key with food tracking. Enable reminders so you don't forget to track what you eat. / Send frequent reminders: Be reminded to log what you eat for every meal. / Send occasional reminders: Get notified if you haven't logged anything in 24 hours and another reminder if you haven't logged anything in a week. / Disable food tracking reminders: You will not receive any notifications reminding you to log what you eat. / 1:08: Welcome to Foodnoms / Log your first meal whenever you're ready.",
+      "controls": "Single-select (Send frequent reminders checked). Continue. Welcome: Let's Go.",
+      "visual": "Same card style as onboarding with an orange bell icon. No exit offer after the paywall's X, and no OS notification prompt appears in the frames. The welcome screen is a single line under the app icon.",
+      "intent": "Places the reminders ask after the paywall, framed around the person's own consistency, and offers an explicit opt-out. The welcome line (\"whenever you're ready\") keeps the no-pressure voice."
+    },
+    {
+      "n": 13,
+      "t": "1:09",
+      "kind": "app",
+      "subtype": "free app with inline upgrade prompts",
+      "title": "Food Log",
+      "body": "Goals: Calories 3,241 under; Carbs 284 under; Fat 90 under; Protein 324 under; Added Sug. Upgrade / Breakfast, Lunch, Dinner, Snack: Add Food / Nutrient Totals / Insights: Streak, Get Started, Begin your first streak.; Calorie Balance, Upgrade Required, Upgrade to Foodnoms+ to get started.; Macros; Weight 163 lb; Calories, Carbs, Fat, Protein: 0 Days Met; Added Sug. Upgrade Required / See All Categories / Library: Foods; Recipes; Meals / Recently Modified: Build your personal food library by creating custom foods, recipes, and meals. Recently saved items will appear here for quick access.",
+      "controls": "Tabs: Food Log; Insights; Library; orange + button.",
+      "visual": "Light grey iOS app with a week strip, goal rings and meal cards. Premium items are shown in place with red \"Upgrade Required\" text rather than pop-ups.",
+      "intent": "The free tier is genuinely usable, and the premium goal the person \"built\" at screen 7 sits in their own dashboard labelled Upgrade, a standing reminder of what they are missing."
+    },
+    {
+      "n": 14,
+      "t": "1:17",
+      "kind": "app",
+      "subtype": "contextual paywall from locked item",
+      "title": "Start Your Free Trial",
+      "body": "Add food sheet: Lunch / Get Started / Try searching the Foodnoms database. / Drinks: Water (locked); Coffee (locked); Sparkling Water / Quick Entry. 1:19 paywall: Get full access to Foodnoms+ and reach your goals faster. Cancel anytime. / Feature | Free | Foodnoms+: AI Meal Scanner; Foodnoms AI; Recipe Website Importing; Calibrated Energy; Weekly & Monthly Charts; Top Foods Analysis; Vitamins and Minerals; Sodium, Fiber, and Saturated Fat; Caffeine and Alcohol; Calorie Balance (last rows faded under the footer) / 7 days free, then $49.99/year. Terms apply.",
+      "controls": "Start Free Trial; View All Plans; X top left. Recording then returns to Library and ends in Control Center at 1:23.",
+      "visual": "Tapping a padlocked drink chip slides up a white paywall with a comparison table (grey dash for Free, green check for Foodnoms+). Closed at 1:21. Same price, no discount.",
+      "intent": "Re-presents the offer at the moment a locked feature is wanted, using a plain free-versus-paid table rather than urgency."
+    }
+  ],
+  "intermission_pattern": "Foodnoms uses almost no intermissions: the only screen that asks nothing between questions and paywall is a medical disclaimer modal (screen 8) that interrupts the plan reveal. Instead, the explanatory and reassuring work other apps do in interstitials is written into each question's subtitle: what the answer controls (\"This sets your starting macros\"), why it is needed and that it stays private (\"These details estimate your daily calorie needs and stay private to your account, never sold or shared.\"), and that it can be changed (\"You can adjust anytime\", \"Slower changes are easier to stick with\"). The tone is plain, factual and iOS-native, with no mascot, no stories, no social proof and no loader before the reveal. Collectively these micro-explanations build a sense that the tool is transparent and on the person's side, which the paywall then continues with a day-by-day trial timeline, cancel instructions and the founder's story.",
+  "standouts": [
+    "Screen 3 does the job of a privacy and science intermission inside one subtitle and footnote: the reason, \"stay private to your account, never sold or shared\", and the named Mifflin-St Jeor equation, with no extra screen.",
+    "Screen 7 marks one of the person's own targets (Added Sugars 10%) with a \"+\" badge and \"Some goals require Foodnoms+\", a quiet loss-aversion seed planted one step before the paywall.",
+    "Screen 8 is the only intermission and it deliberately slows things down with a medical disclaimer right after the calorie number, trading momentum for credibility.",
+    "Screen 10 closes its long paywall with \"About Foodnoms\", the story of Ryan, an independent developer, turning the subscription into support for a person rather than a purchase under pressure."
+  ],
+  "gaps": "The recording starts at the optional \"Anything else to focus on?\" question, so any welcome, carousel, main goal or goal-weight screens are not shown. No row on screen 1 shows a check, yet Added Sugars appears in the targets, so it is unclear whether it came from an earlier pick or a default. The Apple In-App Purchase sheets, the Purchase Cancelled alert and the account line on those sheets are folded into the paywall entries (the account email is left out on purpose). No OS notification prompt appears after the post-paywall reminders choice. \"other\" counts the two paywall entries plus the three app entries."
+}

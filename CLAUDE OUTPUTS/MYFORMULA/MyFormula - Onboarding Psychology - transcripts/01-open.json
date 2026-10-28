@@ -1,0 +1,131 @@
+{
+  "app": "Open",
+  "file": "01-open",
+  "category": "breathwork and meditation",
+  "recording": {
+    "length": "1:02",
+    "starts": "partway through onboarding: the first frame is the multi-select goal question \"How can Open support your mind and body?\"; any welcome, name entry (home later greets \"HUGH\") and earlier questions are not captured",
+    "onboarding_span": "0:00-0:11",
+    "paywall_at": "0:11",
+    "after_paywall": "\"Later →\" dismisses it with no exit offer; an attribution question, a short brand intro and a 7-Day Reset card lead to home, and the same paywall returns as a closable modal when a locked program is started."
+  },
+  "counts": {"questions": 1, "intermissions": 0, "permissions": 2, "loaders": 0, "reveals": 0, "other": 4},
+  "strategy": "What is captured is the very end of a short, mood-led onboarding: one goal question where the person names what they are struggling with (stress, grief, depression, sleep), two permission primers dressed up as gifts (\"Receive inspiration\", \"Unlock personal insights\"), then a calm editorial paywall. The arc runs from admitting a need, to being promised attention and insight, to being told \"Your free reset starts now\", so the trial is framed as the first step of a nervous-system reset rather than a purchase. Pressure is deliberately low: a \"Later →\" link is visible from the first second, only one plan is shown, and the renewal date and full yearly price are printed in the plan card. The one idea that carries it is the \"reset\": the person arrives depleted and the product offers a clean restart that costs \"$0 today\".",
+  "phases": [
+    {
+      "name": "Name the need",
+      "span": "0:00-0:06",
+      "screens": [1],
+      "goal": "Get the person to admit, in their own picks, several things they want help with (here grief, stress, depression, sleep, focus), so the offer that follows reads as the answer to problems they just named.",
+      "feelings": ["seen", "hope"],
+      "mechanisms": ["Personalization signal", "Commitment & consistency"]
+    },
+    {
+      "name": "Permission asks as gifts",
+      "span": "0:06-0:11",
+      "screens": [2, 3],
+      "goal": "Secure a re-engagement channel and health data by presenting each permission as something the person receives (inspiration, insights) rather than something they give up.",
+      "feelings": ["anticipation", "trust"],
+      "mechanisms": ["Permission priming", "Future pacing", "Personalization signal"]
+    },
+    {
+      "name": "The free reset offer",
+      "span": "0:11-0:35",
+      "screens": [4],
+      "goal": "Convert into the annual trial by framing it as a reset that has already begun and costs nothing today, while removing perceived risk with visible renewal terms, a cancel guide and a no-guilt exit.",
+      "feelings": ["calm", "safety", "aspiration"],
+      "mechanisms": ["Future pacing", "Reassurance / risk removal", "Social proof", "Anchoring"]
+    }
+  ],
+  "screens": [
+    {
+      "n": 1,
+      "t": "0:00",
+      "kind": "question",
+      "subtype": "goals multi-select",
+      "title": "How can Open support your mind and body?",
+      "body": "Select one or more",
+      "controls": "Options: Strengthen connections and relationships; Navigate loss and grief; Balance emotions and energy; Reduce stress and anxiety; Enhance performance and productivity; Ease depression; Enhance sleep quality; Improve focus and concentration; Build self-love and confidence; Find purpose and meaning (multi-select). Button: round arrow (→) bottom right, no label. Back arrow top left.",
+      "visual": "Pure black screen, light thin sans headline, ten dark pill rows in a scrolling list. A picked row gains a bright outline and a thin check at right. The round arrow button is dim until something is picked, then turns cream. Picks shown: Navigate loss and grief, Balance emotions and energy, Reduce stress and anxiety, Ease depression, Enhance sleep quality, Improve focus and concentration. No progress bar.",
+      "intent": "Asks the person to self-diagnose broadly, with emotionally heavy options (grief, depression) sitting beside performance ones, so they declare several needs at once. It sits last before the asks and the offer, so the paywall lands right after the person has admitted what is wrong.",
+      "mechanisms": ["Personalization signal", "Commitment & consistency"]
+    },
+    {
+      "n": 2,
+      "t": "0:06",
+      "kind": "permission",
+      "subtype": "notifications primer",
+      "title": "Receive inspiration",
+      "body": "Get personalized classes, progress updates, and new releases. / [mock lock screen] Wednesday, August 14 / 3:38 / Energy boost, no crash / “Espresso Shot” ▶ 2 min / now",
+      "controls": "Button: Turn on notifications. Link: Later → (top right). Back arrow top left.",
+      "visual": "Slides in from the right. A phone mockup with a deep red lock screen (a close-up of an ear) and one Open notification card offering a 2 min session. Cream full-width pill button at the bottom. No OS prompt is seen before the next screen.",
+      "intent": "Reframes a notification permission as receiving \"inspiration\" and shows the exact kind of nudge that will arrive (a 2 minute energy session), so saying yes feels like accepting a helpful habit cue rather than allowing interruptions. It comes straight after the goals so \"personalized classes\" feels earned by the answers.",
+      "mechanisms": ["Permission priming", "Future pacing", "Personalization signal"]
+    },
+    {
+      "n": 3,
+      "t": "0:08",
+      "kind": "permission",
+      "subtype": "Apple Health primer",
+      "title": "Unlock personal insights with Apple Health",
+      "body": "Tap 'Continue' to review and manage permissions for syncing health data. / [mock session card] Oceanic Breath / Manoj D. / 10 min / 60 BPM",
+      "controls": "Button: Continue. Link: Later → (top right). Back arrow top left.",
+      "visual": "Slides in from the right. Phone mockup with a dark purple screen and a glowing red-orange orb, a session card showing a breathing class and a heart rate, and the Apple Health heart icon in a white tile. No Health sheet appears before the paywall.",
+      "intent": "Frames sharing health data as \"unlocking\" insights, showing a heart rate attached to a breathing session to suggest measurable body effects. The copy is unusually candid (\"review and manage permissions\"), which lowers resistance; placed directly before the paywall it also primes the idea that the product has science and measurement behind it.",
+      "mechanisms": ["Permission priming", "Authority / education", "Future pacing"]
+    },
+    {
+      "n": 4,
+      "t": "0:11",
+      "kind": "paywall",
+      "subtype": "single-plan trial paywall",
+      "title": "Your free reset starts now",
+      "body": "$0 today. Free for 7 days. Cancel anytime. / Improve sleep, stress, focus, mood / Designed by experts in neurobiology / Regulate your nervous system / Breathwork, meditation, movement, sound / Access a new perspective / Bridge science and spirituality / Annual $12.50/mo / 7 Days Free / AUTO-RENEWS OCT 5, 2026 AT 150$/YR UNLESS CANCELED / VIEW ALL OPTIONS (expanded at 0:27: Annual card adds Save $90/yr ✓; Monthly $20/mo AUTO-RENEWS OCT 5, 2026 AT 20$/MO UNLESS CANCELED) / FEATURED IN [logos: Rolling Stone, Apple, Fast Company, WSJ, Strava, goop, GQ, jetBlue] / PROMO CODE / Accessibility is important to us. Scholarships are available to those who need support. Please email support@o-p-e-n.com to request more info. / TERMS & CONDITIONS → / PRIVACY POLICY → / HOW TO CANCEL →",
+      "controls": "Button: Start free trial → (sticky). Links: Restore Purchases →; Later → (top right, visible at once); back arrow (top left); VIEW ALL OPTIONS ⌄; Cancel anytime. (underlined); PROMO CODE field; TERMS & CONDITIONS →; PRIVACY POLICY →; HOW TO CANCEL →.",
+      "visual": "Black page with the letter-spaced wordmark \"Op e n\" sticky at top, a strip of three moody photo tiles labelled FOCUSED MIND, HEART & HEARTBREAK, MENTAL DETOX, a very large light headline, three benefit rows with thin checks, then one outlined Annual card with \"7 Days Free\" in olive green and the renewal line in small monospace caps. Scrolled down and back twice (0:14-0:18, 0:22-0:32). Tapping VIEW ALL OPTIONS (0:27) adds a dimmer Monthly card and a green \"Save $90/yr ✓\" pill on Annual, which stays selected. The press logos drift sideways as a slow marquee. Cream sticky CTA throughout.",
+      "intent": "Treats the trial as a reset already under way (\"starts now\", \"$0 today\") so starting it feels like continuing rather than buying. Risk is removed openly: renewal date and full price in the card, a How to cancel link, a scholarship line and a no-guilt Later. The pressure that remains is structural: only the annual trial is visible until the person digs for other options, and the monthly price appears only as an anchor that makes $12.50/mo and \"Save $90/yr\" look good.",
+      "mechanisms": ["Future pacing", "Reassurance / risk removal", "Social proof", "Authority / education", "Anchoring", "Mood / brand setting"]
+    },
+    {
+      "n": 5,
+      "t": "0:35",
+      "kind": "app",
+      "subtype": "attribution and brand intro after paywall",
+      "title": "How did you hear about Open?",
+      "body": "Attribution chips: Online Search (Google); Appstore; Friends / Family; Ad on Meta / Instagram; @op_e__n Instagram; Open Studio; An influencer I follow. / 0:39 logo animation with \"Begin →\" / 0:41 \"We long for experiences which wrench us from the everyday.\" with \"Skip →\" / 0:46 card: 7-DAY RESET / Reset your nervous system, reawaken your senses, and feel alive again.",
+      "controls": "Attribution: chips plus round arrow button. Intro: Begin →; Skip →. Card: I'm in →; Dismiss.",
+      "visual": "\"Later →\" on the paywall slides straight to the attribution grid (two columns of outlined pills), with no exit offer. Then a black screen with the abstract four-shape logo, a single manifesto line fading in and out, and a full-height card with a portrait photo for the 7-DAY RESET program.",
+      "intent": "Collects marketing attribution after the paywall, when the person has already declined and is unlikely to drop off, then delivers the brand mood (a one-line manifesto) and a first program invitation. Asking \"I'm in →\" after the paywall turns the reset framing into a small free commitment that leads straight to locked content."
+    },
+    {
+      "n": 6,
+      "t": "0:50",
+      "kind": "app",
+      "subtype": "home and program page",
+      "title": "GOOD EVENING, HUGH • How do you feel?",
+      "body": "Banner: Track your progress and build ritual. / Turn on notifications / Daily Meditation - 9/29/2026 / MARGINAL GAINS / Olivia O. - 13 min / Tabs: Meditate, Breathe, Move, Sleep, Program / 0:51 program page: PROGRAM • 7 PRACTICES / 7-Day Nervous System Reset / 231.7k present / Take a trip inward. A 7-day program to retrain your nervous system, reawaken your senses, and feel alive again. / Back to Life, Manoj D. • 7 min, BODY SCAN; Recalibrate, Tessa R. • 9 min, CONTEMPLATION; Emotional Insight ...",
+      "controls": "Banner: → and X. Home: play button. Program: Start →; download, share, more icons.",
+      "visual": "Warm blurred amber gradient home with a week strip and a daily meditation hero. A notification ask returns as an in-app banner at the top. The program page has a large blurred portrait, avatar stack with \"231.7k present\", and session thumbnails with small lock icons.",
+      "intent": "The home greets by name and asks for notifications again (the second ask after the primer), while the program page uses a live-feeling attendance count (\"231.7k present\") and visible locks to make the free tier feel like a waiting room."
+    },
+    {
+      "n": 7,
+      "t": "0:53",
+      "kind": "app",
+      "subtype": "paywall re-shown from locked content",
+      "title": "Your free reset starts now",
+      "body": "Same paywall as screen 4 shown as a modal: $0 today. Free for 7 days. Cancel anytime. / three benefit rows / Annual $12.50/mo / 7 Days Free / Start free trial → / Restore Purchases →. Closed at 0:56; the locked session list (Back to Life, Recalibrate, Emotional Insight, Stress Cycle, Recovery Mode, Rhythm of Resilience, Alive Again ft. James Blake) is scrolled, then home again at 0:59 and the recording ends in Control Center at 1:01.",
+      "controls": "X (top right, visible at once) in place of Later; Start free trial →; Restore Purchases →.",
+      "visual": "Modal sheet slides up over the program page with the identical layout. After closing, every session thumbnail shows a padlock. No discount or second offer appears.",
+      "intent": "Re-presents the identical offer at the moment of intent (tapping Start on a program the person just said \"I'm in\" to), which is where a soft first paywall gets its second chance. Closing is easy and carries no win-back."
+    }
+  ],
+  "intermission_pattern": "In the captured section there are no intermissions at all: the goal question leads straight into two permission primers and then the paywall. The primers do the job intermissions usually do, each one a single benefit headline over a product mockup (a lock-screen notification, a heart-rate session card), so they show the future product rather than ask for anything abstract. The app's brand-mood beats (the four-shape logo, the one-line manifesto \"We long for experiences which wrench us from the everyday.\", the 7-DAY RESET card) appear only after the paywall is dismissed, which is unusual: the emotional set-up comes after the sale attempt, and it builds toward a first free commitment that ends at locked content and the same paywall again. Because the recording starts mid-flow, any intermissions earlier in onboarding are not visible.",
+  "standouts": [
+    "Screen 2 sells the notification permission by showing the exact notification that will arrive (\"Energy boost, no crash\", a 2 min session), which makes the ask concrete and helpful rather than abstract.",
+    "Screen 4 turns the trial into a process already started (\"Your free reset starts now\") and pairs it with unusually transparent terms (renewal date and $150/yr in the card, a How to cancel link, a scholarship line), so the low-pressure tone is itself the persuasion.",
+    "Screen 4 hides the monthly plan behind a small grey \"VIEW ALL OPTIONS\" link, so the default view is a single annual trial and the monthly price only appears as an anchor that adds a \"Save $90/yr\" badge.",
+    "Screen 5 places the brand manifesto and a commitment card (\"I'm in →\") after the paywall instead of before it, and that commitment leads straight to a locked program that re-shows the paywall (screen 7)."
+  ],
+  "gaps": "The recording starts at the goal question, so any welcome, carousel, name entry (home later greets \"HUGH\") and earlier questions or intermissions are not shown. No OS permission dialog appears after either primer, so it is not visible whether the person tapped the main button or \"Later →\". Press logos are read from a moving marquee and are partly cut at the edges. The post-paywall attribution question is folded into an app entry per the rules and is not counted in questions. \"other\" counts the paywall plus the three app entries."
+}

@@ -1,0 +1,147 @@
+{
+  "app": "Tangerine",
+  "file": "07-tangerine",
+  "category": "habits, mood and journal",
+  "recording": {
+    "length": "0:31",
+    "starts": "first intro carousel slide (looks like a fresh launch; no splash screen is captured)",
+    "onboarding_span": "0:00-0:10",
+    "paywall_at": null,
+    "after_paywall": "No paywall in onboarding: it drops straight into an empty Routine tab; the only paywall opens at 0:14 from a blurred, locked Insights & Stats page and is swiped away with no exit offer."
+  },
+  "counts": {"questions": 0, "intermissions": 5, "permissions": 1, "loaders": 0, "reveals": 0, "other": 3},
+  "strategy": "Tangerine's onboarding is a ten-second, five-slide feature carousel and one reminder ask, then the empty app: no questions, no personalisation, no plan and no paywall. The strategy is low friction and warmth: present the app as a friendly \"guide to daily self-care\" that covers habits, mood, journaling and progress in one place, then get out of the way so the person can start. The arc runs from a cheerful welcome, through small promises of lasting habits and self-understanding, to a loss-framed reminder ask (\"Never forget or miss a habit again!\") and an inviting blank day. The one idea is \"all in one\" self-care made easy; monetisation is deferred to later curiosity about one's own patterns, baited by a blurred Insights page.",
+  "phases": [
+    {
+      "name": "Promise carousel",
+      "span": "0:00-0:07",
+      "screens": [1, 2, 3, 4, 5],
+      "goal": "Make the app feel like a warm, complete self-care companion and plant the expectation of lasting habits and self-insight, while keeping effort near zero with \"Skip intro\" always on screen.",
+      "feelings": ["warmth", "optimism", "ease"],
+      "mechanisms": ["Mood / brand setting", "Future pacing", "Low-effort framing"]
+    },
+    {
+      "name": "Reminder ask",
+      "span": "0:07-0:10",
+      "screens": [6],
+      "goal": "Win notification permission by tying it to the habit promise just made and to the worry of forgetting a habit.",
+      "feelings": ["motivation", "mild worry"],
+      "mechanisms": ["Permission priming", "Loss aversion", "Authority / education"]
+    }
+  ],
+  "screens": [
+    {
+      "n": 1,
+      "t": "0:00",
+      "kind": "intermission",
+      "subtype": "value prop carousel",
+      "title": "Tangerine 🍊 is your guide to daily self-care",
+      "body": "Form habits, track your mood and journal. All in one app.",
+      "controls": "Link: Skip intro. Five page dots (1 of 5). Swipe to advance.",
+      "visual": "Warm off-white background, bold black headline with a tangerine emoji, flat illustration on a peach blob: two dark navy habit cards, pink journal lines, a clock, a thought bubble with hearts, a yellow smiley, sparkles.",
+      "intent": "Positions the app as a gentle guide rather than a tool, and bundles three jobs into one promise (\"All in one app\") so the person expects a complete self-care companion.",
+      "mechanisms": ["Mood / brand setting", "Future pacing"]
+    },
+    {
+      "n": 2,
+      "t": "0:02",
+      "kind": "intermission",
+      "subtype": "value prop carousel",
+      "title": "Form habits that last",
+      "body": "Tangerine not only helps you form healthy habits, but also keep them.",
+      "controls": "Link: Skip intro. Page dots (2 of 5).",
+      "visual": "Two navy habit cards, the top one checked, surrounded by colourful confetti and a confetti line beneath.",
+      "intent": "Speaks to the common experience of habits that fade, promising durability, and shows a celebrated completed habit before the person has done anything, so success feels close.",
+      "mechanisms": ["Future pacing", "Delight / reward"]
+    },
+    {
+      "n": 3,
+      "t": "0:03",
+      "kind": "intermission",
+      "subtype": "value prop carousel",
+      "title": "Track your mood",
+      "body": "Reflect on your days and see what makes you happy or sad.",
+      "controls": "Link: Skip intro. Page dots (3 of 5).",
+      "visual": "Stack of coloured mood rows (blue, coral, peach, pink) with small scenes and a \"LOVE\" badge, hearts and happy and sad yellow faces at left.",
+      "intent": "Offers self-understanding as the payoff of logging mood, the first hint of the insight value that is later locked behind the paywall.",
+      "mechanisms": ["Curiosity / open loop", "Future pacing"]
+    },
+    {
+      "n": 4,
+      "t": "0:04",
+      "kind": "intermission",
+      "subtype": "value prop carousel",
+      "title": "Journal, reflect and look back",
+      "body": "Clarify your thinking and get a boost in mindfulness, memory and communication skills.",
+      "controls": "Link: Skip intro. Page dots (4 of 5).",
+      "visual": "Minimal timeline illustration with two entries (navy and orange dots) and grey text lines.",
+      "intent": "Gives journaling concrete, almost clinical benefits (memory, communication) so a soft activity reads as self-improvement.",
+      "mechanisms": ["Authority / education", "Future pacing"]
+    },
+    {
+      "n": 5,
+      "t": "0:05",
+      "kind": "intermission",
+      "subtype": "value prop carousel",
+      "title": "Measure your progress",
+      "body": "Get an overview of how you are performing and motivate yourself to achieve even more.",
+      "controls": "Button: Get started (replaces Skip intro on this last slide). Page dots (5 of 5).",
+      "visual": "Habit grid card with orange dots, a navy stats card and a calendar, with an orange arrow curving up. The black full-width Get started pill fades in at 0:06; tapping it turns the page with a 3D curl into the app (0:07).",
+      "intent": "Ends the pitch on progress and achievement, then offers the only commitment button once the full set of promises has been seen.",
+      "mechanisms": ["Future pacing", "Progress / momentum"]
+    },
+    {
+      "n": 6,
+      "t": "0:07",
+      "kind": "permission",
+      "subtype": "notifications primer",
+      "title": "Would you like to be reminded to do your habits?",
+      "body": "In order to build lasting habits, we highly recommend that you enable your notifications. Never forget or miss a habit again!",
+      "controls": "Button: Enable notifications. Link: No, thanks.",
+      "visual": "Full-screen overlay fading in over the just-loaded Routine tab: illustration of a navy habit card with a pink blob and a bell with a slash in a peach circle, centred bold question, black pill and a text link. The person taps No, thanks (0:09), so no OS prompt appears.",
+      "intent": "Cashes in the carousel's \"habits that last\" promise: notifications are presented as the expert-recommended condition for success, with a loss frame (\"Never forget or miss a habit again!\"). Asking only after \"Get started\" means the person has already committed to trying.",
+      "mechanisms": ["Permission priming", "Loss aversion", "Authority / education", "Commitment & consistency"]
+    },
+    {
+      "n": 7,
+      "t": "0:10",
+      "kind": "app",
+      "subtype": "empty home",
+      "title": "How was your day?",
+      "body": "2026 SEP date strip (Fri 25 to Sat 3, Tue 29 highlighted) / How was your day? / Awesome; Good; Ok; Bad; Terrible / Today's habits / Show 0 completed",
+      "controls": "Mood chips. Tabs: Routine; Journal; +; History; Settings.",
+      "visual": "Warm off-white Routine tab with emoji mood chips and an empty habits list. A spinner briefly appears at 0:11 as the list loads.",
+      "intent": "Starts the person with one effortless action (tap a mood) instead of setup, keeping the low-friction promise."
+    },
+    {
+      "n": 8,
+      "t": "0:13",
+      "kind": "app",
+      "subtype": "locked feature and contextual paywall",
+      "title": "Insights & Stats",
+      "body": "Reflect on how your routine affects your mood and get an overview of your progress / [blurred sample data behind, partly legible: Insights / Stats / In the past 7 days, your days were: [unreadable] / Since you joined Tangerine, you completed 2.14 habits per day on average when your days were awesome / Highlights / Yesterday → (Sep 22, 2026 on a later visit) / Habits completed 67% (100% later) / Feelings 2 / Words written 0] / 0:14 paywall sheet: Unlimited habits / Make the most out of Tangerine and become your better self with unlimited habits / (slide 2 at 0:18) Unlimited reminders per habit / Ideal for \"stubborn\" habits and the ones that require multiple completions / Yearly + 7-day free trial, SAVE 48%, $39.99 / year ($3.33 / month), Cancel up to 24 hours before trial ends / Monthly, $6.99 / month, Recurring billing. Cancel anytime. / Subscribe now / First 7 days free. Then $39.99/year. / Subscription terms: after the 7-day free trial for the yearly subscription, your iTunes account will be charged $39.99. For the monthly subscription, $6.99 will be charged to your iTunes account at confirmation of purchase. Subscriptions automatically renews unless auto-renew is turned off at least 24h before the current period ends. To manage your subscription or turn off auto-renew, please go to your iTunes Account settings. / Privacy Policy | Terms of Use / Restore purchase",
+      "controls": "Locked page: Unlock Insights & Stats. Paywall: Yearly and Monthly cards (Yearly pre-selected); Subscribe now; Privacy Policy; Terms of Use; Restore purchase. No X; dismissed by swiping down.",
+      "visual": "History tab is a rainbow-gradient blur over sample stats with a black unlock pill. The paywall is a deep navy page sheet with an eight-dot feature carousel of flat illustrations, a cream outlined Yearly card with a black SAVE 48% tag, an indigo Monthly card and a neon-green two-line CTA. Swiped down at about 0:19, back to the blurred page; no exit offer.",
+      "intent": "Uses curiosity about one's own patterns as the paywall trigger, showing plausible but fake stats the new user cannot have yet, which is a mildly misleading preview. The paywall itself is transparent about the trial and price inside the button, but has no close button, and the \"SAVE 48%\" figure does not match the plan prices (about 52% off monthly)."
+    },
+    {
+      "n": 9,
+      "t": "0:20",
+      "kind": "app",
+      "subtype": "browsing tabs, then leaving",
+      "title": "Journal",
+      "body": "Gratitude / Reflect on what you're grateful for / Calm Anxiety / Work through anxious ... / Try one of our guided journaling templates, write a note on a habit, track your mood or tap the \"+\" icon and write down your thoughts. / 0:25 Settings: Sign in; Manage habits; Notifications; Siri shortcuts; Appearance; Passcode (Passcode is required to activate Face ID); Upgrade to Premium; Restore purchases; Invite friends; Love Tangerine? Rate us ❤️; Contact us",
+      "controls": "Tabs; journaling template cards; Settings rows.",
+      "visual": "Journal tab with blue and purple template cards and an illustration, Routine and the locked History page again, then Settings with a permanent Upgrade to Premium row. At 0:27 the person leaves the app; a home-screen long-press shows Remove App (0:29) and is dismissed; recording ends in Control Center (0:30).",
+      "intent": "The free app stays usable and calm; the upgrade lives as a standing Settings row and the locked History tab rather than as interruptions."
+    }
+  ],
+  "intermission_pattern": "All five intermissions are front-loaded as a single swipeable feature carousel before anything is asked, one feature per slide (self-care overview, lasting habits, mood, journaling, progress), each with a bold headline, one benefit sentence and a flat illustration in the same layout. In this recording each slide is on screen only about a second. The tone is friendly and benefit-led, with small aspirational claims (\"not only helps you form healthy habits, but also keep them\", \"a boost in mindfulness, memory and communication skills\"). \"Skip intro\" stays visible until the last slide, which swaps in \"Get started\", and five dots show progress. There are no questions for them to sit between, no mirrors, social proof or mascot; together they build one promise (an all-in-one self-care companion) that the notification primer immediately cashes in. After onboarding, the blurred Insights page plays the role an intermission might, showing what the person's data could look like.",
+  "standouts": [
+    "Screen 2 celebrates a completed habit with confetti before the person has done anything, borrowing the reward feeling of success to make the promise feel close.",
+    "Screen 5 holds back the only commitment button (\"Get started\") until the last slide, while \"Skip intro\" is offered on every slide before it, so leaving the pitch is easy but committing comes after the full set of promises.",
+    "Screen 6 turns the carousel's promise into a loss-framed reminder ask (\"we highly recommend ... Never forget or miss a habit again!\"), placed right after the person has committed with Get started.",
+    "Screen 8 baits the paywall with a blurred Insights page full of sample stats (\"Habits completed 67%\", \"2.14 habits per day on average when your days were awesome\") that a brand-new user cannot have, a curiosity hook that edges into misleading."
+  ],
+  "gaps": "The carousel is swiped quickly, about one second per slide; all five slides are readable. It is not certain the first frame is the very first launch (no splash is captured). \"No, thanks\" was tapped on the primer, so the OS notification prompt is not shown. The paywall is outside onboarding (paywall_at null) and is recorded as an app entry; its carousel has eight dots but only slides 1 and 2 are seen, and whether slide 2 auto-advanced or was swiped is not visible. The sample stats behind the blur are only partly legible. The long-press Remove App menu at 0:29 is dismissed without the app being deleted in the recording. \"other\" counts the three app entries."
+}

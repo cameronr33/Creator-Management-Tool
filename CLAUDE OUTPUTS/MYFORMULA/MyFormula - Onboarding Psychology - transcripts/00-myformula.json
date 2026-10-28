@@ -1,0 +1,828 @@
+{
+ "app": "MyFormula (ours)",
+ "file": "00-myformula",
+ "category": "supplement routine (our app)",
+ "recording": {
+  "length": "about 10 to 11 minutes (spec estimate)",
+  "starts": "not a recording: the flow as built in the app on 27 Oct 2026",
+  "onboarding_span": "Screens 1 to 31",
+  "paywall_at": "Screen 34, after the Screen 32 build checklist",
+  "after_paywall": "Close opens the monthly win-back (35), then email capture, then the soft exit (36)."
+ },
+ "strategy": "A consultation that earns trust by showing the industry's problems with sourced numbers, then lifts the blame off the person and positions the app as the independent fix. The arc runs hope (goals) to being heard (validation), to doubt and alarm (three question-then-fact pairs), to relief (the absolution), then a long consultation paid back with mirrors, a first swap and a safety note, then anticipation (the scoring method, a watched build) and a paywall that is the person's own result. The carrying idea: it was never your fault; the shelf is rigged, and we grade it for you.",
+ "phases": [
+  {
+   "name": "Welcome",
+   "span": "Screen 1",
+   "screens": [
+    "1"
+   ],
+   "goal": "Frame the app as an independent, evidence-based consultation fitted to the person's body.",
+   "feelings": [
+    "trust",
+    "curiosity"
+   ],
+   "mechanisms": [
+    "Mood / brand setting",
+    "Authority / education"
+   ]
+  },
+  {
+   "name": "What you want",
+   "span": "Screens 15, 4, 2, 5, 6",
+   "screens": [
+    "15",
+    "4",
+    "2",
+    "5",
+    "6"
+   ],
+   "goal": "Open on hope (the goal), reflect it back once so the person feels understood, then invite them to say what went wrong before.",
+   "feelings": [
+    "hope",
+    "seen",
+    "honesty"
+   ],
+   "mechanisms": [
+    "Validation",
+    "Commitment & consistency"
+   ]
+  },
+  {
+   "name": "The industry",
+   "span": "Screens 7 to 12",
+   "screens": [
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12"
+   ],
+   "goal": "Turn vague doubt into specific, sourced alarm in three question-then-fact pairs, each worded to the answer just given and ending on a way out.",
+   "feelings": [
+    "doubt",
+    "alarm",
+    "vindication"
+   ],
+   "mechanisms": [
+    "Problem agitation",
+    "Authority / education",
+    "Mirroring"
+   ]
+  },
+  {
+   "name": "The turn",
+   "span": "Screens 13 and 13b",
+   "screens": [
+    "13",
+    "13b"
+   ],
+   "goal": "Release the alarm in one move: it was never the person's fault, the app is the independent remedy, and here is the short road ahead.",
+   "feelings": [
+    "relief",
+    "trust",
+    "readiness"
+   ],
+   "mechanisms": [
+    "Absolution / reframe",
+    "Authority / education",
+    "Low-effort framing"
+   ]
+  },
+  {
+   "name": "Your goals",
+   "span": "Screens 16 to 19",
+   "screens": [
+    "16-18",
+    "14",
+    "19"
+   ],
+   "goal": "Make it feel like a real consultation about their goal, then prove the app listened by showing their own answers back.",
+   "feelings": [
+    "understood",
+    "in control",
+    "momentum"
+   ],
+   "mechanisms": [
+    "Personalization signal",
+    "Mirroring",
+    "Progress / momentum"
+   ]
+  },
+  {
+   "name": "Health profile",
+   "span": "Screens 20 to 24c",
+   "screens": [
+    "20",
+    "21",
+    "22",
+    "22b",
+    "24b",
+    "23",
+    "23b",
+    "24",
+    "24c"
+   ],
+   "goal": "Collect the heavy, sensitive data while paying each part back at once (a swap, a safety note, a list of what the answers unlocked) so effort feels rewarded.",
+   "feelings": [
+    "safety",
+    "seriousness",
+    "pride in effort"
+   ],
+   "mechanisms": [
+    "Reciprocity",
+    "Effort justification",
+    "Reassurance / risk removal"
+   ]
+  },
+  {
+   "name": "Lifestyle",
+   "span": "Screens 25 to 30",
+   "screens": [
+    "25",
+    "25b",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30"
+   ],
+   "goal": "Finish fast with 'almost done' cues, show the diet answer changed the plan, then show the scoring method so the result will feel earned.",
+   "feelings": [
+    "momentum",
+    "anticipation",
+    "trust"
+   ],
+   "mechanisms": [
+    "Low-effort framing",
+    "Personalization signal",
+    "Authority / education"
+   ]
+  },
+  {
+   "name": "Reminders",
+   "span": "Screen 31",
+   "screens": [
+    "31"
+   ],
+   "goal": "Picture tomorrow morning with the routine in it and record a yes to reminders, a small commitment before the build.",
+   "feelings": [
+    "anticipation",
+    "ownership"
+   ],
+   "mechanisms": [
+    "Future pacing",
+    "Permission priming"
+   ]
+  },
+  {
+   "name": "The build",
+   "span": "AI consent, Screen 32",
+   "screens": [
+    "AI",
+    "32"
+   ],
+   "goal": "Watch the routine being built from their own goals, bottles and medications for about 30 seconds, so the result feels made and worth paying for.",
+   "feelings": [
+    "anticipation",
+    "trust"
+   ],
+   "mechanisms": [
+    "Labor illusion",
+    "Personalization signal"
+   ]
+  },
+  {
+   "name": "The result paywall",
+   "span": "Screen 34",
+   "screens": [
+    "34"
+   ],
+   "goal": "Make the paywall the reveal: what they take now against the new routine, then the plan, with the free week's dates spelled out.",
+   "feelings": [
+    "ownership",
+    "safety",
+    "desire"
+   ],
+   "mechanisms": [
+    "Anticipation / reveal",
+    "Loss aversion",
+    "Reassurance / risk removal"
+   ]
+  },
+  {
+   "name": "After a no",
+   "span": "Screens 35 and 36",
+   "screens": [
+    "35",
+    "36"
+   ],
+   "goal": "Offer a smaller step (a month) rather than a discount, then keep the profile for a week and leave the door open.",
+   "feelings": [
+    "second chance",
+    "calm"
+   ],
+   "mechanisms": [
+    "Anchoring",
+    "Reassurance / risk removal"
+   ]
+  }
+ ],
+ "screens": [
+  {
+   "n": "1",
+   "t": "Splash",
+   "kind": "intermission",
+   "subtype": "splash",
+   "title": "MyFormula",
+   "body": "An independent, science-based guide to the supplements that fit your body.",
+   "controls": "Begin my consultation / I already have an account",
+   "visual": "Centred wordmark on the page wash. No progress bar.",
+   "intent": "Sets the frame for everything after it: this is a consultation, not a quiz, and the app is on the person's side (independent) and on evidence's side (science-based). 'Fit your body' plants the promise of personal fit before a single question.",
+   "mechanisms": [
+    "Mood / brand setting",
+    "Authority / education",
+    "Personalization signal"
+   ]
+  },
+  {
+   "n": "15",
+   "t": "About you · 1 of 4",
+   "kind": "question",
+   "subtype": "goals",
+   "title": "What do you want to improve?",
+   "body": "Pick up to 3 goals. / Select at least one.",
+   "controls": "Options: More energy; Better sleep; Less stress; Sharper focus; More muscle; Better recovery; Better digestion; Getting sick less; Healthier skin, hair and nails; Looking after my heart; Aging well; A healthier weight; Balanced hormones (if you have periods); Healthier joints and bones; Memory; Feeling like myself again; Knowing I'm doing it right (up to 3). Button: Continue",
+   "visual": "Section label 'About you · 1 of 4' and a bar that fills per section.",
+   "intent": "Opens on what the person wants, so the first act is hope, not a form. Two feeling options ('Feeling like myself again', 'Knowing I'm doing it right') let people name an emotional goal.",
+   "mechanisms": [
+    "Commitment & consistency",
+    "Future pacing"
+   ]
+  },
+  {
+   "n": "4",
+   "t": "About you (quiet step)",
+   "kind": "intermission",
+   "subtype": "validation",
+   "title": "Bad sleep doesn't stay in bed.",
+   "body": "It follows you all day. The right help exists, once you know which is real.",
+   "controls": "Continue",
+   "visual": "Full-bleed, centred, no count. One of 17 versions keyed to the first goal picked (e.g. 'Stress lives in the body.', 'Focus is a finite resource.', 'Weight is rarely just willpower.'), plus a fallback 'Knowing what works shouldn't be this hard.'",
+   "intent": "The first reply to the person. It names the pain of their goal in their terms (validation), then hints that most help on offer is not real, which seeds the industry section to come. Round 3 proposes adding a 'You want...' outcome line here; it has no pick yet, so today's words stand.",
+   "mechanisms": [
+    "Validation",
+    "Curiosity / open loop",
+    "Problem agitation"
+   ]
+  },
+  {
+   "n": "2",
+   "t": "About you · 3 of 4",
+   "kind": "question",
+   "subtype": "attribution",
+   "title": "How did you hear about us?",
+   "body": "",
+   "controls": "Options: TikTok; Instagram; Facebook; YouTube; Google; Reddit; Podcast; Doctor or practitioner; Friend or family; App Store; Other",
+   "visual": "",
+   "intent": "Business question placed after the person has been heard once, so it costs less goodwill.",
+   "mechanisms": []
+  },
+  {
+   "n": "5",
+   "t": "About you · 4 of 4",
+   "kind": "question",
+   "subtype": "history",
+   "title": "Have you tried taking supplements before?",
+   "body": "",
+   "controls": "Options: Yes, I currently take supplements; Yes, but I stopped; No, I've wanted to but didn't know where to start",
+   "visual": "",
+   "intent": "",
+   "mechanisms": []
+  },
+  {
+   "n": "6",
+   "t": "About you (closer, only after 'stopped')",
+   "kind": "question",
+   "subtype": "failure reasons",
+   "title": "What got in the way?",
+   "body": "Select all that apply.",
+   "controls": "Options: I didn't see any results; It was too expensive to keep up; I kept forgetting to take them; I didn't know if they were actually doing anything; I had side effects; I couldn't figure out what to actually take; I didn't trust what I was buying. Button: Continue (shows count)",
+   "visual": "Cards.",
+   "intent": "Invites the person to say what went wrong, which the next three fact screens call back to by name.",
+   "mechanisms": [
+    "Validation"
+   ]
+  },
+  {
+   "n": "7",
+   "t": "The industry · 1 of 6",
+   "kind": "question",
+   "subtype": "confidence check",
+   "title": "How confident are you in what you're taking?",
+   "body": "",
+   "controls": "Options: Confident; Somewhat; Not very; No idea, that's why I'm here",
+   "visual": "'Never' takers see 'How confident would you be picking a supplement off the shelf?'",
+   "intent": "A self-assessment that sets up the next screen's fact. Admitting doubt here makes the fact land as confirmation.",
+   "mechanisms": [
+    "Commitment & consistency"
+   ]
+  },
+  {
+   "n": "8",
+   "t": "The industry · 2 of 6",
+   "kind": "intermission",
+   "subtype": "fact (matched stat)",
+   "title": "4%",
+   "body": "How much of magnesium oxide, the most-sold form, your body absorbs. / There's a reason. Pick the right supplement in the wrong form, and your body barely absorbs it. / Better-absorbed forms sit on the same shelf, and our scores favor them. / — Magnesium Research (Firoz and Graber, 2001)",
+   "controls": "Good to know",
+   "visual": "Animated 'What you take 500 mg / What you absorb About 20 mg' visual. Callback above it for some: 'You said you didn't see results. This is often why:'. The body line changes with the Screen 7 answer (four versions).",
+   "intent": "First of three question-then-fact pairs. It tells the person their past failure may not have been them (absorption), answers them in their own tone, and ends on a way out (better forms exist and the scores favour them). The cited source is the trust device.",
+   "mechanisms": [
+    "Problem agitation",
+    "Authority / education",
+    "Mirroring",
+    "Absolution / reframe"
+   ]
+  },
+  {
+   "n": "9",
+   "t": "The industry · 3 of 6",
+   "kind": "question",
+   "subtype": "confidence check",
+   "title": "Do you trust that what's on the label is actually in the bottle?",
+   "body": "",
+   "controls": "Options: Yes, I trust what's listed; I assume so, but I've never checked; I'm honestly not sure; No, I've heard too many things",
+   "visual": "",
+   "intent": "",
+   "mechanisms": [
+    "Commitment & consistency"
+   ]
+  },
+  {
+   "n": "10",
+   "t": "The industry · 4 of 6",
+   "kind": "intermission",
+   "subtype": "fact (matched stat)",
+   "title": "22 of 25",
+   "body": "Melatonin gummies more than 10% off the dose on their label. / Your doubt is well placed. In one, the lab found no melatonin at all. / Some brands have their dose checked independently, and our scores give them credit for it. / — JAMA (Cohen and others, 2023)",
+   "controls": "Good to know",
+   "visual": "Grid of 25 bottles, 3 marked within 10%. Callback for 'no trust': 'You said you didn't trust what you were buying. Here's what one test found:'. Body changes with the Screen 9 answer.",
+   "intent": "Confirms the doubt the person just voiced, so they feel smart rather than fooled, and again ends on a way out (independent testing, which the scores reward).",
+   "mechanisms": [
+    "Problem agitation",
+    "Authority / education",
+    "Validation",
+    "Mirroring"
+   ]
+  },
+  {
+   "n": "11",
+   "t": "The industry · 5 of 6",
+   "kind": "question",
+   "subtype": "confidence check",
+   "title": "Ever worry about what else is in the bottle?",
+   "body": "",
+   "controls": "Options: Never thought about it; A little; Yes; Yes, I've had a bad reaction",
+   "visual": "",
+   "intent": "",
+   "mechanisms": [
+    "Commitment & consistency"
+   ]
+  },
+  {
+   "n": "12",
+   "t": "The industry · 6 of 6",
+   "kind": "intermission",
+   "subtype": "fact (matched stat)",
+   "title": "7 in 10",
+   "body": "Bestselling protein powders that tested positive for lead. / Most people assume someone checks for this. Cadmium, arsenic and mercury turned up in the same tests. / Tested supplements exist, and testing counts in every score we give. / — Clean Label Project (2018), via Global News. No supplement needs FDA approval before sale (DSHEA).",
+   "controls": "So what can I trust?",
+   "visual": "Grid of 10, 7 marked 'Lead found'. Callback for side effects: 'You said you had side effects. Here's what else can be in the bottle:'.",
+   "intent": "The peak of the fear curve: the most alarming figure, and a button that voices the person's next thought as a question the app is about to answer. It hands the person straight to the turn.",
+   "mechanisms": [
+    "Problem agitation",
+    "Authority / education",
+    "Curiosity / open loop"
+   ]
+  },
+  {
+   "n": "13",
+   "t": "The industry (closer)",
+   "kind": "intermission",
+   "subtype": "absolution",
+   "title": "None of that was your fault.",
+   "body": "You didn't fail. You were set up to fail. / Every pick is chosen for you and graded on its evidence. / ✓ Built on 1,200+ peer-reviewed studies ✓ Every product we pick is scored on seven quality measures ✓ No brand pays to be on your list",
+   "controls": "Find what's right for me",
+   "visual": "Extra-large headline over a glow; bar full.",
+   "intent": "The emotional turn of the whole flow: lifts blame off the person after three screens of problems, then names the app as the remedy with three proof points. The button turns relief into a request to continue.",
+   "mechanisms": [
+    "Absolution / reframe",
+    "Authority / education",
+    "Reassurance / risk removal",
+    "Identity / belonging"
+   ]
+  },
+  {
+   "n": "13b",
+   "t": "The industry (closer)",
+   "kind": "intermission",
+   "subtype": "section intro (roadmap)",
+   "title": "Here's how this works.",
+   "body": "1 Your goals and health 2 What you take, any blood test and your medications 3 Your food, exercise and sleep 4 Then we build your routine",
+   "controls": "Start with my goals",
+   "visual": "Numbered steps, the founder's round 3 pick (he turned down a privacy line, 'We never sell what you tell us.').",
+   "intent": "Makes the long consultation ahead feel bounded and purposeful before the personal questions start.",
+   "mechanisms": [
+    "Low-effort framing",
+    "Progress / momentum",
+    "Reassurance / risk removal"
+   ]
+  },
+  {
+   "n": "16-18",
+   "t": "Your goals · 1-3 of 2-4",
+   "kind": "question",
+   "subtype": "goal deep dive",
+   "title": "About your sleep",
+   "body": "",
+   "controls": "One dive per goal (e.g. 'About your energy', 'About your focus'), each a short form of goal-specific questions.",
+   "visual": "Asked once per goal picked.",
+   "intent": "The consultation feeling: specific questions show the app is digging into their goal.",
+   "mechanisms": [
+    "Personalization signal",
+    "Effort justification"
+   ]
+  },
+  {
+   "n": "14",
+   "t": "Your goals · last",
+   "kind": "question",
+   "subtype": "depth",
+   "title": "How deep should we go?",
+   "body": "",
+   "controls": "Options: Base Coverage; A Step Ahead; Full Optimization",
+   "visual": "",
+   "intent": "Gives the person control over the size of the routine.",
+   "mechanisms": [
+    "Commitment & consistency"
+   ]
+  },
+  {
+   "n": "19",
+   "t": "Your goals (closer)",
+   "kind": "intermission",
+   "subtype": "mirror (personal summary)",
+   "title": "Here's what you've told us so far.",
+   "body": "Sleep: Falling asleep is the hard part / Focus: Hardest in the afternoons / Depth: A Step Ahead / Three sections down. Two to go, then your routine is ready.",
+   "controls": "Keep going",
+   "visual": "Rows built from the person's own first answer per goal and their depth pick (built 27 Oct from round 3's option A, Foodvisor's 'personal summary').",
+   "intent": "Proves the app has been listening, using only the person's own words, and marks progress so the second half feels shorter.",
+   "mechanisms": [
+    "Mirroring",
+    "Progress / momentum",
+    "Personalization signal"
+   ]
+  },
+  {
+   "n": "20",
+   "t": "Health profile · 1 of n",
+   "kind": "question",
+   "subtype": "demographics",
+   "title": "The basics",
+   "body": "These help shape your routine.",
+   "controls": "Fields: What should we call you?; Biological sex; Age; Height; Weight. Button: Continue",
+   "visual": "",
+   "intent": "",
+   "mechanisms": []
+  },
+  {
+   "n": "21",
+   "t": "Health profile",
+   "kind": "question",
+   "subtype": "sex-specific",
+   "title": "Pregnant, breastfeeding, or trying to conceive? / Anything here apply?",
+   "body": "",
+   "controls": "Female: Menstrual cycle; Perimenopause; Menopause; PCOS; None. Male: Prostate; Testosterone; Hair loss prevention; ...",
+   "visual": "",
+   "intent": "",
+   "mechanisms": [
+    "Personalization signal"
+   ]
+  },
+  {
+   "n": "22",
+   "t": "Health profile",
+   "kind": "question",
+   "subtype": "current stack",
+   "title": "What were you taking before you stopped?",
+   "body": "Search for each product. When we have its label, we fill in the dose.",
+   "controls": "Search for a product",
+   "visual": "Title varies: 'What are you taking now?' / 'Ever taken supplements?'.",
+   "intent": "",
+   "mechanisms": [
+    "Effort justification"
+   ]
+  },
+  {
+   "n": "22b",
+   "t": "Health profile (aside, only with a pair)",
+   "kind": "intermission",
+   "subtype": "reveal (first value)",
+   "title": "A swap that scores 23 points higher.",
+   "body": "From the 2 products you added. / [old product and score] → [our pick and score] / We'll go through your whole list at the end.",
+   "controls": "Continue",
+   "visual": "Two product cards with scores. Alternate 'Same ingredient. Different bottle.' compare. Only shown when a scored pair exists.",
+   "intent": "The first piece of real value before the paywall, made from the person's own bottle. It proves the scoring is real and teases the full review at the end.",
+   "mechanisms": [
+    "Reciprocity",
+    "Anticipation / reveal",
+    "Personalization signal",
+    "Authority / education"
+   ]
+  },
+  {
+   "n": "24b",
+   "t": "Health profile",
+   "kind": "question",
+   "subtype": "blood test",
+   "title": "Had a blood test in the last 12 months?",
+   "body": "Add a photo or PDF and we dose to your levels, not averages.",
+   "controls": "Add my labs / Skip for now",
+   "visual": "",
+   "intent": "",
+   "mechanisms": [
+    "Personalization signal"
+   ]
+  },
+  {
+   "n": "23",
+   "t": "Health profile",
+   "kind": "question",
+   "subtype": "medications",
+   "title": "Any medications you take regularly?",
+   "body": "We screen for interactions. This does not replace advice from your pharmacist or doctor.",
+   "controls": "Include prescription and over-the-counter medications. Button: Continue",
+   "visual": "",
+   "intent": "The subtitle explains why the question is asked, which lowers the cost of answering a sensitive one.",
+   "mechanisms": [
+    "Reassurance / risk removal"
+   ]
+  },
+  {
+   "n": "23b",
+   "t": "Health profile (aside, only with a medication)",
+   "kind": "intermission",
+   "subtype": "safety note",
+   "title": "Your sertraline and a supplement you take can interact.",
+   "body": "You take sertraline and St. John's wort. / This does not replace advice from your pharmacist or doctor. / [source line]",
+   "controls": "Continue",
+   "visual": "Shown only to someone who listed a medication; general title 'Medications and supplements can interact.' when no pair.",
+   "intent": "Pays back the sensitive answer at once with something protective and specific, so the person sees why it was worth giving.",
+   "mechanisms": [
+    "Reciprocity",
+    "Authority / education",
+    "Reassurance / risk removal"
+   ]
+  },
+  {
+   "n": "24",
+   "t": "Health profile · last",
+   "kind": "question",
+   "subtype": "medical history",
+   "title": "Your health background",
+   "body": "",
+   "controls": "Ever diagnosed with any of these? (grouped list) ...",
+   "visual": "",
+   "intent": "",
+   "mechanisms": []
+  },
+  {
+   "n": "24c",
+   "t": "Health profile (closer)",
+   "kind": "intermission",
+   "subtype": "progress beat",
+   "title": "Four sections down. One to go.",
+   "body": "Here's what your answers are used for so far: ✓ Interaction screening, against your medication ✓ Your 2 products, checked against your routine ✓ Picks checked against 4 blood test values",
+   "controls": "Continue",
+   "visual": "Without any of those: 'One section left: food, exercise, sleep and budget.' and a 'Profile strength' meter 70% → 85%, '+15% this section', 'Every answer sharpens your recommendations.'",
+   "intent": "Converts the heaviest section into visible returns ('what your answers are used for') and shows the end is near, to carry momentum into the last section.",
+   "mechanisms": [
+    "Progress / momentum",
+    "Effort justification",
+    "Personalization signal"
+   ]
+  },
+  {
+   "n": "25",
+   "t": "Lifestyle · 1 of 5",
+   "kind": "question",
+   "subtype": "diet",
+   "title": "Food and drink",
+   "body": "",
+   "controls": "Follow a specific diet? (No specific diet; Vegetarian; Vegan; ...) / Any ingredients you avoid?",
+   "visual": "",
+   "intent": "",
+   "mechanisms": []
+  },
+  {
+   "n": "25b",
+   "t": "Lifestyle (quiet step)",
+   "kind": "intermission",
+   "subtype": "reaction (insight)",
+   "title": "Every product we pick will be vegan.",
+   "body": "Plant-based almost always needs B12, and often iron. / A few quick questions left.",
+   "controls": "Keep going",
+   "visual": "Versions for vegan, vegetarian, keto, carnivore; others see 'Your routine is taking shape.' / 'Your diet changes which gaps you're likely to have.'",
+   "intent": "Shows the answer changed the plan (a concrete promise), teaches one relevant fact, and lowers the cost of what is left.",
+   "mechanisms": [
+    "Personalization signal",
+    "Authority / education",
+    "Low-effort framing"
+   ]
+  },
+  {
+   "n": "26",
+   "t": "Lifestyle",
+   "kind": "question",
+   "subtype": "lifestyle",
+   "title": "Your typical week?",
+   "body": "",
+   "controls": "Your workday?; Exercise outside work?; What kind of exercise?; Smoke or vape?",
+   "visual": "",
+   "intent": "",
+   "mechanisms": []
+  },
+  {
+   "n": "27",
+   "t": "Lifestyle",
+   "kind": "question",
+   "subtype": "symptoms, sleep, stress",
+   "title": "Almost done.",
+   "body": "",
+   "controls": "Symptoms (Fatigue; Brain fog; ...), wake and sleep times, stress",
+   "visual": "",
+   "intent": "The title itself is a progress beat.",
+   "mechanisms": [
+    "Progress / momentum"
+   ]
+  },
+  {
+   "n": "28",
+   "t": "Lifestyle",
+   "kind": "question",
+   "subtype": "preferences",
+   "title": "What matters most in a supplement?",
+   "body": "Pick up to 2. When products score close, these can tip the pick.",
+   "controls": "Clinical doses; Tested for purity; Clean ingredients; Value for money / Format?",
+   "visual": "",
+   "intent": "",
+   "mechanisms": [
+    "Commitment & consistency"
+   ]
+  },
+  {
+   "n": "29",
+   "t": "Lifestyle · last",
+   "kind": "question",
+   "subtype": "budget",
+   "title": "What's your monthly budget?",
+   "body": "",
+   "controls": "Under $50 ... Just tell me what I need",
+   "visual": "",
+   "intent": "",
+   "mechanisms": [
+    "Anchoring"
+   ]
+  },
+  {
+   "n": "30",
+   "t": "Lifestyle (closer)",
+   "kind": "intermission",
+   "subtype": "authority (method)",
+   "title": "Here's how we score a product.",
+   "body": "Seven rows, each with its weight: Product quality (Absorbable forms at research doses); Testing (How it's tested, and by whom); Inactive ingredients; Manufacturing; Certifications; Technical innovation; Value / [standard name]. Every product we pick is rated Good or better.",
+   "controls": "Build my routine",
+   "visual": "Table of the seven scored factors and weights.",
+   "intent": "Shows the machinery just before the build, so the coming result reads as earned by a method rather than generated. The button names the reward.",
+   "mechanisms": [
+    "Authority / education",
+    "Anticipation / reveal",
+    "Reassurance / risk removal"
+   ]
+  },
+  {
+   "n": "31",
+   "t": "No bar",
+   "kind": "permission",
+   "subtype": "reminder primer",
+   "title": "Want daily reminders to stay on track?",
+   "body": "[Mock notification: MyFormula · now / 6:30 am · Morning routine / Multivitamin, Vitamin C, Vitamin B12] / We'll remind you when to take each supplement.",
+   "controls": "Enable reminders / Maybe later",
+   "visual": "Uses their own wake time. Records intent only; iOS asks after purchase.",
+   "intent": "Future pacing: a glimpse of tomorrow morning with the routine in it, before anything is bought.",
+   "mechanisms": [
+    "Future pacing",
+    "Permission priming",
+    "Personalization signal"
+   ]
+  },
+  {
+   "n": "AI",
+   "t": "Sheet",
+   "kind": "permission",
+   "subtype": "consent",
+   "title": "Let's analyze your profile",
+   "body": "Our AI analyzes your goals, medications and lab results, guided by peer-reviewed research, to build a routine that fits you, screened for interactions and safe doses. / Your health answers are sent to a third-party AI service to do this. Never your name or email, and never used to train AI.",
+   "controls": "Allow and build my routine / Not now",
+   "visual": "Required by Apple's guideline; shown once.",
+   "intent": "Compliance, but worded to restate the value of what is about to happen.",
+   "mechanisms": [
+    "Reassurance / risk removal"
+   ]
+  },
+  {
+   "n": "32",
+   "t": "Paywall page 1",
+   "kind": "loader",
+   "subtype": "build checklist",
+   "title": "Building your routine, Sam",
+   "body": "Six checks, one at a time. It takes about 30 seconds, and every step is real work. / Reading your answers · Weighing what you take now · Checking the research · Screening your medications · Grading products and prices · Placing picks in your day / Your routine is ready. Opening it now.",
+   "controls": "",
+   "visual": "Six steps tick one by one (minimum 5 s each, about 30 s total), each line naming the person's own goals, times, bottles and medications.",
+   "intent": "Labour you can watch, described with the person's own details, so the routine feels made for them and worth paying for.",
+   "mechanisms": [
+    "Labor illusion",
+    "Personalization signal",
+    "Anticipation / reveal",
+    "Effort justification"
+   ]
+  },
+  {
+   "n": "34",
+   "t": "Paywall page 2",
+   "kind": "paywall",
+   "subtype": "personal result paywall",
+   "title": "Your routine scores 72. Your new one scores 88.",
+   "body": "Before-and-after tiles ($64 → $41 a month; 1 → 0 flagged with sertraline; 1 of 3 → 3 of 3 goals covered) / What you take now: KEEP / SWAP / STOP rows / What you get: six-card carousel / Your free week: Today, Day 5 reminder, Day 7 charge / Four questions",
+   "controls": "Annual: 7 days free, then $99.99 a year · Start my routine · Switch to monthly",
+   "visual": "One scrolling page with a slim pinned plate; close button top right.",
+   "intent": "The paywall is the result: it shows what the person's current stack costs them and what the new routine fixes, so paying feels like collecting what they already earned. The free-week timeline removes the fear of being charged by surprise.",
+   "mechanisms": [
+    "Anticipation / reveal",
+    "Loss aversion",
+    "Personalization signal",
+    "Reassurance / risk removal",
+    "Anchoring"
+   ]
+  },
+  {
+   "n": "35",
+   "t": "After close",
+   "kind": "exit",
+   "subtype": "win-back",
+   "title": "Your profile is ready.",
+   "body": "Here's what we found: One supplement you're taking failed our testing standard. / 6 supplements picked for your goals / ✓ medications screened for interactions / Not ready for a year? Start with a month. $19.99 a month",
+   "controls": "Start monthly, $19.99 / Not right now / Restore purchase",
+   "visual": "Then email capture: 'Want us to follow up?'",
+   "intent": "Re-states the person's own findings and offers a smaller step instead of a discount.",
+   "mechanisms": [
+    "Loss aversion",
+    "Anchoring",
+    "Personalization signal"
+   ]
+  },
+  {
+   "n": "36",
+   "t": "After close",
+   "kind": "exit",
+   "subtype": "soft exit",
+   "title": "Your profile will be here when you're ready.",
+   "body": "We'll keep your profile for 7 days.",
+   "controls": "Take another look / I'll be back",
+   "visual": "",
+   "intent": "Keeps the door open with a gentle deadline.",
+   "mechanisms": [
+    "Scarcity / urgency",
+    "Reassurance / risk removal"
+   ]
+  }
+ ],
+ "intermission_pattern": "Thirteen screens ask nothing (1, 4, 8, 10, 12, 13, 13b, 19, 22b, 23b, 24c, 25b, 30), roughly one after every two questions, plus the reminder primer, the build checklist and the paywall. They are tied to the five sections: a reply after the opener (4), three question-then-fact pairs in the industry section (8, 10, 12) closed by the turn (13) and a roadmap (13b), then each later section closes on a beat that shows progress or returns value (19, 24c, 30), with two conditional asides that pay back a specific answer (22b, 23b) and a diet reaction (25b). They are longer and more text-led than most references, cite named studies where others cite their own users, and lean on fear more than any of the ten, then release it once, hard, at Screen 13.",
+ "standouts": [
+  "Screens 7 to 12 are the only question-then-fact pairs among the eleven apps: each fact is chosen and worded by the answer just given, and callbacks quote the Screen 6 failure reason back.",
+  "Screen 13 is the strongest single turn in any of the flows, because it follows the person admitting what went wrong.",
+  "Screen 22b gives real value (a scored swap from their own bottle) before any price, which only RISE (Health data) and Foodvisor (first advice) also do.",
+  "Screen 34 is the only paywall built from the person's own result: the score of what they take now against the new routine."
+ ],
+ "gaps": "Not a recording: the words are the app's own as built on 27 Oct 2026, with one example where a screen changes with the answers. The founder's round 3 picks are built; Screen 4 has no pick yet and keeps its earlier words. Timing is the spec's estimate.",
+ "counts": {
+  "questions": 20,
+  "intermissions": 13,
+  "permissions": 2,
+  "loaders": 1,
+  "reveals": 0,
+  "other": 3
+ }
+}

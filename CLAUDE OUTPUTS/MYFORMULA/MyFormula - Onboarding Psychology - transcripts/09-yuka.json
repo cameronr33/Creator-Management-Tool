@@ -1,0 +1,177 @@
+{
+  "app": "Yuka",
+  "file": "09-yuka",
+  "category": "food and cosmetics barcode scanner",
+  "recording": {
+    "length": "1:29",
+    "starts": "first welcome carousel slide (looks like a fresh launch; no splash screen is captured)",
+    "onboarding_span": "0:00-0:30",
+    "paywall_at": null,
+    "after_paywall": "No paywall in onboarding: it ends in the live scanner; a referral gate appears on the Top tab (0:35) and a pay-what-you-want membership sheet opens from the Search tab at 1:18, closed with X and no exit offer."
+  },
+  "counts": {"questions": 0, "intermissions": 3, "permissions": 2, "loaders": 0, "reveals": 0, "other": 6},
+  "strategy": "Yuka's onboarding is a 30-second runway to the camera: three mascot-led cards (independence, product analysis, healthier alternatives), an email account, one line explaining scanning, and the camera permission. There is no questionnaire, no personalisation and no paywall; the person's first real experience is pointing the camera at a product. The emotional arc goes from trust (\"a completely independent app\") and curiosity about what is good or poor, through a short chore (account), to agency (scan anything). The idea that carries it is independence: Yuka presents itself as a neutral judge on the person's side, and that same idea later frames payment as \"support Yuka\" at a price the person chooses.",
+  "phases": [
+    {
+      "name": "Mission and promise",
+      "span": "0:00-0:05",
+      "screens": [1, 2, 3],
+      "goal": "Establish Yuka as an independent, trustworthy judge of products and make the person curious to see how their own groceries are rated.",
+      "feelings": ["trust", "curiosity", "warmth"],
+      "mechanisms": ["Mood / brand setting", "Authority / education", "Curiosity / open loop"]
+    },
+    {
+      "name": "Account",
+      "span": "0:05-0:23",
+      "screens": [4, 5, 6],
+      "goal": "Get an identified user (email, first name, password) with as little friction as possible, softened by the mascot's cheer.",
+      "feelings": ["mild effort", "belonging"],
+      "mechanisms": ["Low-effort framing", "Identity / belonging"]
+    },
+    {
+      "name": "First scan",
+      "span": "0:23-0:30",
+      "screens": [7, 8],
+      "goal": "Move the person straight into the core action, so the camera permission arrives as the obvious next step of doing what the app is for.",
+      "feelings": ["readiness", "agency"],
+      "mechanisms": ["Permission priming", "Low-effort framing", "Progress / momentum"]
+    }
+  ],
+  "screens": [
+    {
+      "n": 1,
+      "t": "0:00",
+      "kind": "intermission",
+      "subtype": "mascot intro / value prop carousel",
+      "title": "Welcome!",
+      "body": "Yuka is a completely independent app that helps you choose the right products",
+      "controls": "Slide to continue ‹. Three page markers (a home icon and two circles).",
+      "visual": "Flat green background, a smiling carrot mascot in a white circle, a script-font heading. Swiped at 0:01, with the next slide's orange colour wiping in from a corner.",
+      "intent": "Opens with independence as the first claim, before any feature, to pre-empt the suspicion that ratings are paid for. The mascot sets a friendly, non-preachy tone for a product that will judge the person's food.",
+      "mechanisms": ["Mood / brand setting", "Reassurance / risk removal", "Authority / education"]
+    },
+    {
+      "n": 2,
+      "t": "0:01",
+      "kind": "intermission",
+      "subtype": "value prop carousel",
+      "title": "Product analysis",
+      "body": "Yuka scans products and assesses their health benefits / [illustration labels] Good / Poor",
+      "controls": "Swipe. Page markers (magnifier icon active).",
+      "visual": "Orange background, a circle of grocery items (pasta, oil, cereal, cookies, cheese, jam) with hand-drawn arrows labelling one \"Good\" (green dot) and one \"Poor\" (red dot).",
+      "intent": "Shows the core mechanic as a simple verdict on familiar groceries, inviting the person to wonder how their own cupboard would score.",
+      "mechanisms": ["Curiosity / open loop", "Authority / education"]
+    },
+    {
+      "n": 3,
+      "t": "0:03",
+      "kind": "intermission",
+      "subtype": "value prop carousel",
+      "title": "Recommendations",
+      "body": "Yuka recommends healthier alternatives",
+      "controls": "Button: Let's go!. Page markers (thumbs-up icon active).",
+      "visual": "Green background, two chocolate dessert pots, one marked with a red X, an arrow, and the other with a green check. The dark green Let's go! pill fades in at 0:04.",
+      "intent": "Resolves the worry the previous slide could raise (a \"Poor\" verdict) with a solution, so the app feels helpful rather than judgemental. Placing the only button here means the person commits after hearing the full promise.",
+      "mechanisms": ["Future pacing", "Reassurance / risk removal"]
+    },
+    {
+      "n": 4,
+      "t": "0:05",
+      "kind": "account",
+      "subtype": "sign up / log in sheet",
+      "title": "Sign up / Log in",
+      "body": "[speech bubble] Root for good health!",
+      "controls": "Button: Continue with email. X (top left).",
+      "visual": "Light grey sheet slides up over the carousel. The carrot mascot gives an OK hand sign with a speech bubble. Only one sign-in method is offered.",
+      "intent": "Uses the mascot's pun to make the account ask feel like joining a cause. The X suggests the account could be skipped, but the single prominent button steers toward signing up.",
+      "mechanisms": ["Identity / belonging", "Low-effort framing", "Mood / brand setting"]
+    },
+    {
+      "n": 5,
+      "t": "0:06",
+      "kind": "account",
+      "subtype": "email entry",
+      "title": "Enter your email",
+      "body": "Email: Enter your email",
+      "controls": "Field: Email. Button: Next (top right). Back (top left).",
+      "visual": "Plain iOS form pushed in from the right with the keyboard up. The email is autofilled from the keyboard suggestion (0:07-0:11).",
+      "intent": "A single field keeps the step short; nothing here sells, it is pure utility."
+    },
+    {
+      "n": 6,
+      "t": "0:12",
+      "kind": "account",
+      "subtype": "create account form",
+      "title": "Create account",
+      "body": "First name / Email [prefilled] / Password: Choose password / By continuing, you agree to the terms of service and limitations of the app.",
+      "controls": "Fields: First name; Email; Password (show/hide eye). Button: Next (top right). Back (top left). Links: terms of service; limitations.",
+      "visual": "Same plain form. First name autofilled from the keyboard suggestion, password filled by a password manager; a dark loading spinner tile appears at 0:21. A third-party password manager then shows an unlock sheet and a \"Save password in\" sheet (0:24-0:27) over the next screen.",
+      "intent": "Collects a name and password with no explanation of why an account is needed. The terms line links to \"limitations of the app\", which quietly sets expectations about how far the ratings can be trusted."
+    },
+    {
+      "n": 7,
+      "t": "0:23",
+      "kind": "permission",
+      "subtype": "how it works / implicit camera primer",
+      "title": "Yuka scans the barcodes of your products to analyze them",
+      "body": "",
+      "controls": "Button: Scan a product.",
+      "visual": "Green background (the Recommendations slide is briefly visible behind as the sheet closes at 0:22), a crisp packet with a barcode in a white circle, one line of text and a dark green button. Shown again after the password-manager sheets close (0:27); tapped at 0:28.",
+      "intent": "Teaches the one action that matters and turns it into the button, so the camera permission that follows is triggered by the person's own tap and its purpose is already obvious. It never mentions the camera, which makes the OS prompt feel like part of scanning rather than a request.",
+      "mechanisms": ["Permission priming", "Low-effort framing", "Authority / education"]
+    },
+    {
+      "n": 8,
+      "t": "0:28",
+      "kind": "permission",
+      "subtype": "camera OS prompt",
+      "title": "“Yuka” would like to access the Camera.",
+      "body": "Access to the camera is required to scan the barcode.",
+      "controls": "Don't Allow; Allow.",
+      "visual": "System alert over the black scanner view, with the five-tab bar (History, Recs, Scan, Top, Search) already visible below. Allowed at 0:30; the live camera with corner brackets and a small SCANDIT label appears at 0:30.",
+      "intent": "Arrives at the exact moment the person has asked to scan, with a plain functional reason, which maximises the chance of Allow.",
+      "mechanisms": ["Permission priming"]
+    },
+    {
+      "n": 9,
+      "t": "0:30",
+      "kind": "app",
+      "subtype": "scanner and empty tabs",
+      "title": "Scan",
+      "body": "Recommendations: NO RECOMMENDATIONS / Yuka recommendations will appear here. / History: NO PRODUCTS / Scan a product's barcode to begin. / Scan a product",
+      "controls": "Tabs: History; Recs; Scan; Top; Search. Scanner: torch and sound buttons. History: Scan a product.",
+      "visual": "Full-screen camera with white corner brackets. Empty tabs use mascot drawings (carrot holding a good and a bad product; carrot pushing a shopping cart) in a hand-drawn caps font. Between 0:40 and 1:13 the person moves between Scan, Recs and History and points the camera around a room and kitchen without scanning a barcode, so no product result is shown. A Notification Center pull-down at 0:52 is not part of the app.",
+      "intent": "Drops the person straight into the tool, with empty states that point back to the single core action (scan)."
+    },
+    {
+      "n": 10,
+      "t": "0:35",
+      "kind": "app",
+      "subtype": "referral gate",
+      "title": "Top",
+      "body": "Food / Beauty / Invite a friend and access the full list of top products / Ice Cream; Peanut Butter; Muesli & Granolas (open) / Cereal Bars; Dark Chocolate Bars; Candies; Fruit Snacks; Iced Teas; Popcorn; Tortilla Chips; Pretzels and Breadsticks; Puffed Snacks; Crackers (locked) / 0:37 dialog: Share the app with a friend to access the full top products.",
+      "controls": "Segmented Food / Beauty; Invite a friend banner; dialog buttons Close and Invite a friend.",
+      "visual": "Grey list with three open categories (chevrons) and the rest greyed with small padlocks. Tapping a locked row shows a small alert; the person taps Close (0:39). Revisited at 1:13.",
+      "intent": "Gates content behind a referral instead of payment, trading access for word of mouth. Showing three open categories first lets the person taste the feature before the lock."
+    },
+    {
+      "n": 11,
+      "t": "1:16",
+      "kind": "app",
+      "subtype": "contextual pay-what-you-want paywall",
+      "title": "Become a member, support Yuka",
+      "body": "Search tab gate: MEMBER ACCESS / Search for any product / 6 million food and cosmetic products available. / Become a member. Sheet (1:17): MEMBER ACCESS / Become a member, support Yuka / Search: Search any product by its name, without having to scan it. / Offline mode: Scan your items even when your phone has no signal. / Food preferences: Detect the presence of palm oil, gluten, lactose, etc. / Pay what you want / NO COMMITMENT / $15/year / Your participation helps the project to grow. / Payment will be charged to your iTunes account upon purchase confirmation. The subscription will be automatically renewed after 1 year, at the same price, unless it is canceled 24 hours before the renewal at the latest. Your account will be charged for renewal 24 hours before the end of the current period. You can cancel your subscription at any time on App Store account. / Privacy policy • Restore purchase",
+      "controls": "Gate: Become a member. Sheet: X (top left, visible at once); Learn more (under each feature); price slider ($10/year to $20/year, default $15/year); Become a member; Privacy policy; Restore purchase.",
+      "visual": "White sheet slides up almost full height. Feature rows with line icons and green Learn more links, then a carrot mascot in a grey circle above a large green price and a slider. Dragging the slider changes the mascot: at $10/year (1:22) the carrot sinks to just its eyes peeking over the circle edge; at $20/year (1:23) it grows, closes its eyes in a smile and waves. Returned to $15, scrolled back up, closed with X at 1:27 to the same Search gate card; no exit offer or discount. The recording ends in Control Center (1:28).",
+      "intent": "Frames payment as voluntary support for an independent project rather than a purchase, and lets the person choose the price. The mascot's reaction is an emotional nudge: paying less visibly saddens and shrinks the character the person has been bonding with, a gentle guilt cue toward the higher price."
+    }
+  ],
+  "intermission_pattern": "All three intermissions come first, as a swipeable mascot carousel shown before any ask; there are no questions for intermissions to sit between. Each card is one script-font heading, one sentence and a circular illustration on a flat green or orange background, on screen for about one to two seconds here. The tone is friendly and plain, and together the cards build a three-step promise: an independent app (trust), a verdict on products (curiosity), and better alternatives (relief). After the account, a single teaching line (\"Yuka scans the barcodes of your products to analyze them\") works as a bridge to the camera. The mascot then carries the brand voice through every empty state (\"NO PRODUCTS\", \"NO RECOMMENDATIONS\") and finally the paywall, where it reacts to the chosen price.",
+  "standouts": [
+    "Screen 1 leads with \"a completely independent app\" before any feature, setting up trust as the product's core value and the later \"support Yuka\" framing of payment.",
+    "Screen 7 never mentions the camera; it turns the explanation of scanning into a \"Scan a product\" button, so the OS camera prompt on screen 8 feels like the natural next step of the person's own action.",
+    "Screen 10 locks part of a list behind a referral rather than payment, using the free user base as a growth channel.",
+    "Screen 11 lets the person pick their price, but the mascot shrinks and sinks at $10/year and waves happily at $20/year, a light emotional nudge toward paying more."
+  ],
+  "gaps": "No barcode is ever scanned in the recording, so the product result screen, ratings and recommendations are not shown. The email and first name are autofilled and the password comes from a third-party password manager, whose unlock and save sheets (0:24-0:27) are not part of Yuka and are only noted in visuals; the person's email address is left out on purpose. Whether the X on the sign-up sheet skips account creation is not tested. The Notification Center pull-down at 0:52 shows personal notifications and is not transcribed. Learn more links on the paywall are not opened. The pay-what-you-want sheet is outside onboarding (paywall_at null) and is recorded as an app entry. \"other\" counts the three account entries plus the three app entries."
+}

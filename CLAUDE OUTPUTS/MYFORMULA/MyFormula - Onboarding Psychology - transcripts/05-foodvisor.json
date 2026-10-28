@@ -1,0 +1,1074 @@
+{
+  "app": "Foodvisor",
+  "file": "05-foodvisor",
+  "category": "nutrition",
+  "recording": {
+    "length": "6:31",
+    "starts": "partway through onboarding: the first frame is the goal question already greeting 'Hello Cameron!', so any splash and name entry happened before the recording",
+    "onboarding_span": "0:00-3:58",
+    "paywall_at": "3:58",
+    "after_paywall": "Apple sheet dismissed, then a spin-the-wheel exit offer (scripted 10% then 75%), a 75% off countdown offer whose Apple sheet was also dismissed, then the free-tier app with the countdown card on the journal and further in-app paywalls (50% and 76% off)."
+  },
+  "counts": {
+    "questions": 37,
+    "intermissions": 10,
+    "permissions": 0,
+    "loaders": 1,
+    "reveals": 1,
+    "other": 8
+  },
+  "strategy": "Foodvisor runs a long, gentle, chaptered questionnaire (Goal & profile, Your environment, Your habits & behaviour, Your needs) that keeps telling the person their answers are changing their program: live BMI and goal-weight verdicts, a personal summary, and small 'Your program has been updated!' sheets. The arc moves from self-definition and a reassuring body verdict, through lifestyle limits framed as inputs rather than failings, to emotional and identity goals ('build greater self-confidence') right before the price. A science-flavoured loader and a 'We have found your custom program!' beat build anticipation, but the plan itself is only shown as a sales page headed with the person's goal weight. The one idea that carries it is that a personalised program, unlike a generic diet, is what finally works, and every answer visibly feeds that program.",
+  "phases": [
+    {
+      "name": "Hook and goal",
+      "span": "0:00-0:24",
+      "screens": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "goal": "Get the person to define themselves by a goal and their reasons for it within seconds, then reassure them they picked the right app.",
+      "feelings": [
+        "seen",
+        "hope",
+        "relief"
+      ],
+      "mechanisms": [
+        "Personalization signal",
+        "Mirroring",
+        "Validation"
+      ]
+    },
+    {
+      "name": "Body profile and mirror",
+      "span": "0:24-1:37",
+      "screens": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "goal": "Collect body data while rewarding each entry with a verdict, hand it back as a flattering summary, then teach that a generic diet fails and a personalised one succeeds.",
+      "feelings": [
+        "pride",
+        "seen",
+        "trust",
+        "curiosity"
+      ],
+      "mechanisms": [
+        "Validation",
+        "Mirroring",
+        "Authority / education",
+        "Problem agitation"
+      ]
+    },
+    {
+      "name": "Lifestyle, health, privacy and account",
+      "span": "1:37-2:12",
+      "screens": [
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "goal": "Gather constraints and health conditions while promising low effort and data safety, then secure an account while investment is high.",
+      "feelings": [
+        "relief",
+        "safety",
+        "momentum"
+      ],
+      "mechanisms": [
+        "Low-effort framing",
+        "Reassurance / risk removal",
+        "Commitment & consistency"
+      ]
+    },
+    {
+      "name": "Your environment",
+      "span": "2:12-2:42",
+      "screens": [
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "goal": "Make the person feel their real-life circumstances (location, kids, time, desk job, budget) are understood and factored in, and slip in a referral ask.",
+      "feelings": [
+        "understood",
+        "seen",
+        "belonging"
+      ],
+      "mechanisms": [
+        "Mirroring",
+        "Personalization signal",
+        "Social proof",
+        "Reciprocity"
+      ]
+    },
+    {
+      "name": "Your habits and behaviour",
+      "span": "2:42-3:27",
+      "screens": [
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "goal": "Surface eating and exercise habits without shame, show the camera logging as effortless, and lock in small exercise commitments the plan 'adds'.",
+      "feelings": [
+        "momentum",
+        "relief",
+        "commitment"
+      ],
+      "mechanisms": [
+        "Progress / momentum",
+        "Low-effort framing",
+        "Commitment & consistency",
+        "Personalization signal"
+      ]
+    },
+    {
+      "name": "Build and reveal",
+      "span": "3:27-3:39",
+      "screens": [
+        40,
+        41
+      ],
+      "goal": "Make the plan feel earned and evidence-based through a thank-you, a progress bar and science claims, then announce it without showing it.",
+      "feelings": [
+        "anticipation",
+        "trust",
+        "pride"
+      ],
+      "mechanisms": [
+        "Labor illusion",
+        "Authority / education",
+        "Anticipation / reveal"
+      ]
+    },
+    {
+      "name": "Your needs and identity",
+      "span": "3:39-3:58",
+      "screens": [
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50
+      ],
+      "goal": "Have the person choose the features they want and articulate emotional and identity outcomes in the first person, so the paywall can sell back their own words.",
+      "feelings": [
+        "hope",
+        "aspiration",
+        "belonging"
+      ],
+      "mechanisms": [
+        "Future pacing",
+        "Identity / belonging",
+        "Social proof",
+        "Commitment & consistency"
+      ]
+    },
+    {
+      "name": "Paywall",
+      "span": "3:58-4:33",
+      "screens": [
+        51,
+        52
+      ],
+      "goal": "Present the 'program' as a personal deliverable aimed at their goal weight, remove refund worry, then convert on an annual plan framed per month.",
+      "feelings": [
+        "anticipation",
+        "trust",
+        "hope"
+      ],
+      "mechanisms": [
+        "Personalization signal",
+        "Future pacing",
+        "Anchoring",
+        "Reassurance / risk removal"
+      ]
+    },
+    {
+      "name": "Exit offers",
+      "span": "4:33-5:06",
+      "screens": [
+        53,
+        54
+      ],
+      "goal": "Recover a refusal through a gamified 'lucky' discount and a ticking countdown.",
+      "feelings": [
+        "excitement",
+        "urgency",
+        "fear of missing out"
+      ],
+      "mechanisms": [
+        "Scarcity / urgency",
+        "Loss aversion",
+        "Delight / reward"
+      ]
+    },
+    {
+      "name": "Free tier with paywalls",
+      "span": "5:06-6:31",
+      "screens": [
+        55,
+        56,
+        57
+      ],
+      "goal": "Give a first taste of value (calorie goal, logging) while keeping the discount and gated coaching in view.",
+      "feelings": [
+        "reward",
+        "urgency"
+      ],
+      "mechanisms": [
+        "Delight / reward",
+        "Scarcity / urgency",
+        "Anchoring"
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "n": 1,
+      "t": "0:00",
+      "kind": "question",
+      "subtype": "goal",
+      "title": "Hello Cameron! So, what brings you here?",
+      "body": "",
+      "controls": "Options: Losing weight; Gaining muscle and losing fat; Gaining muscle, losing fat is secondary; Eating healthier without losing weight (single-select, auto-advance)",
+      "visual": "Waving avocado mascot on a grey circle above a serif greeting that already uses the person's first name (recording starts after an earlier name step). No progress bar on this first screen. Picked: Gaining muscle and losing fat.",
+      "intent": "Opens on the person's own name and goal, so the first act is self-definition rather than a feature tour.",
+      "mechanisms": [
+        "Personalization signal",
+        "Mood / brand setting"
+      ]
+    },
+    {
+      "n": 2,
+      "t": "0:02",
+      "kind": "question",
+      "subtype": "attribution",
+      "title": "How did you hear about Foodvisor?",
+      "body": "",
+      "controls": "Options: Instagram / Facebook; TikTok; TV; App Store; Friends / Family; Influencer; Online search (Google, etc.); Ad in another app; Chat AI (single-select)",
+      "visual": "Orange 'Goal & profile' tag top-left with a segmented progress bar (one long orange segment for this section, three short grey ones for the sections ahead). Round grey back button.",
+      "mechanisms": []
+    },
+    {
+      "n": 3,
+      "t": "0:05",
+      "kind": "question",
+      "subtype": "referral code",
+      "title": "Enter referral code (optional)",
+      "body": "You can skip this step",
+      "controls": "Text field: Code. Button: Skip",
+      "visual": "Plain white form, single outlined field, dark navy pill button labelled Skip until something is typed.",
+      "mechanisms": [
+        "Low-effort framing"
+      ]
+    },
+    {
+      "n": 4,
+      "t": "0:07",
+      "kind": "question",
+      "subtype": "motivation",
+      "title": "We all have different reasons to gain muscle and lose fat, what are yours?",
+      "body": "This will help us keep you motivated towards your goal.",
+      "controls": "Options: Feel better in my body; Be healthier; Get in shape; Fit in my old clothes; Be more energetic; Move better or improve at a sport; Improve my mental health; For medical reason; Live longer; Other reasons (multi-select). Button: Next",
+      "visual": "The heading repeats the goal picked on screen 1. Long scrolling list of checkbox cards; picked cards turn peach with a green tick. Picked: Get in shape, Be more energetic, Improve my mental health.",
+      "intent": "Echoing the chosen goal in the question shows the answers are being used, and asking for reasons collects emotional motives the summary and paywall reuse later.",
+      "mechanisms": [
+        "Mirroring",
+        "Personalization signal"
+      ]
+    },
+    {
+      "n": 5,
+      "t": "0:18",
+      "kind": "intermission",
+      "subtype": "validation",
+      "title": "You are in the right place!",
+      "body": "We need to confirm some basic information to customize your plan",
+      "controls": "Button: Next",
+      "visual": "Full peach background, avocado mascot lounging against a tree, serif headline. Slides in over the previous question.",
+      "intent": "Reassures the person they chose well before the run of body-measurement questions, and frames the coming data entry as customisation rather than assessment.",
+      "mechanisms": [
+        "Validation",
+        "Reassurance / risk removal",
+        "Personalization signal"
+      ]
+    },
+    {
+      "n": 6,
+      "t": "0:24",
+      "kind": "question",
+      "subtype": "demographic",
+      "title": "What is your gender?",
+      "body": "",
+      "controls": "Options: Male; Female; Non binary; Prefer not to say; Other (single-select)",
+      "visual": "White list of option cards under the 'Goal & profile' tag; progress segment begins to fill.",
+      "mechanisms": []
+    },
+    {
+      "n": 7,
+      "t": "0:26",
+      "kind": "question",
+      "subtype": "demographic",
+      "title": "How old are you?",
+      "body": "",
+      "controls": "Wheel picker (years). Button: Next",
+      "visual": "Large numeric scroll wheel centred on the screen.",
+      "mechanisms": []
+    },
+    {
+      "n": 8,
+      "t": "0:28",
+      "kind": "question",
+      "subtype": "body measurement",
+      "title": "How tall are you?",
+      "body": "",
+      "controls": "Wheel picker feet and inches with a cm / ft unit toggle. Button: Next",
+      "visual": "Two-column scroll wheel (6'.0\" picked) with the unit labels to the right.",
+      "mechanisms": []
+    },
+    {
+      "n": 9,
+      "t": "0:35",
+      "kind": "question",
+      "subtype": "body measurement",
+      "title": "What is your current weight?",
+      "body": "",
+      "controls": "Wheel picker with st / kg / lbs unit toggle. Button: Next",
+      "reaction": "Live card under the picker: 'Your BMI: 23.9' with tag 'Healthy' and 'Great job! You're in a range that supports general health'; at low weights 'Your BMI: 9.4' with tag 'Underweight' and 'Almost there! Focus on balance nutrition to boost your energy'",
+      "visual": "Weight wheel with a live card pinned under it that recalculates BMI on every scroll. The person scrolled through extreme values (69, 112, 119 lbs) and the card switched from a green 'Healthy' tag to a blue 'Underweight' tag and back. Settled at 165.4 lbs, BMI 22.4.",
+      "intent": "The live card turns a data-entry chore into instant feedback about the person's body, rewarding a 'healthy' result with praise so they keep going.",
+      "mechanisms": [
+        "Validation",
+        "Personalization signal",
+        "Delight / reward"
+      ]
+    },
+    {
+      "n": 10,
+      "t": "1:03",
+      "kind": "intermission",
+      "subtype": "personal summary",
+      "title": "Your personal summary",
+      "body": "Man / 39 years old / 6.0 ft / 165.4 lbs / Body Mass Index (BMI) 22.4 / Underweight Healthy Overweight Obese / Healthy BMI You're right where you need to be! It's a perfect base to tone your body and build sustainable habits. / Goal Gaining muscle and losing fat / Motivation Get in shape, Be more energetic, Improve my mental health",
+      "controls": "Button: Next",
+      "visual": "Light blue header, avocado mascot peeking over the chip row, BMI scale bar (12 / 18 / 25 / 30 / 50) with a green marker on Healthy, flag icon for goal and heart for motivation. At 1:09 to 1:16 the person went back through weight, height and age to correct the age from 39 to 24, then returned to the same summary (1:17 to 1:21) now showing '24 years old'.",
+      "intent": "Hands every answer so far back as a tidy profile card with a verdict, proving the app is listening and making it easy to spot and fix mistakes; the positive BMI line frames the person as a good starting point, not a problem.",
+      "mechanisms": [
+        "Mirroring",
+        "Validation",
+        "Personalization signal",
+        "Progress / momentum"
+      ]
+    },
+    {
+      "n": 11,
+      "t": "1:21",
+      "kind": "question",
+      "subtype": "goal weight",
+      "title": "What's your ideal weight?",
+      "body": "",
+      "controls": "Wheel picker with st / kg / lbs. Link: Skip this step. Button: Next (appears once a value is moved)",
+      "reaction": "Card under the picker: 'Weight gain: 3%' with green tag 'Realistic' and 'This is a safe and realistic weight gain goal with noticeable health benefits'",
+      "visual": "Same wheel style as current weight; starts at the current weight with only a 'Skip this step' link. Once moved to 170.4 lbs a live card appears below.",
+      "intent": "The live card judges the target as realistic, nudging the person toward a modest, achievable goal and pre-justifying the plan that will be built around it.",
+      "mechanisms": [
+        "Validation",
+        "Reassurance / risk removal",
+        "Personalization signal"
+      ]
+    },
+    {
+      "n": 12,
+      "t": "1:29",
+      "kind": "question",
+      "subtype": "pace",
+      "title": "What pace do you want to achieve your goal?",
+      "body": "",
+      "controls": "Slider with three stops: Slowly but surely; In the middle; As fast as possible. Button: Next",
+      "visual": "Orange slider with foot, bicycle and rocket icons above the stops. Default In the middle; the person dragged it to As fast as possible.",
+      "mechanisms": [
+        "Commitment & consistency"
+      ]
+    },
+    {
+      "n": 13,
+      "t": "1:34",
+      "kind": "intermission",
+      "subtype": "fact / education",
+      "title": "There is no 1-size-fits-all diet.",
+      "body": "Foodvisor finds what works for you to reach your personal goals.",
+      "controls": "Button: Next",
+      "visual": "Full teal background, serif headline, white card with an animated chart that draws in stages: a grey U-shaped 'Generic program' curve that dips then rebounds, then a 'Weight' start marker, then a green 'Your Foodvisor program' line that falls steadily and stays down.",
+      "intent": "Placed right after the person has set a target and an aggressive pace, it teaches that generic diets rebound and positions a personalised plan as the only reliable route, preparing them to value what the questionnaire is building.",
+      "mechanisms": [
+        "Authority / education",
+        "Problem agitation",
+        "Personalization signal",
+        "Future pacing"
+      ]
+    },
+    {
+      "n": 14,
+      "t": "1:37",
+      "kind": "question",
+      "subtype": "lifestyle",
+      "title": "Your daily life affects your weight. How would you describe your lifestyle?",
+      "body": "",
+      "controls": "Options: Student; Employed part-time; Employed full-time; Not employed; Retired (single-select)",
+      "visual": "Prefaced by a one-line fact as part of the question. Picked: Employed part-time (peach highlight).",
+      "mechanisms": [
+        "Authority / education"
+      ]
+    },
+    {
+      "n": 15,
+      "t": "1:40",
+      "kind": "question",
+      "subtype": "time commitment",
+      "title": "We will adapt your program to fit into your daily routine How much time do you want to spend on Foodvisor per day?",
+      "body": "",
+      "controls": "Options: 0-5 min; 5-10 min; 10-15 min (single-select)",
+      "reaction": "Bottom sheet: 'Your program has been updated!' / 'Foodvisor is tailored to your needs, and we'll create a program that doesn't take more than 5 minutes a day.' Button: Next",
+      "visual": "Picked 0-5 min. A peach bottom sheet with a clipboard-and-tick icon then slides up over the dimmed question.",
+      "intent": "The sheet confirms the shortest commitment as fine and recasts it as a change to 'your program', so a low-effort answer feels rewarded rather than judged.",
+      "mechanisms": [
+        "Low-effort framing",
+        "Personalization signal",
+        "Reassurance / risk removal"
+      ]
+    },
+    {
+      "n": 16,
+      "t": "1:48",
+      "kind": "question",
+      "subtype": "dietary restrictions",
+      "title": "Do you have any dietary restrictions or food allergies?",
+      "body": "",
+      "controls": "Options: Yes; No (single-select)",
+      "visual": "Broccoli and bread illustration above two side-by-side buttons. Picked: No.",
+      "mechanisms": []
+    },
+    {
+      "n": 17,
+      "t": "1:52",
+      "kind": "question",
+      "subtype": "health conditions",
+      "title": "Have you ever had any of the following conditions?",
+      "body": "",
+      "controls": "Options: Hypertension or high blood pressure; Diabetes; Depression; Eating disorders (Anorexia, Bulimia); Other; None (multi-select). Button: Next",
+      "visual": "Checkbox cards. The person first ticked Eating disorders (Anorexia, Bulimia), the Next button appeared, then they unticked it and ticked None. No screen in the recording reacts to the eating-disorder answer.",
+      "mechanisms": []
+    },
+    {
+      "n": 18,
+      "t": "1:56",
+      "kind": "intermission",
+      "subtype": "reassurance / privacy",
+      "title": "Your privacy matters",
+      "body": "Your personal data is only used to give you personalized nutritional advice / We do not share your personal data with third parties / Your data stays between you and us / Terms & conditions · Privacy policy",
+      "controls": "Checkbox: I have read and accepted the terms and conditions and the privacy policy. Button: Apply (appears after ticking)",
+      "visual": "Pale lime background, avocado mascot hiding behind a door with a no-entry sign, three icon rows (apple, padlock, mask). The Apply button only appears once the box is ticked.",
+      "intent": "Comes straight after the health-conditions question and just before sign-up, so it eases the discomfort of having shared medical details and doubles as the legal consent gate for account creation.",
+      "mechanisms": [
+        "Reassurance / risk removal",
+        "Commitment & consistency"
+      ]
+    },
+    {
+      "n": 19,
+      "t": "1:58",
+      "kind": "account",
+      "subtype": "sign-up",
+      "title": "Create your account",
+      "body": "Register your account to save your settings. / By continuing, I accept the Terms of Service and Privacy Policy.",
+      "controls": "Buttons: Sign in with Apple; Continue with Google; Continue with Email",
+      "visual": "Cactus and bathroom-scale illustration. The person chose Google: iOS alert '“Foodvisor” Wants to Use “accounts.google.com” to Sign In' (Cancel / Continue), Google 'Choose an account' and 'Sign in to Foodvisor' sheets (2:02 to 2:08), a 'Loading...' screen with the avocado pulling a wagon (2:09), then back to Create your account at 2:11 before the next section starts.",
+      "intent": "Account creation sits mid-funnel, after about 18 answers, so the person has enough invested to accept it and the app can save the profile (and remarket) before the paywall.",
+      "mechanisms": [
+        "Effort justification",
+        "Commitment & consistency"
+      ]
+    },
+    {
+      "n": 20,
+      "t": "2:12",
+      "kind": "intermission",
+      "subtype": "section intro",
+      "title": "Your environment has a huge impact on how you can reach your goal.",
+      "body": "The following questions will help us better understand what you'll be able to do or not.",
+      "controls": "Button: Next",
+      "visual": "Sage-green full background, new dark green 'Your environment' tag, water glass and salad bowl illustration, serif headline. Progress bar resets to a new section.",
+      "intent": "Opens a new chapter and frames the next questions as fitting the plan around real-life limits, which lowers the pressure to give 'ideal' answers.",
+      "mechanisms": [
+        "Progress / momentum",
+        "Authority / education",
+        "Personalization signal"
+      ]
+    },
+    {
+      "n": 21,
+      "t": "2:14",
+      "kind": "question",
+      "subtype": "location",
+      "title": "Men at 24 wanting to gain muscle and lose fat might need a different approach based on their location. Where do you live, Cameron?",
+      "body": "",
+      "controls": "Options: In the city; In the suburbs; The country; Other (single-select)",
+      "visual": "The lead-in line is assembled from the person's sex, age and goal, and the question uses their name. Picked: In the suburbs.",
+      "mechanisms": [
+        "Mirroring",
+        "Personalization signal"
+      ]
+    },
+    {
+      "n": 22,
+      "t": "2:20",
+      "kind": "question",
+      "subtype": "family",
+      "title": "Having kids has a huge impact on one's life! Are you the parent or guardian of a teen or young child?",
+      "body": "",
+      "controls": "Options: Yes; No",
+      "visual": "Baby bottle and cookie illustration above two buttons.",
+      "mechanisms": [
+        "Validation"
+      ]
+    },
+    {
+      "n": 23,
+      "t": "2:23",
+      "kind": "question",
+      "subtype": "time / self-care",
+      "title": "Between job demands, social responsibilities, and household chores, it can seem difficult to find time for oneself. Are you still able to make time for the things that truly matter to you?",
+      "body": "",
+      "controls": "Options: Yes; No",
+      "visual": "Avocado mascot sitting on a calendar. Picked: Yes.",
+      "mechanisms": [
+        "Validation",
+        "Absolution / reframe"
+      ]
+    },
+    {
+      "n": 24,
+      "t": "2:29",
+      "kind": "question",
+      "subtype": "activity",
+      "title": "In a typical day, are you mostly active or seated?",
+      "body": "",
+      "controls": "Options: Active; Seated (single-select)",
+      "reaction": "Bottom sheet: 'Your nutritional goal has been updated!' / 'We take this factor into account in your personalized program' Button: Next",
+      "visual": "Picked Seated. A sage bottom sheet with a target-and-tick icon then slides up.",
+      "intent": "Turns a sedentary admission into a visible plan adjustment, so the answer feels useful rather than shameful.",
+      "mechanisms": [
+        "Personalization signal",
+        "Absolution / reframe"
+      ]
+    },
+    {
+      "n": 25,
+      "t": "2:33",
+      "kind": "question",
+      "subtype": "budget",
+      "title": "Would you say that money is a factor in your health journey?",
+      "body": "",
+      "controls": "Options: Yes; No",
+      "visual": "Fork, knife and pink piggy bank illustration.",
+      "mechanisms": []
+    },
+    {
+      "n": 26,
+      "t": "2:37",
+      "kind": "intermission",
+      "subtype": "stat / social proof",
+      "title": "Foodvisor is better together",
+      "body": "People who successfully refer friends or family can reach their goal 32% faster during their program.",
+      "controls": "Button: Next",
+      "visual": "Sage background, three avocados marching beside a '+32%' badge with a rising arrow. No source given for the figure.",
+      "intent": "Primes the referral ask on the next screen with an unsourced speed claim, so recruiting friends feels like it serves the person's own goal.",
+      "mechanisms": [
+        "Social proof",
+        "Future pacing",
+        "Identity / belonging"
+      ]
+    },
+    {
+      "n": 27,
+      "t": "2:38",
+      "kind": "question",
+      "subtype": "referral offer",
+      "title": "Would you like to gift 2 free weeks of Foodvisor to a friend or family member?",
+      "body": "You’ll benefit from faster results and you’ll get a $20 Amazon gift card when they sign up!",
+      "controls": "Options: Yes; No",
+      "visual": "Key phrases in bold ('2 free weeks', 'Foodvisor', 'faster results'). Picked: No.",
+      "intent": "A growth ask dressed as a question; it ties the referral to the person's results and a cash-like reward.",
+      "mechanisms": [
+        "Reciprocity",
+        "Future pacing"
+      ]
+    },
+    {
+      "n": 28,
+      "t": "2:42",
+      "kind": "intermission",
+      "subtype": "section intro",
+      "title": "Almost done! Let’s talk about your nutrition & physical activity.",
+      "body": "A well-rounded diet and regular physical activity are key to maintaining good health and well-being. Let's find out how we can help you make healthier choices and enhance your overall wellness.",
+      "controls": "Button: Next",
+      "visual": "Light blue background, new blue 'Your habits & behaviour' tag, water bottle, trainer and dumbbell illustration.",
+      "intent": "'Almost done!' manages fatigue at roughly the two-thirds mark, even though about 25 more screens remain, and frames the next block as help rather than judgement.",
+      "mechanisms": [
+        "Progress / momentum",
+        "Authority / education"
+      ]
+    },
+    {
+      "n": 29,
+      "t": "2:43",
+      "kind": "question",
+      "subtype": "snacking",
+      "title": "Would you say that snacking is an issue for you?",
+      "body": "",
+      "controls": "Options: Yes; No",
+      "visual": "Ice lolly and cookie illustration.",
+      "mechanisms": []
+    },
+    {
+      "n": 30,
+      "t": "2:46",
+      "kind": "question",
+      "subtype": "self-assessment",
+      "title": "Which statement is most applicable to you?",
+      "body": "",
+      "controls": "Options: My diet is mostly healthy; My diet needs a lot of work (single-select)",
+      "visual": "Two plain option cards.",
+      "mechanisms": []
+    },
+    {
+      "n": 31,
+      "t": "2:48",
+      "kind": "question",
+      "subtype": "eating pattern",
+      "title": "For you, when is it the hardest to eat healthy?",
+      "body": "",
+      "controls": "Options: Breakfast; Lunch; Dinner (single-select)",
+      "visual": "Three plain option cards.",
+      "mechanisms": []
+    },
+    {
+      "n": 32,
+      "t": "2:52",
+      "kind": "question",
+      "subtype": "barriers",
+      "title": "Why?",
+      "body": "",
+      "controls": "Options: It’s hard to eat differently than everyone else; I don’t have time to cook; I don’t know what is healthy; I don’t have easy access to healthy food; Other (multi-select). Button: Next",
+      "visual": "Follow-up to the previous answer. Picked: I don’t have time to cook.",
+      "mechanisms": []
+    },
+    {
+      "n": 33,
+      "t": "2:57",
+      "kind": "question",
+      "subtype": "habit",
+      "title": "How often do you drink soda?",
+      "body": "",
+      "controls": "Options: All day, everyday; Pretty much everyday; 4-5 times a week; Once a week minimum; Not that often (single-select)",
+      "visual": "Plain option cards.",
+      "mechanisms": []
+    },
+    {
+      "n": 34,
+      "t": "3:04",
+      "kind": "question",
+      "subtype": "commitment",
+      "title": "What are you willing to do to achieve your goal?",
+      "body": "",
+      "controls": "Options: Follow a specific diet; Do some physical activity; Add meals; Count calories; Other (multi-select). Button: Next",
+      "visual": "Picked: Follow a specific diet, Do some physical activity, Add meals.",
+      "mechanisms": [
+        "Commitment & consistency"
+      ]
+    },
+    {
+      "n": 35,
+      "t": "3:08",
+      "kind": "intermission",
+      "subtype": "feature demo",
+      "title": "Log your food in seconds!",
+      "body": "No need to search manually for each food to get its calories. You can log your food 4x faster on Foodvisor, just by hovering your phone camera over it!",
+      "controls": "Button: Next",
+      "visual": "Light blue screen; a camera viewfinder frame animates in over a breakfast plate and tags appear on the food ('Wholewheat bread', 'Fried egg', 'Avocado').",
+      "intent": "Breaks up a long run of habit questions with the app's signature feature, answering the 'no time to cook / no time' worry just expressed and showing the logging chore as effortless.",
+      "mechanisms": [
+        "Low-effort framing",
+        "Delight / reward",
+        "Authority / education"
+      ]
+    },
+    {
+      "n": 36,
+      "t": "3:11",
+      "kind": "question",
+      "subtype": "exercise frequency",
+      "title": "Do you work out?",
+      "body": "",
+      "controls": "Options: 6-7 days a week; 3-5 days a week; 1-2 days a week; Less than that; Not at all (single-select)",
+      "visual": "Plain option cards.",
+      "mechanisms": []
+    },
+    {
+      "n": 37,
+      "t": "3:15",
+      "kind": "question",
+      "subtype": "readiness",
+      "title": "At Foodvisor, we will never tell you to do something that you are not ready for. Do you feel ready to work out?",
+      "body": "",
+      "controls": "Options: Yes; No",
+      "reaction": "Bottom sheet: 'Added to your plan!' / 'Experience the benefits of our custom workout program, tailored to your specific goals and preferences for optimal results and well-being.' Button: Next",
+      "visual": "Shorts, water bottle and dumbbell illustration. Picked Yes; a light blue bottom sheet with a dumbbell-plus icon slides up.",
+      "intent": "The opening promise lowers pressure before a commitment question, and the sheet then turns 'Yes' into a concrete feature added to the plan.",
+      "mechanisms": [
+        "Reassurance / risk removal",
+        "Commitment & consistency",
+        "Personalization signal"
+      ]
+    },
+    {
+      "n": 38,
+      "t": "3:22",
+      "kind": "question",
+      "subtype": "fitness level",
+      "title": "What is your fitness level?",
+      "body": "",
+      "controls": "Options: Beginner; Intermediate; Advanced; Expert (single-select)",
+      "visual": "Plain option cards.",
+      "mechanisms": []
+    },
+    {
+      "n": 39,
+      "t": "3:24",
+      "kind": "question",
+      "subtype": "schedule",
+      "title": "Based on your profile, working out 3 days a week will have the best effect! Which days are you willing to workout with Foodvisor?",
+      "body": "",
+      "controls": "Options: Monday; Tuesday; Wednesday; Thursday; Friday; Saturday; Sunday (multi-select). Button: Next",
+      "visual": "Recommendation line followed by a day list. Picked: Tuesday, Wednesday.",
+      "mechanisms": [
+        "Personalization signal",
+        "Commitment & consistency",
+        "Authority / education"
+      ]
+    },
+    {
+      "n": 40,
+      "t": "3:27",
+      "kind": "loader",
+      "subtype": "plan building with claims",
+      "title": "Thank you for sharing your story.",
+      "body": "Foodvisor is backed by multiple behavioral studies. / 73% of our users saw visible results within 14 days. / Our program combines daily coaching with cognitive sciences. / Creating your custom program",
+      "controls": "None (auto-advances)",
+      "visual": "Light blue screen, small 'Thank you / for sharing your story.' line on top, three serif claim cards rotating with diagrams (brain with Prefrontal cortex / Nucleus accumbens / VTA labels; donut 73% / 27%; Cue / Routine / Reward loop with a trophy) above a progress bar labelled 'Creating your custom program'. About 9 seconds.",
+      "intent": "Thanks the person for the effort they just made, then fills the wait with science-flavoured and statistical claims (no sources) so the coming plan feels evidence-based and results feel likely and quick.",
+      "mechanisms": [
+        "Labor illusion",
+        "Authority / education",
+        "Social proof",
+        "Effort justification",
+        "Anticipation / reveal"
+      ]
+    },
+    {
+      "n": 41,
+      "t": "3:36",
+      "kind": "reveal",
+      "subtype": "plan found",
+      "title": "We have found your custom program!",
+      "body": "Achieve lasting success!",
+      "controls": "Button: Next",
+      "visual": "Same light blue; avocado mascot ticking off a clipboard checklist. No plan details are shown.",
+      "intent": "Announces a result to release the tension built by the loader, but holds back any content so curiosity carries the person through one more section of questions.",
+      "mechanisms": [
+        "Anticipation / reveal",
+        "Curiosity / open loop",
+        "Delight / reward"
+      ]
+    },
+    {
+      "n": 42,
+      "t": "3:39",
+      "kind": "question",
+      "subtype": "interests",
+      "title": "What would you be interested in learning about?",
+      "body": "",
+      "controls": "Options: Nutrition; Habit creation; Stress management; Motivation helpers; Behavior change; Sleep; Other (multi-select). Button: Next",
+      "visual": "New navy 'Your needs' tag; earlier three sections shown as completed dashes in the progress bar. Picked: Nutrition, Habit creation.",
+      "mechanisms": []
+    },
+    {
+      "n": 43,
+      "t": "3:42",
+      "kind": "question",
+      "subtype": "feature wishlist",
+      "title": "Foodvisor is fully customized to your needs. What would your perfect program include?",
+      "body": "",
+      "controls": "Options: Healthy & delicious recipes; A personal nutritionist (a human one); Food recognition to log your meal; Water challenge; Workout routine; Calorie and macro tracker; Cognitive Behavioral Therapy (CBT); Tailored meal plans (multi-select). Button: Next",
+      "visual": "Picked: Healthy & delicious recipes, A personal nutritionist (a human one).",
+      "intent": "Lets the person self-select the features they want, which the paywall then presents as 'what you get'.",
+      "mechanisms": [
+        "Commitment & consistency",
+        "Personalization signal"
+      ]
+    },
+    {
+      "n": 44,
+      "t": "3:44",
+      "kind": "question",
+      "subtype": "priority",
+      "title": "For your custom program to be successful, what is the most important factor to you?",
+      "body": "",
+      "controls": "Options: Seeing fast results; Being able to eat everything; Easy to follow; Other (single-select)",
+      "visual": "Picked: Easy to follow. During the transition a button reading 'Set my first goal' is briefly visible at the bottom before the next screen settles.",
+      "mechanisms": []
+    },
+    {
+      "n": 45,
+      "t": "3:45",
+      "kind": "intermission",
+      "subtype": "quote / reframe",
+      "title": "A goal without a plan is just a wish.",
+      "body": "Setting small achievable goals allows for more frequent wins. More wins keep you motivated and help you crush more goals!",
+      "controls": "Button: Next",
+      "visual": "Periwinkle full background, avocado mascot pointing at a clipboard checklist, scattered confetti dots.",
+      "intent": "Reframes success as many small wins right after the person chose 'Easy to follow', and implies that having a plan (the product) is what separates a goal from a wish.",
+      "mechanisms": [
+        "Absolution / reframe",
+        "Future pacing",
+        "Authority / education"
+      ]
+    },
+    {
+      "n": 46,
+      "t": "3:46",
+      "kind": "question",
+      "subtype": "short-term outcome",
+      "title": "What would success look like in 2 weeks?",
+      "body": "",
+      "controls": "Options: Feel more energized; See a weight loss; Visible muscle gain; Sleep better; Run a race (5k, marathon, etc.); Other (single-select)",
+      "visual": "Plain option cards; picked Other.",
+      "mechanisms": [
+        "Future pacing"
+      ]
+    },
+    {
+      "n": 47,
+      "t": "3:48",
+      "kind": "intermission",
+      "subtype": "social proof / press",
+      "title": "Great choice! Millions of users have reached their goals with Foodvisor.",
+      "body": "More than 50,000 ratings / App of the Day / Editor’s Choice / As seen on",
+      "controls": "Button: Next",
+      "visual": "Five yellow stars, laurel badges, press logos (Good Morning America, CBS, Men's Health, Forbes) and a tilted app screenshot (macro ring '32 / 73 g Fat', 'My tools', 'Meal Plans') sliding in on the right.",
+      "intent": "Praises the answer just given ('Great choice!') and immediately stacks ratings, store awards and press logos so the decision to continue feels shared by millions.",
+      "mechanisms": [
+        "Social proof",
+        "Validation",
+        "Authority / education"
+      ]
+    },
+    {
+      "n": 48,
+      "t": "3:51",
+      "kind": "question",
+      "subtype": "emotional outcome",
+      "title": "What feelings are you hoping to achieve with Foodvisor?",
+      "body": "",
+      "controls": "Options: Peace; Happiness; Gratitude; Empowerment; Revitalized; Other (multi-select). Button: Next",
+      "visual": "Picked: Happiness, Gratitude.",
+      "mechanisms": [
+        "Future pacing",
+        "Identity / belonging"
+      ]
+    },
+    {
+      "n": 49,
+      "t": "3:53",
+      "kind": "question",
+      "subtype": "identity outcome",
+      "title": "With Foodvisor, my goal is to build greater...",
+      "body": "",
+      "controls": "Options: Self-confidence; Self-worth; Self-awareness; Self-acceptance; Self-care; Other (multi-select). Button: Next",
+      "visual": "Sentence-completion format in the first person. Picked: Self-confidence.",
+      "mechanisms": [
+        "Identity / belonging",
+        "Commitment & consistency"
+      ]
+    },
+    {
+      "n": 50,
+      "t": "3:55",
+      "kind": "question",
+      "subtype": "aspiration",
+      "title": "When I reach my goal, I'd love to...",
+      "body": "",
+      "controls": "Options: Eat more mindfully; Enjoy all foods guilt-free; Live outside my comfort zone; Have a more vibrant social life; Worry less about my body; Put my needs first; Other (multi-select). Button: Next",
+      "visual": "First-person sentence completion as the last question before the paywall. Picked: Eat more mindfully, Enjoy all foods guilt-free.",
+      "mechanisms": [
+        "Future pacing",
+        "Identity / belonging"
+      ]
+    },
+    {
+      "n": 51,
+      "t": "3:58",
+      "kind": "paywall",
+      "subtype": "personalized program sales page",
+      "title": "Your personalized program",
+      "body": "to reach 170.4 lbs sustainably / We created this program based on your unique profile, and this is what you get. / Advice to reach your goal: End of week 1 You'll feel better and start creating healthier habits. ... End of week 4 You'll get your first results on the scale, congrats! / Hundreds of healthy recipes: Mango Mint Green Smoothie 150 Cal 10 min of preparation; Sweet and sour veggie wok 269 Cal 50 min; Mapo tofu 502 Cal 70 min / A support community: Get help and tips from others that are on the same journey / Tools to visualize and track your achievements: Carbs Protein Fat Fiber, On track, Off track, Congrats! You are right on track. Keep going and you'll see results in no time! / Join 4 million happy users: Editor's choice, 4.5/5 over +60k ratings, 4.5/5 over +15k ratings / Success stories from our clients: I've tried other apps to try to manage my weight, but Foodvisor has been the best by far! Lynn; After 60 days I los[unreadable] detection works g[unreadable] easy and fast. Peter / Common questions: How is my program designed? ... What does the Foodvisor program include? ... Can I get a refund or cancel my subscription anytime? Yes, you can get your money back or cancel anytime. If the Premium version does not meet your expectations, do not hesitate to let us know before canceling your subscription. There may be features which you have missed. Contact the Apple Store support directly for processing a request for refund. Foodvisor does not handle any transaction, all payments are directly done via Apple Store.",
+      "controls": "Button: Continue (pinned). No close or skip.",
+      "visual": "Long scrolling light blue page with serif section headings: clipboard and food hero with the goal weight in the subtitle, swipeable milestone cards, recipe carousel, pink hands illustration, macro bar mock, mascot with hearts, review cards, FAQ. The person scrolled to the bottom and back to the top (3:58 to 4:14). No prices anywhere.",
+      "intent": "Doubles as the plan reveal: the person's own goal weight is the headline, and every block reframes a feature as something 'you get', with milestones that promise results in four weeks. Ending on a plain refund FAQ lowers risk before the price appears. There is no visible exit.",
+      "mechanisms": [
+        "Personalization signal",
+        "Future pacing",
+        "Social proof",
+        "Anticipation / reveal",
+        "Reassurance / risk removal",
+        "Mirroring"
+      ]
+    },
+    {
+      "n": 52,
+      "t": "4:14",
+      "kind": "paywall",
+      "subtype": "plan picker",
+      "title": "Begin your Foodvisor journey!",
+      "body": "Most popular Yearly plan 12 mo · $83.99 $6.99 / mo / Family plan 12 mo · $119.99 $9.99 / mo (tag '2 - 6 members' when selected) / View all plans / Cancel at any time / Restore purchase | Terms & conditions",
+      "controls": "Link: Not now (top right). Plan cards: Yearly plan (pre-selected), Family plan. Button: Continue",
+      "visual": "Light blue sky with avocado mascot, sunrise and trees; selected card gets an orange outline and tab. The person tapped Family, then back to Yearly, then Continue (4:29 'Loading ...'); Apple sheet at 4:31: 'Foodvisor Premium', '$83.99 per year', 'Cancel anytime in Settings > Apple Account at least a day before each renewal date. Plan automatically renews until canceled.', 'Confirm with Side Button'. The person closed it. No free trial.",
+      "intent": "Leads with the per-month equivalent in large type and the annual total in small type, pre-selects the yearly plan, and keeps the exit as a faint 'Not now'.",
+      "mechanisms": [
+        "Anchoring",
+        "Reassurance / risk removal",
+        "Low-effort framing"
+      ]
+    },
+    {
+      "n": 53,
+      "t": "4:33",
+      "kind": "exit",
+      "subtype": "spin-the-wheel discount",
+      "title": "Get a better deal",
+      "body": "Try your luck to save up to 75% forever! / sheet: It's not over yet! 10% off is already great, but who knows? Your next spin might bring even more luck!",
+      "controls": "Button: Spin the wheel; then sheet button: Spin Again",
+      "visual": "Shown immediately after the Apple sheet is dismissed. Orange ribbon banner, prize wheel with 5% / 10% / 15% / 25% wedges and one red gift wedge. First spin (4:35 to 4:43) lands on 10% and a white bottom sheet with a star-eyed emoji offers 'Spin Again'; second spin (4:48 to 4:55) lands on the gift wedge and confetti bursts (4:57).",
+      "intent": "Converts a refusal into a game of chance whose outcome is scripted: a small first prize sets up 'one more try', and the jackpot on the second spin manufactures a feeling of luck and winning. This is manipulative: the discount is not luck.",
+      "mechanisms": [
+        "Scarcity / urgency",
+        "Delight / reward",
+        "Anchoring",
+        "Curiosity / open loop"
+      ]
+    },
+    {
+      "n": 54,
+      "t": "4:58",
+      "kind": "exit",
+      "subtype": "discount offer with countdown",
+      "title": "Congratulations!",
+      "body": "You have unlocked 75% off! Don’t miss this opportunity. / -75% / Special Offer / 00 days 00 hr 09 min 35 sec / $1.99 /month 12 months for $23.99 / review cards (Lynn, Peter)",
+      "controls": "Small x top-left. Button: Continue",
+      "visual": "Gift box with party-hat avocado, confetti, a 'Special Offer' card with an orange -75% corner ribbon and a live countdown starting at 9 min 35 sec. The person tapped Continue: Apple sheet at 5:04 'Foodvisor Premium', '$23.99 per year', then dismissed it and the app opened at 5:06.",
+      "intent": "Frames the price as a prize already won and adds a ticking clock so leaving feels like losing something; the per-month figure again leads.",
+      "mechanisms": [
+        "Scarcity / urgency",
+        "Loss aversion",
+        "Anchoring",
+        "Delight / reward",
+        "Social proof"
+      ]
+    },
+    {
+      "n": 55,
+      "t": "5:06",
+      "kind": "app",
+      "subtype": "first-run setup",
+      "title": "Here’s your daily nutritional goal",
+      "body": "2551 Calorie goal / 57g fat 179g protein 319g carbs 26g fiber / Log your foods to reach your daily goal / It's easy and fun! Just fill your circle / Great day! / Start by logging your most recent meal",
+      "controls": "Buttons: Next; meal choices Breakfast, Lunch, Dinner; link I haven't eaten yet today",
+      "visual": "5:06 to 5:28: calorie ring over a camping scene with confetti, an animated tutorial filling the ring with three meal icons, then a meal picker. The journal behind it (5:27) already carries the same -75% 'Special Offer' countdown card at the top of the Today list.",
+      "intent": "Delivers the long-awaited number from the questionnaire as the first free-tier value, while the offer card keeps the discount and clock in view.",
+      "mechanisms": [
+        "Delight / reward",
+        "Personalization signal",
+        "Scarcity / urgency"
+      ]
+    },
+    {
+      "n": 56,
+      "t": "5:28",
+      "kind": "app",
+      "subtype": "logging tools tour",
+      "title": "Lunch",
+      "body": "Don’t forget, you can always take a Photo, we will recognize your food! / You can search food here ... / Scan barcodes to log foods! / Find your favorites here. Add them by clicking on the or clicking Create!",
+      "controls": "Tabs: Barcode; Search; Photo; Quick Add; My foods. Buttons: Got it; Get started!",
+      "visual": "5:28 to 5:54: teal logging sheet with tooltip coach marks, barcode scanner demo, favourites empty state, then the Journal tab with Activities (Connect Health), Water Challenge and Notes cards, and the Special Offer countdown still ticking (about 8 min left).",
+      "intent": "Shows the free logging tools working so the app feels usable without paying, with the discount timer persistent on the home tab.",
+      "mechanisms": [
+        "Low-effort framing",
+        "Scarcity / urgency"
+      ]
+    },
+    {
+      "n": 57,
+      "t": "5:55",
+      "kind": "app",
+      "subtype": "in-app paywalls",
+      "title": "Unlock your personalized program",
+      "body": "50% discount / Access to a personalized daily coaching experience / later: 76% off just for you! on the 'Your personalized program' page / Begin your Foodvisor journey! plan picker again",
+      "controls": "Button: Unlock my offer; Continue; Not now",
+      "visual": "5:55 to 6:31: the Coach tab is gated by a peach '50% discount' sheet; 'Unlock my offer' reopens the program sales page now with a green '76% off just for you!' badge (6:00), which leads to the same plan picker at the undiscounted $6.99 / mo and $83.99 (6:04 to 6:10). The person backs out, the journal reloads (6:20) with the countdown still running, then visits Profile (weight chart, goal 170.4 lbs, 2551 Cal / d) and the recording ends in Control Center.",
+      "intent": "Keeps reselling the same plan from inside the app with three different discount figures (50%, 75%, 76%) in two minutes, one of which leads to full prices; the inconsistency undercuts the urgency it tries to create.",
+      "mechanisms": [
+        "Scarcity / urgency",
+        "Anchoring",
+        "Loss aversion"
+      ]
+    }
+  ],
+  "intermission_pattern": "Foodvisor uses about ten full-screen intermissions across roughly 37 questions (about one every four questions), plus three answer-triggered bottom sheets ('Your program has been updated!' after the time question, 'Your nutritional goal has been updated!' after active or seated, 'Added to your plan!' after readiness to work out) and two live verdict cards on the weight pickers. They cluster at section boundaries: each coloured chapter opens with a full-bleed section intro in its own colour ('You are in the right place!', 'Your environment has a huge impact...', 'Almost done! Let's talk about...'), and in-section beats are short one-idea statements in serif type with a mascot or diagram. Tone is warm, coach-like and non-judgemental ('we will never tell you to do something that you are not ready for'), and many questions carry a one-line fact or mirror of the person's own data as a preamble, blurring question and intermission. Collectively they build three beliefs before the price: every answer changes the program, a personalised program beats generic diets, and millions of people and science back it. The proof points (32% faster, 73% within 14 days, 4 million users, press logos) are unsourced.",
+  "standouts": [
+    "Screens 9 and 11 put a live verdict card under the weight wheels ('Your BMI: 22.4 Healthy', 'Weight gain: 3% Realistic') that recalculates as the person scrolls, turning data entry into instant feedback.",
+    "Screen 10's 'Your personal summary' replays sex, age, height, weight, BMI scale, goal and motivations as chips and a scale bar; the person used it to notice and go back to fix a wrong age.",
+    "The answer-triggered bottom sheets after screens 15, 24 and 37 make even 'low' answers (0-5 min a day, mostly seated) feel like they improved the plan rather than exposed a weakness.",
+    "Screen 53's spin-the-wheel is scripted to land on 10% first, offer 'Spin Again', then hit the 75% gift, a manufactured-luck exit offer followed by a 9-minute countdown that keeps ticking inside the app."
+  ],
+  "gaps": "The recording starts at the goal question, so any splash, intro carousel or name entry is not shown. The second review card on the paywall is cut off at the right edge ('After 60 days I los[unreadable]'). The Google sign-in round trip at 1:58 to 2:11 returns to 'Create your account' and it is not clear whether sign-in succeeded. Screen 44 briefly shows a 'Set my first goal' button during the transition that may belong to screen 45. The sheets after the paywall exit (5:06 onward) were reviewed by sampling sheets 40 to 56 rather than frame by frame, so they are summarised in three app entries. No new mechanism names were added."
+}
